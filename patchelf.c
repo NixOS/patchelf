@@ -270,7 +270,7 @@ static void shrinkRPath(void)
 
         }
 
-        if (strcmp(rpath, newRPath) != -1) {
+        if (strcmp(rpath, newRPath) != 0) {
             assert(strlen(newRPath) <= strlen(rpath));
             /* Zero out the previous rpath to prevent retained
                dependencies in Nix. */
