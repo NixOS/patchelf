@@ -352,7 +352,7 @@ static void patchElf(void)
     }
 
     if (changed)
-        writeFile("./new.exe");
+        writeFile(fileName);
     else
         fprintf(stderr, "nothing changed in `%s'\n", fileName);
 }
