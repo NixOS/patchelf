@@ -55,11 +55,12 @@ static void growFile(off_t newSize)
 }
 
 
-static void readFile(char * fileName)
+static void readFile(char * fileName, mode_t * fileMode)
 {
     struct stat st;
     if (stat(fileName, &st) != 0) error("stat");
     fileSize = st.st_size;
+    *fileMode = st.st_mode;
     maxSize = fileSize + 128 * 1024;
     
     contents = malloc(fileSize + maxSize);
@@ -74,14 +75,23 @@ static void readFile(char * fileName)
 }
 
 
-static void writeFile(char * fileName)
+static void writeFile(char * fileName, mode_t fileMode)
 {
-    int fd = open(fileName, O_CREAT | O_TRUNC | O_WRONLY, 0777);
+    char fileName2[PATH_MAX];
+    if (snprintf(fileName2, sizeof(fileName2),
+            "%s_patchelf_tmp", fileName) >= sizeof(fileName2))
+        error("file name too long");
+    
+    int fd = open(fileName2, O_CREAT | O_TRUNC | O_WRONLY, 0700);
     if (fd == -1) error("open");
 
     if (write(fd, contents, fileSize) != fileSize) error("write");
     
-    close(fd);
+    if (close(fd) != 0) error("close");
+
+    if (chmod(fileName2, fileMode) != 0) error("chmod");
+
+    if (rename(fileName2, fileName) != 0) error("rename");
 }
 
 
@@ -253,7 +263,9 @@ static void shrinkRPath(void)
             for (j = 0; j < nrNeededLibs; ++j)
                 if (!neededLibFound[j]) {
                     char libName[PATH_MAX];
-                    snprintf(libName, sizeof(libName), "%s/%s", dirName, neededLibs[j]);
+                    if (snprintf(libName, sizeof(libName), "%s/%s", dirName, neededLibs[j])
+                        >= sizeof(libName))
+                        error("file name too long");
                     struct stat st;
                     if (stat(libName, &st) == 0) {
                         neededLibFound[j] = 1;
@@ -286,7 +298,9 @@ static void patchElf(void)
 {
     fprintf(stderr, "patching ELF file `%s'\n", fileName);
 
-    readFile(fileName);
+    mode_t fileMode;
+    
+    readFile(fileName, &fileMode);
 
     /* Check the ELF header for basic validity. */
     if (fileSize < sizeof(Elf32_Ehdr)) error("missing ELF header");
@@ -352,7 +366,7 @@ static void patchElf(void)
     }
 
     if (changed)
-        writeFile(fileName);
+        writeFile(fileName, fileMode);
     else
         fprintf(stderr, "nothing changed in `%s'\n", fileName);
 }
