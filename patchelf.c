@@ -12,7 +12,7 @@
 #include <elf.h>
 
 
-static off_t fileSize, maxSize = 128 * 1024;
+static off_t fileSize, maxSize;
 static unsigned char * contents = 0;
 
 
@@ -38,6 +38,7 @@ static void readFile(char * fileName)
     struct stat st;
     if (stat(fileName, &st) != 0) error("stat");
     fileSize = st.st_size;
+    maxSize = fileSize + 128 * 1024;
     
     contents = malloc(fileSize + maxSize);
     if (!contents) abort();
@@ -94,7 +95,7 @@ static void patchElf(char * fileName)
         error("missing program header");
     
     if (hdr->e_shoff + hdr->e_shnum * hdr->e_shentsize > fileSize)
-        error("missing program header");
+        error("missing section header");
 
     /* Find the PT_INTERP segment. */
     Elf32_Phdr * phdr = (Elf32_Phdr *) (contents + hdr->e_phoff);
