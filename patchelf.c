@@ -12,8 +12,12 @@
 #include <elf.h>
 
 
+#define MAX_PHEADERS 128
+
+
 static off_t fileSize, maxSize;
 static unsigned char * contents = 0;
+static Elf32_Phdr phdrs[MAX_PHEADERS];
 
 
 static void error(char * msg)
@@ -63,8 +67,15 @@ static void writeFile(char * fileName)
 }
 
 
+static unsigned int roundUp(unsigned int n, unsigned int m)
+{
+    return ((n - 1) / m + 1) * m;
+}
+
+
 //char newInterpreter[] = "/lib/ld-linux.so.2";
-char newInterpreter[] = "/nix/store/42de22963bca8f234ad54b01118215df-glibc-2.3.2/lib/ld-linux.so.2";
+//char newInterpreter[] = "/nix/store/42de22963bca8f234ad54b01118215df-glibc-2.3.2/lib/ld-linux.so.2";
+char newInterpreter[] = "/nix/store/2ccde1632ef69ebdb5f21cd2222d19f2-glibc-2.3.3/lib/ld-linux.so.2";
 
 
 static void patchElf(char * fileName)
@@ -73,6 +84,7 @@ static void patchElf(char * fileName)
 
     readFile(fileName);
 
+    /* Check the ELF header for basic validity. */
     if (fileSize < sizeof(Elf32_Ehdr)) error("missing ELF header");
 
     Elf32_Ehdr * hdr = (Elf32_Ehdr *) contents;
@@ -92,28 +104,101 @@ static void patchElf(char * fileName)
         hdr->e_phnum, hdr->e_shnum);
 
     if (hdr->e_phoff + hdr->e_phnum * hdr->e_phentsize > fileSize)
-        error("missing program header");
+        error("missing program headers");
     
     if (hdr->e_shoff + hdr->e_shnum * hdr->e_shentsize > fileSize)
-        error("missing section header");
+        error("missing section headers");
 
-    /* Find the PT_INTERP segment. */
-    Elf32_Phdr * phdr = (Elf32_Phdr *) (contents + hdr->e_phoff);
+    if (hdr->e_phentsize != sizeof(Elf32_Phdr))
+        error("program headers have wrong size");
 
+    /* Copy the program headers. */
+    memcpy(phdrs, contents + hdr->e_phoff, hdr->e_phnum * sizeof(Elf32_Phdr));
+
+    /* Find the next free virtual address page so that we can add
+       segments without messing up other segments. */
     int i;
-    for (i = 0; i < hdr->e_phnum; ++i, ++phdr) {
+    unsigned int nextFreePage = 0;
+    for (i = 0; i < hdr->e_phnum; ++i) {
+        Elf32_Phdr * phdr = phdrs + i;
+        unsigned int end = roundUp(phdr->p_vaddr + phdr->p_memsz, 4096);
+        if (end > nextFreePage) nextFreePage = end;
+    }
+
+    fprintf(stderr, "next free page is %x\n", nextFreePage);
+
+    unsigned int firstPage = 0x08047000;
+    
+    /* Move the entire contents of the file one page further. */
+    unsigned int oldSize = fileSize;
+    growFile(fileSize + 4096);
+    memmove(contents + 4096, contents, oldSize);
+    memset(contents + sizeof(Elf32_Ehdr), 0, 4096 - sizeof(Elf32_Ehdr));
+
+    /* Update the ELF header. */
+    hdr->e_shoff += 4096;
+
+    /* Update the offsets in the section headers. */
+    for (i = 0; i < hdr->e_shnum; ++i) {
+        Elf32_Shdr * shdr = (Elf32_Shdr *) (contents + hdr->e_shoff) + i;
+        fprintf(stderr, "section type %d at %x\n",
+            shdr->sh_type, shdr->sh_offset);
+        shdr->sh_offset += 4096;
+    }
+    
+    /* Update the offsets in the program headers. */
+    for (i = 0; i < hdr->e_phnum; ++i) {
+        phdrs[i].p_offset += 4096;
+    }
+
+    /* Add a segment that maps the new program headers and PT_INTERP
+       segment into memory.  Otherwise glibc will choke. Add this
+       after the PT_PHDR segment but before all other PT_LOAD
+       segments. */
+    for (i = hdr->e_phnum; i > 1; --i)
+        phdrs[i] = phdrs[i - 1];
+
+    hdr->e_phnum++;
+    Elf32_Phdr * phdr = phdrs + 1;
+    phdr->p_type = PT_LOAD;
+    phdr->p_offset = 0;
+    phdr->p_vaddr = phdr->p_paddr = firstPage;
+    phdr->p_filesz = phdr->p_memsz = 4096;
+    phdr->p_flags = PF_R;
+    phdr->p_align = 4096;
+
+    unsigned int freeOffset =
+        sizeof(Elf32_Ehdr) + hdr->e_phnum * sizeof(Elf32_Phdr);
+
+    /* Find the PT_INTERP segment and replace it by a new one that
+       contains the new interpreter name. */
+    unsigned int interpOffset = 0, interpSize = 0, interpAddr = 0;
+    for (i = 0; i < hdr->e_phnum; ++i) {
+        Elf32_Phdr * phdr = phdrs + i;
         fprintf(stderr, "segment type %d at %x\n", phdr->p_type, phdr->p_offset);
         if (phdr->p_type == PT_INTERP) {
             fprintf(stderr, "found interpreter (%s)\n",
                 (char *) (contents + phdr->p_offset));
-            unsigned int segLen = strlen(newInterpreter) + 1;
-            phdr->p_offset = fileSize;
-            growFile(phdr->p_offset + segLen);
-            phdr->p_vaddr = phdr->p_paddr = 0x08048000 + phdr->p_offset;
-            phdr->p_filesz = phdr->p_memsz = segLen;
-            strncpy(contents + phdr->p_offset, newInterpreter, segLen);
+            interpOffset = freeOffset;
+            interpSize = strlen(newInterpreter) + 1;
+            interpAddr = firstPage + interpOffset % 4096;
+            phdr->p_offset = interpOffset;
+            growFile(phdr->p_offset + interpSize);
+            phdr->p_vaddr = phdr->p_paddr = interpAddr;
+            phdr->p_filesz = phdr->p_memsz = interpSize;
+            strncpy(contents + interpOffset,
+                newInterpreter, interpSize);
         }
     }
+    
+    /* Rewrite the program header at the top of the file. */
+    hdr->e_phoff = sizeof(Elf32_Ehdr);
+    assert(phdrs[0].p_type == PT_PHDR);
+    phdrs[0].p_offset = hdr->e_phoff;
+    phdrs[0].p_vaddr = phdrs[0].p_paddr = firstPage + hdr->e_phoff % 4096;
+    phdrs[0].p_filesz = phdrs[0].p_memsz = hdr->e_phnum * sizeof(Elf32_Phdr);
+    growFile(hdr->e_phoff + hdr->e_phnum * sizeof(Elf32_Phdr));
+    memcpy(contents + hdr->e_phoff, phdrs, hdr->e_phnum * sizeof(Elf32_Phdr));
 
     writeFile("./new.exe");
 }
