@@ -173,6 +173,13 @@ static void setInterpreter(void)
 }
 
 
+static void concat(char * dst, char * src)
+{
+    if (*dst) strcat(dst, ":");
+    strcat(dst, src);
+}
+
+
 static void shrinkRPath(void)
 {
     /* Shrink the RPATH. */
@@ -254,7 +261,13 @@ static void shrinkRPath(void)
             dirName[end - pos] = 0;
             if (*end == ':') ++end;
             pos = end;
-            if (*dirName != '/') continue;
+
+            /* Non-absolute entries are allowed (e.g., the special
+               "$ORIGIN" hack). */
+            if (*dirName != '/') {
+                concat(newRPath, dirName);
+                continue;
+            }
 
             /* For each library that we haven't found yet, see if it
                exists in this directory. */
@@ -275,11 +288,8 @@ static void shrinkRPath(void)
 
             if (!libFound)
                 fprintf(stderr, "removing directory `%s' from RPATH\n", dirName);
-            else {
-                if (*newRPath) strcat(newRPath, ":");
-                strcat(newRPath, dirName);
-            }
-
+            else
+                concat(newRPath, dirName);
         }
 
         if (strcmp(rpath, newRPath) != 0) {
