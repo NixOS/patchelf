@@ -13,11 +13,13 @@
 
 
 #define MAX_PHEADERS 128
+#define MAX_SHEADERS 128
 
 
 static off_t fileSize, maxSize;
 static unsigned char * contents = 0;
 static Elf32_Phdr phdrs[MAX_PHEADERS];
+static Elf32_Shdr shdrs[MAX_SHEADERS];
 
 
 static void error(char * msg)
@@ -74,8 +76,8 @@ static unsigned int roundUp(unsigned int n, unsigned int m)
 
 
 //char newInterpreter[] = "/lib/ld-linux.so.2";
-//char newInterpreter[] = "/nix/store/42de22963bca8f234ad54b01118215df-glibc-2.3.2/lib/ld-linux.so.2";
-char newInterpreter[] = "/nix/store/2ccde1632ef69ebdb5f21cd2222d19f2-glibc-2.3.3/lib/ld-linux.so.2";
+char newInterpreter[] = "/nix/store/42de22963bca8f234ad54b01118215df-glibc-2.3.2/lib/ld-linux.so.2";
+//char newInterpreter[] = "/nix/store/2ccde1632ef69ebdb5f21cd2222d19f2-glibc-2.3.3/lib/ld-linux.so.2";
 
 
 static void patchElf(char * fileName)
@@ -112,8 +114,9 @@ static void patchElf(char * fileName)
     if (hdr->e_phentsize != sizeof(Elf32_Phdr))
         error("program headers have wrong size");
 
-    /* Copy the program headers. */
+    /* Copy the program and section headers. */
     memcpy(phdrs, contents + hdr->e_phoff, hdr->e_phnum * sizeof(Elf32_Phdr));
+    memcpy(shdrs, contents + hdr->e_shoff, hdr->e_shnum * sizeof(Elf32_Shdr));
 
     /* Find the next free virtual address page so that we can add
        segments without messing up other segments. */
@@ -140,10 +143,7 @@ static void patchElf(char * fileName)
 
     /* Update the offsets in the section headers. */
     for (i = 0; i < hdr->e_shnum; ++i) {
-        Elf32_Shdr * shdr = (Elf32_Shdr *) (contents + hdr->e_shoff) + i;
-        fprintf(stderr, "section type %d at %x\n",
-            shdr->sh_type, shdr->sh_offset);
-        shdr->sh_offset += 4096;
+        shdrs[i].sh_offset += 4096;
     }
     
     /* Update the offsets in the program headers. */
@@ -151,13 +151,12 @@ static void patchElf(char * fileName)
         phdrs[i].p_offset += 4096;
     }
 
-    /* Add a segment that maps the new program headers and PT_INTERP
-       segment into memory.  Otherwise glibc will choke. Add this
-       after the PT_PHDR segment but before all other PT_LOAD
+    /* Add a segment that maps the new program/section headers and
+       PT_INTERP segment into memory.  Otherwise glibc will choke. Add
+       this after the PT_PHDR segment but before all other PT_LOAD
        segments. */
     for (i = hdr->e_phnum; i > 1; --i)
         phdrs[i] = phdrs[i - 1];
-
     hdr->e_phnum++;
     Elf32_Phdr * phdr = phdrs + 1;
     phdr->p_type = PT_LOAD;
@@ -167,8 +166,7 @@ static void patchElf(char * fileName)
     phdr->p_flags = PF_R;
     phdr->p_align = 4096;
 
-    unsigned int freeOffset =
-        sizeof(Elf32_Ehdr) + hdr->e_phnum * sizeof(Elf32_Phdr);
+    unsigned int freeOffset = sizeof(Elf32_Ehdr);
 
     /* Find the PT_INTERP segment and replace it by a new one that
        contains the new interpreter name. */
@@ -181,6 +179,7 @@ static void patchElf(char * fileName)
                 (char *) (contents + phdr->p_offset));
             interpOffset = freeOffset;
             interpSize = strlen(newInterpreter) + 1;
+            freeOffset += roundUp(interpSize, 4);
             interpAddr = firstPage + interpOffset % 4096;
             phdr->p_offset = interpOffset;
             growFile(phdr->p_offset + interpSize);
@@ -191,15 +190,22 @@ static void patchElf(char * fileName)
         }
     }
     
-    /* Rewrite the program header at the top of the file. */
-    hdr->e_phoff = sizeof(Elf32_Ehdr);
+    /* Rewrite the program header table. */
+    hdr->e_phoff = freeOffset;
+    freeOffset += hdr->e_phnum * sizeof(Elf32_Phdr);
     assert(phdrs[0].p_type == PT_PHDR);
     phdrs[0].p_offset = hdr->e_phoff;
     phdrs[0].p_vaddr = phdrs[0].p_paddr = firstPage + hdr->e_phoff % 4096;
     phdrs[0].p_filesz = phdrs[0].p_memsz = hdr->e_phnum * sizeof(Elf32_Phdr);
-    growFile(hdr->e_phoff + hdr->e_phnum * sizeof(Elf32_Phdr));
     memcpy(contents + hdr->e_phoff, phdrs, hdr->e_phnum * sizeof(Elf32_Phdr));
 
+    /* Rewrite the section header table. */
+    hdr->e_shoff = freeOffset;
+    freeOffset += hdr->e_shnum * sizeof(Elf32_Shdr);
+    memcpy(contents + hdr->e_shoff, shdrs, hdr->e_shnum * sizeof(Elf32_Shdr));
+
+    if (freeOffset > 4096) error("ran out of space in page 0");
+    
     writeFile("./new.exe");
 }
 
