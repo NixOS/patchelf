@@ -403,7 +403,7 @@ int main(int argc, char * * argv)
 
     if (i == argc) error("missing filename");
     fileName = argv[i];
-    
+
     patchElf();
 
     return 0;
