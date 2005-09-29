@@ -15,7 +15,7 @@ main.o: main.c
 	$(CC) -fpic -o main.o -c main.c
 
 libfoo.so: foo.o libbar.so
-	$(CC) -shared -o libfoo.so foo.o -L . -lbar -Wl,-rpath,/no-such-path
+	NIX_DONT_SET_RPATH=1 $(CC) -shared -o libfoo.so foo.o -L . -lbar -Wl,-rpath,/no-such-path
 
 foo.o: foo.c
 	$(CC) -fpic -o foo.o -c foo.c
