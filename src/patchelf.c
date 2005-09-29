@@ -16,6 +16,7 @@
 static char * fileName = 0;
 static char * newInterpreter = 0;
 static int doShrinkRPath = 0;
+static int printInterpreter = 0;
 
 
 #define MAX_PHEADERS 128
@@ -148,12 +149,16 @@ static void setInterpreter(void)
 {
     /* Find the PT_INTERP segment and replace it by a new one that
        contains the new interpreter name. */
-    if (newInterpreter && hdr->e_type == ET_EXEC) {
+    if ((newInterpreter || printInterpreter) && hdr->e_type == ET_EXEC) {
         shiftFile();
         int i;
         for (i = 0; i < hdr->e_phnum; ++i) {
             Elf32_Phdr * phdr = phdrs + i;
             if (phdr->p_type == PT_INTERP) {
+                if (printInterpreter) {
+                    printf("%s\n", (char *) (contents + phdr->p_offset));
+                    exit(0);
+                }
                 fprintf(stderr, "changing interpreter from `%s' to `%s'\n",
                     (char *) (contents + phdr->p_offset), newInterpreter);
                 unsigned int interpOffset = freeOffset;
@@ -306,7 +311,8 @@ static void shrinkRPath(void)
 
 static void patchElf(void)
 {
-    fprintf(stderr, "patching ELF file `%s'\n", fileName);
+    if (!printInterpreter)
+        fprintf(stderr, "patching ELF file `%s'\n", fileName);
 
     mode_t fileMode;
     
@@ -385,7 +391,11 @@ static void patchElf(void)
 int main(int argc, char * * argv)
 {
     if (argc <= 1) {
-        fprintf(stderr, "syntax: %s [--interpreter FILENAME] [--shrink-rpath] FILENAME\n", argv[0]);
+        fprintf(stderr, "syntax: %s\n\
+  [--interpreter FILENAME]\n\
+  [--print-interpreter]\n\
+  [--shrink-rpath]\n\
+  FILENAME\n", argv[0]);
         return 1;
     }
 
@@ -394,6 +404,9 @@ int main(int argc, char * * argv)
         if (strcmp(argv[i], "--interpreter") == 0) {
             if (++i == argc) error("missing argument");
             newInterpreter = argv[i];
+        }
+        else if (strcmp(argv[i], "--print-interpreter") == 0) {
+            printInterpreter = 1;
         }
         else if (strcmp(argv[i], "--shrink-rpath") == 0) {
             doShrinkRPath = 1;
