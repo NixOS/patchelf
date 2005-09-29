@@ -1,0 +1,6 @@
+Bug in Linux kernel, in fs/binfmt_elf.c:
+
+  NEW_AUX_ENT( 3, AT_PHDR, load_addr + exec->e_phoff);
+
+This is wrong since the actual virtual address of the program headers
+may be somewhere else.
