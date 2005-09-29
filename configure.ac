@@ -1,5 +1,5 @@
 AC_INIT(patchelf, "0.1")
-AC_CONFIG_SRCDIR(patchelf.c)
+AC_CONFIG_SRCDIR(Makefile.am)
 AM_INIT_AUTOMAKE
 
 # Change to `1' to produce a `stable' release (i.e., the `preREVISION'
@@ -16,5 +16,5 @@ if test "$STABLE" != "1"; then
 fi
 
 AC_PROG_CC
-AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile tests/Makefile])
 AC_OUTPUT

@@ -1,4 +1,1 @@
-bin_PROGRAMS = patchelf
-
-patchelf_SOURCES = patchelf.c
-
+SUBDIRS = src tests
