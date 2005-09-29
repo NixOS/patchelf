@@ -25,3 +25,6 @@ bar.o: bar.c
 
 clean-local:
 	$(RM) *.o libfoo.so libbar.so main
+
+
+EXTRA_DIST = main.c foo.c bar.c $(TESTS)
