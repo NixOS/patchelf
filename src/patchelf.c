@@ -16,6 +16,7 @@
 static char * fileName = 0;
 static char * newInterpreter = 0;
 static int doShrinkRPath = 0;
+static int printRPath = 0;
 static int printInterpreter = 0;
 
 
@@ -188,7 +189,7 @@ static void concat(char * dst, char * src)
 static void shrinkRPath(void)
 {
     /* Shrink the RPATH. */
-    if (doShrinkRPath) {
+    if (doShrinkRPath || printRPath) {
 
         /* Find the .dynamic section. */
         int i, dynSec = 0;
@@ -241,6 +242,11 @@ static void shrinkRPath(void)
             }
         }
 
+        if (printRPath) {
+            printf("%s\n", rpath ? rpath : "");
+            exit(0);
+        }
+        
         if (!rpath) {
             fprintf(stderr, "no RPATH to shrink\n");
             return;
@@ -311,7 +317,7 @@ static void shrinkRPath(void)
 
 static void patchElf(void)
 {
-    if (!printInterpreter)
+    if (!printInterpreter && !printRPath)
         fprintf(stderr, "patching ELF file `%s'\n", fileName);
 
     mode_t fileMode;
@@ -395,6 +401,7 @@ int main(int argc, char * * argv)
   [--interpreter FILENAME]\n\
   [--print-interpreter]\n\
   [--shrink-rpath]\n\
+  [--print-rpath]\n\
   FILENAME\n", argv[0]);
         return 1;
     }
@@ -410,6 +417,9 @@ int main(int argc, char * * argv)
         }
         else if (strcmp(argv[i], "--shrink-rpath") == 0) {
             doShrinkRPath = 1;
+        }
+        else if (strcmp(argv[i], "--print-rpath") == 0) {
+            printRPath = 1;
         }
         else break;
     }
