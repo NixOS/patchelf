@@ -1,8 +1,11 @@
-check_PROGRAMS = main
+check_PROGRAMS = main simple
 
-TESTS = plain-run.sh $(XFAIL_TESTS)
+TESTS = plain-run.sh shrink.sh set-interpreter.sh $(XFAIL_TESTS)
 
 XFAIL_TESTS = plain-fail.sh
+
+
+simple_SOURCES = simple.c
 
 
 main: main.o libfoo.so
@@ -12,7 +15,7 @@ main.o: main.c
 	$(CC) -fpic -o main.o -c main.c
 
 libfoo.so: foo.o libbar.so
-	$(CC) -shared -o libfoo.so foo.o -L . -lbar
+	$(CC) -shared -o libfoo.so foo.o -L . -lbar -Wl,-rpath,/no-such-path
 
 foo.o: foo.c
 	$(CC) -fpic -o foo.o -c foo.c
