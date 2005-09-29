@@ -1,6 +1,6 @@
 check_PROGRAMS = main simple
 
-TESTS = plain-run.sh shrink.sh set-interpreter.sh $(XFAIL_TESTS)
+TESTS = plain-run.sh shrink.sh set-interpreter.sh set-rpath.sh $(XFAIL_TESTS)
 
 XFAIL_TESTS = plain-fail.sh
 
