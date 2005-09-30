@@ -185,7 +185,7 @@ static void rewriteSections()
 
     for (ReplacedSections::iterator i = replacedSections.begin();
          i != replacedSections.end(); ++i)
-        fprintf(stderr, "replacing section `%s' with size `%d', content `%s'\n",
+        fprintf(stderr, "replacing section `%s' with size %d, content `%s'\n",
             i->first.c_str(), i->second.size(), i->second.c_str());
 
     
@@ -215,7 +215,8 @@ static void rewriteSections()
         string sectionName = getSectionName(shdr);
         fprintf(stderr, "looking at section `%s'\n", sectionName.c_str());
         if (replacedSections.find(sectionName) != replacedSections.end()) continue;
-        if (shdr.sh_type == SHT_PROGBITS && sectionName != ".interp") {
+        if (true /* XXX shdr.sh_type == SHT_PROGBITS && sectionName !=
+               ".interp" */) {
             startOffset = shdr.sh_offset;
             startAddr = shdr.sh_addr;
             lastReplaced = i - 1;
@@ -288,13 +289,25 @@ static void rewriteSections()
         shdr.sh_addralign = 4;
 
         /* If this is the .interp section, then the PT_INTERP segment
-           has to be synced with it. */
-        for (int j = 0; j < phdrs.size(); ++j)
-            if (phdrs[j].p_type == PT_INTERP) {
-                phdrs[j].p_offset = shdr.sh_offset;
-                phdrs[j].p_vaddr = phdrs[j].p_paddr = shdr.sh_addr;
-                phdrs[j].p_filesz = phdrs[j].p_memsz = shdr.sh_size;
-            }
+           has to be sync'ed with it. */
+        if (i->first == ".interp") {
+            for (int j = 0; j < phdrs.size(); ++j)
+                if (phdrs[j].p_type == PT_INTERP) {
+                    phdrs[j].p_offset = shdr.sh_offset;
+                    phdrs[j].p_vaddr = phdrs[j].p_paddr = shdr.sh_addr;
+                    phdrs[j].p_filesz = phdrs[j].p_memsz = shdr.sh_size;
+                }
+        }
+
+        /* If this is the .dynstr section, then the .dynamic section
+           has to be sync'ed with it. */
+        if (i->first == ".dynstr") {
+            Elf32_Shdr & shdrDynamic = findSection(".dynamic");
+            Elf32_Dyn * dyn = (Elf32_Dyn *) (contents + shdrDynamic.sh_offset);
+            for ( ; dyn->d_tag != DT_NULL; dyn++)
+                if (dyn->d_tag == DT_STRTAB)
+                    dyn->d_un.d_ptr = shdr.sh_addr;
+        }
             
         curOff += roundUp(i->second.size(), 4);
     }
@@ -369,10 +382,12 @@ static void modifyRPath(RPathOp op, string newRPath)
     /* Walk through the dynamic section, look for the RPATH entry. */
     static vector<string> neededLibs;
     dyn = (Elf32_Dyn *) (contents + shdrDynamic.sh_offset);
+    Elf32_Dyn * dynRPath = 0;
     Elf32_Dyn * rpathEntry = 0;
     char * rpath = 0;
     for ( ; dyn->d_tag != DT_NULL; dyn++) {
         if (dyn->d_tag == DT_RPATH) {
+            dynRPath = dyn;
             rpathEntry = dyn;
             rpath = strTab + dyn->d_un.d_val;
         }
@@ -437,14 +452,17 @@ static void modifyRPath(RPathOp op, string newRPath)
     }
 
     
-    if (string(rpath) == newRPath) return;
+    if (string(rpath ? rpath : "") == newRPath) return;
 
     changed = true;
     
     /* Zero out the previous rpath to prevent retained
        dependencies in Nix. */
-    unsigned int rpathSize = strlen(rpath);
-    memset(rpath, 0, rpathSize);
+    unsigned int rpathSize = 0;
+    if (rpath) {
+        rpathSize = strlen(rpath);
+        memset(rpath, 'X', rpathSize);
+    }
 
     fprintf(stderr, "new rpath is `%s'\n", newRPath.c_str());
     
@@ -453,7 +471,16 @@ static void modifyRPath(RPathOp op, string newRPath)
         return;
     }
 
+    /* Grow the .dynstr section to make room for the new RPATH. */
     fprintf(stderr, "rpath is too long, resizing...\n");
+
+    string & newDynStr = replaceSection(".dynstr",
+        shdrDynStr.sh_size + newRPath.size() + 1);
+    setSubstr(newDynStr, shdrDynStr.sh_size, newRPath + '\0');
+
+    /* Update the DT_RPATH entry. */
+    assert(dynRPath != 0);
+    dynRPath->d_un.d_val = shdrDynStr.sh_size;
 }
 
 
