@@ -1,5 +1,7 @@
 #include <string>
 #include <vector>
+#include <map>
+#include <algorithm>
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -18,13 +20,10 @@
 using namespace std;
 
 
+const unsigned int pageSize = 4096;
+
+
 static string fileName;
-static string newInterpreter;
-
-static bool doShrinkRPath = false;
-static bool printRPath = false;
-static bool printInterpreter = false;
-
 
 static off_t fileSize, maxSize;
 static unsigned char * contents = 0;
@@ -36,6 +35,13 @@ static unsigned int firstPage;
 
 static bool changed = false;
 static bool rewriteHeaders = false;
+
+typedef string SectionName;
+typedef map<SectionName, string> ReplacedSections;
+
+static ReplacedSections replacedSections;
+
+static string sectionNames; /* content of the .shstrtab section */
 
 
 static void error(string msg)
@@ -99,26 +105,26 @@ static unsigned int roundUp(unsigned int n, unsigned int m)
 }
 
 
-static void shiftFile(void)
+static void shiftFile(unsigned int extraPages)
 {
     /* Move the entire contents of the file one page further. */
     unsigned int oldSize = fileSize;
-    growFile(fileSize + 4096);
-    memmove(contents + 4096, contents, oldSize);
-    memset(contents + sizeof(Elf32_Ehdr), 0, 4096 - sizeof(Elf32_Ehdr));
+    growFile(fileSize + extraPages * pageSize);
+    memmove(contents + extraPages * pageSize, contents, oldSize);
+    memset(contents + sizeof(Elf32_Ehdr), 0, extraPages * pageSize - sizeof(Elf32_Ehdr));
 
     /* Update the ELF header. */
-    hdr->e_shoff += 4096;
+    hdr->e_shoff += extraPages * pageSize;
 
     /* Update the offsets in the section headers. */
     int i;
     for (i = 0; i < hdr->e_shnum; ++i) {
-        shdrs[i].sh_offset += 4096;
+        shdrs[i].sh_offset += extraPages * pageSize;
     }
     
     /* Update the offsets in the program headers. */
     for (i = 0; i < hdr->e_phnum; ++i) {
-        phdrs[i].p_offset += 4096;
+        phdrs[i].p_offset += extraPages * pageSize;
     }
 
     /* Add a segment that maps the new program/section headers and
@@ -132,8 +138,9 @@ static void shiftFile(void)
     Elf32_Phdr & phdr = phdrs[1];
     phdr.p_type = PT_LOAD;
     phdr.p_offset = 0;
+    firstPage = 0x08047000; /* !!! */
     phdr.p_vaddr = phdr.p_paddr = firstPage;
-    phdr.p_filesz = phdr.p_memsz = 4096;
+    phdr.p_filesz = phdr.p_memsz = extraPages * pageSize;
     phdr.p_flags = PF_R;
     phdr.p_align = 4096;
 
@@ -143,7 +150,143 @@ static void shiftFile(void)
 }
 
 
-static void setInterpreter(void)
+static void checkPointer(void * p, unsigned int size)
+{
+    unsigned char * q = (unsigned char *) p;
+    assert(q >= contents && q + size <= contents + fileSize);
+}
+
+
+static string getSectionName(const Elf32_Shdr & shdr)
+{
+    return string(sectionNames.c_str() + shdr.sh_name);
+}
+
+
+static Elf32_Shdr & findSection(const SectionName & sectionName)
+{
+    for (unsigned int i = 1; i < hdr->e_shnum; ++i)
+        if (getSectionName(shdrs[i]) == sectionName) return shdrs[i];
+    error("cannot find section");
+}
+
+
+static string & replaceSection(const SectionName & sectionName,
+    unsigned int size)
+{
+    ReplacedSections::iterator i = replacedSections.find(sectionName);
+    string s;
+    
+    if (i != replacedSections.end()) {
+        s = string(i->second);
+    } else {
+        Elf32_Shdr & shdr = findSection(sectionName);
+        s = string((char *) contents + shdr.sh_offset, shdr.sh_size);
+    }
+    
+    s.resize(size);
+    replacedSections[sectionName] = s;
+
+    return replacedSections[sectionName];
+}
+
+
+static void rewriteSections()
+{
+    if (replacedSections.empty()) return;
+
+    for (ReplacedSections::iterator i = replacedSections.begin();
+         i != replacedSections.end(); ++i)
+        fprintf(stderr, "replacing section `%s' with size `%d', content `%s'\n",
+            i->first.c_str(), i->second.size(), i->second.c_str());
+
+    /* What is the index of the last replaced section? */
+    unsigned int lastReplaced = 0;
+    for (unsigned int i = 1; i < hdr->e_shnum; ++i) {
+        string sectionName = getSectionName(shdrs[i]);
+        if (replacedSections.find(sectionName) != replacedSections.end()) {
+            printf("using replaced section `%s'\n", sectionName.c_str());
+            lastReplaced = i;
+        }
+    }
+
+    assert(lastReplaced != 0);
+
+    fprintf(stderr, "last replaced is %d\n", lastReplaced);
+    
+    /* Try to replace all section before that, as far as possible.
+       Stop when we reach an irreplacable section (such as one of type
+       SHT_PROGBITS).  These cannot be moved in virtual address space
+       since that would invalidate absolute references to them. */
+    assert(lastReplaced + 1 < shdrs.size()); /* !!! I'm lazy. */
+    off_t startOffset = shdrs[lastReplaced + 1].sh_offset;
+    for (unsigned int i = 1; i <= lastReplaced; ++i) {
+        Elf32_Shdr & shdr(shdrs[i]);
+        string sectionName = getSectionName(shdr);
+        fprintf(stderr, "looking at section `%s'\n", sectionName.c_str());
+        if (replacedSections.find(sectionName) != replacedSections.end()) continue;
+        if (shdr.sh_type == SHT_PROGBITS && sectionName != ".interp") {
+            startOffset = shdr.sh_addr;
+            lastReplaced = i - 1;
+            break;
+        } else {
+            fprintf(stderr, "replacing section `%s' which is in the way\n", sectionName.c_str());
+            replaceSection(sectionName, shdr.sh_size);
+        }
+    }
+
+    fprintf(stderr, "first reserved offset is %d\n", startOffset);
+
+    /* Right now we assume that the section headers are somewhere near
+       the end, which appears to be the case most of the time.
+       Therefore its not accidentally overwritten by the replaced
+       sections. !!!  Fix this. */
+    assert(hdr->e_shoff >= startOffset);
+
+    /* Compute the total space needed for the replaced sections, the
+       ELF header, and the program headers. */
+    off_t neededSpace = sizeof(Elf32_Ehdr) + phdrs.size() * sizeof(Elf32_Phdr);
+    for (ReplacedSections::iterator i = replacedSections.begin();
+         i != replacedSections.end(); ++i)
+        neededSpace += roundUp(i->second.size(), 4);
+
+    fprintf(stderr, "needed space is %d\n", neededSpace);
+
+    /* If we need more space at the start of the file, then grow the
+       file by the minimum number of pages and adjust internal
+       offsets. */
+    if (neededSpace > startOffset) {
+
+        /* We also need an additional program header, so adjust for that. */
+        if (neededSpace > startOffset) neededSpace += sizeof(Elf32_Phdr);
+        fprintf(stderr, "needed space is %d\n", neededSpace);
+        
+        unsigned int neededPages = roundUp(neededSpace - startOffset, pageSize) / pageSize;
+        fprintf(stderr, "needed pages is %d\n", neededPages);
+
+        shiftFile(neededPages);
+        
+    }
+}
+
+
+static void setSubstr(string & s, unsigned int pos, const string & t)
+{
+    assert(pos + t.size() <= s.size());
+    copy(t.begin(), t.end(), s.begin() + pos);
+}
+
+
+static void setInterpreter(const string & newInterpreter)
+{
+    string & section = replaceSection(".interp", newInterpreter.size() + 1);
+    setSubstr(section, 0, newInterpreter + '\0');
+    changed = true;
+}
+
+
+#if 0
+static void setInterpreter()
 {
     /* Find the PT_INTERP segment and replace it by a new one that
        contains the new interpreter name. */
@@ -183,7 +326,7 @@ static void concatToRPath(string & rpath, const string & path)
 }
 
 
-static void shrinkRPath(void)
+static void shrinkRPath()
 {
     /* Shrink the RPATH. */
     if (doShrinkRPath || printRPath) {
@@ -301,17 +444,11 @@ static void shrinkRPath(void)
         }
     }
 }
+#endif
 
 
-static void patchElf(void)
+static void parseElf()
 {
-    if (!printInterpreter && !printRPath)
-        fprintf(stderr, "patching ELF file `%s'\n", fileName.c_str());
-
-    mode_t fileMode;
-    
-    readFile(fileName, &fileMode);
-
     /* Check the ELF header for basic validity. */
     if (fileSize < sizeof(Elf32_Ehdr)) error("missing ELF header");
 
@@ -344,6 +481,52 @@ static void patchElf(void)
     for (int i = 0; i < hdr->e_shnum; ++i)
         shdrs.push_back(* ((Elf32_Shdr *) (contents + hdr->e_shoff) + i));
 
+    /* Get the section header string table section (".shstrtab").  Its
+       index in the section header table is given by e_shstrndx field
+       of the ELF header. */
+    unsigned int shstrtabIndex = hdr->e_shstrndx;
+    assert(shstrtabIndex < shdrs.size());
+    unsigned int shstrtabSize = shdrs[shstrtabIndex].sh_size;
+    char * shstrtab = (char * ) contents + shdrs[shstrtabIndex].sh_offset;
+    checkPointer(shstrtab, shstrtabSize);
+
+    assert(shstrtabSize > 0);
+    assert(shstrtab[shstrtabSize - 1] == 0);
+
+    sectionNames = string(shstrtab, shstrtabSize);
+}
+
+
+static string newInterpreter;
+
+static bool doShrinkRPath = false;
+static bool printRPath = false;
+static bool printInterpreter = false;
+
+
+static void patchElf()
+{
+    if (!printInterpreter && !printRPath)
+        fprintf(stderr, "patching ELF file `%s'\n", fileName.c_str());
+
+    mode_t fileMode;
+    
+    readFile(fileName, &fileMode);
+
+    parseElf();
+
+    /* Do what we're supposed to do. */
+    if (newInterpreter != "")
+        setInterpreter(newInterpreter);
+
+    rewriteSections();
+
+    if (changed)
+        writeFile(fileName, fileMode);
+    else
+        fprintf(stderr, "nothing changed in `%s'\n", fileName.c_str());
+    
+#if 0    
     /* Find the next free virtual address page so that we can add
        segments without messing up other segments. */
     int i;
@@ -381,11 +564,7 @@ static void patchElf(void)
 
         if (freeOffset > 4096) error("ran out of space in page 0");
     }
-
-    if (changed)
-        writeFile(fileName, fileMode);
-    else
-        fprintf(stderr, "nothing changed in `%s'\n", fileName.c_str());
+#endif
 }
 
 
