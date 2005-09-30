@@ -260,13 +260,18 @@ static void rewriteSections()
         if (neededPages * pageSize > startPage)
             error("virtual address space underrun!");
         startPage -= neededPages * pageSize;
+        startOffset += neededPages * pageSize;
 
         shiftFile(neededPages, startPage);
     }
 
 
-    /* Write out the replaced sections. */
+    /* Clear out the free space. */
     Elf32_Off curOff = sizeof(Elf32_Ehdr) + phdrs.size() * sizeof(Elf32_Phdr);
+    memset(contents + curOff, 0, startOffset - curOff);
+    
+
+    /* Write out the replaced sections. */
     for (ReplacedSections::iterator i = replacedSections.begin();
          i != replacedSections.end(); ++i)
     {
