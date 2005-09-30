@@ -30,11 +30,8 @@ static unsigned char * contents = 0;
 static Elf32_Ehdr * hdr;
 static vector<Elf32_Phdr> phdrs;
 static vector<Elf32_Shdr> shdrs;
-static unsigned int freeOffset;
-static unsigned int firstPage;
 
 static bool changed = false;
-static bool rewriteHeaders = false;
 
 typedef string SectionName;
 typedef map<SectionName, string> ReplacedSections;
@@ -105,48 +102,39 @@ static unsigned int roundUp(unsigned int n, unsigned int m)
 }
 
 
-static void shiftFile(unsigned int extraPages)
+static void shiftFile(unsigned int extraPages, Elf32_Addr startPage)
 {
-    /* Move the entire contents of the file one page further. */
+    /* Move the entire contents of the file `extraPages' pages
+       further. */
     unsigned int oldSize = fileSize;
+    unsigned int shift = extraPages * pageSize;
     growFile(fileSize + extraPages * pageSize);
     memmove(contents + extraPages * pageSize, contents, oldSize);
-    memset(contents + sizeof(Elf32_Ehdr), 0, extraPages * pageSize - sizeof(Elf32_Ehdr));
+    memset(contents + sizeof(Elf32_Ehdr), 0, shift - sizeof(Elf32_Ehdr));
 
-    /* Update the ELF header. */
-    hdr->e_shoff += extraPages * pageSize;
-
+    /* Adjust the ELF header. */
+    hdr->e_phoff = sizeof(Elf32_Ehdr);
+    hdr->e_shoff += shift;
+    
     /* Update the offsets in the section headers. */
-    int i;
-    for (i = 0; i < hdr->e_shnum; ++i) {
-        shdrs[i].sh_offset += extraPages * pageSize;
-    }
+    for (int i = 0; i < hdr->e_shnum; ++i)
+        shdrs[i].sh_offset += shift;
     
     /* Update the offsets in the program headers. */
-    for (i = 0; i < hdr->e_phnum; ++i) {
-        phdrs[i].p_offset += extraPages * pageSize;
-    }
+    for (int i = 0; i < hdr->e_phnum; ++i)
+        phdrs[i].p_offset += shift;
 
     /* Add a segment that maps the new program/section headers and
-       PT_INTERP segment into memory.  Otherwise glibc will choke. Add
-       this after the PT_PHDR segment but before all other PT_LOAD
-       segments. */
+       PT_INTERP segment into memory.  Otherwise glibc will choke. */
     phdrs.resize(hdr->e_phnum + 1);
-    for (i = hdr->e_phnum; i > 1; --i)
-        phdrs[i] = phdrs[i - 1];
     hdr->e_phnum++;
-    Elf32_Phdr & phdr = phdrs[1];
+    Elf32_Phdr & phdr = phdrs[hdr->e_phnum - 1];
     phdr.p_type = PT_LOAD;
     phdr.p_offset = 0;
-    firstPage = 0x08047000; /* !!! */
-    phdr.p_vaddr = phdr.p_paddr = firstPage;
-    phdr.p_filesz = phdr.p_memsz = extraPages * pageSize;
+    phdr.p_vaddr = phdr.p_paddr = startPage;
+    phdr.p_filesz = phdr.p_memsz = shift;
     phdr.p_flags = PF_R;
     phdr.p_align = 4096;
-
-    freeOffset = sizeof(Elf32_Ehdr);
-
-    rewriteHeaders = true;
 }
 
 
@@ -200,6 +188,7 @@ static void rewriteSections()
         fprintf(stderr, "replacing section `%s' with size `%d', content `%s'\n",
             i->first.c_str(), i->second.size(), i->second.c_str());
 
+    
     /* What is the index of the last replaced section? */
     unsigned int lastReplaced = 0;
     for (unsigned int i = 1; i < hdr->e_shnum; ++i) {
@@ -220,13 +209,15 @@ static void rewriteSections()
        since that would invalidate absolute references to them. */
     assert(lastReplaced + 1 < shdrs.size()); /* !!! I'm lazy. */
     off_t startOffset = shdrs[lastReplaced + 1].sh_offset;
+    Elf32_Addr startAddr = shdrs[lastReplaced + 1].sh_addr;
     for (unsigned int i = 1; i <= lastReplaced; ++i) {
         Elf32_Shdr & shdr(shdrs[i]);
         string sectionName = getSectionName(shdr);
         fprintf(stderr, "looking at section `%s'\n", sectionName.c_str());
         if (replacedSections.find(sectionName) != replacedSections.end()) continue;
         if (shdr.sh_type == SHT_PROGBITS && sectionName != ".interp") {
-            startOffset = shdr.sh_addr;
+            startOffset = shdr.sh_offset;
+            startAddr = shdr.sh_addr;
             lastReplaced = i - 1;
             break;
         } else {
@@ -235,7 +226,9 @@ static void rewriteSections()
         }
     }
 
-    fprintf(stderr, "first reserved offset is %d\n", startOffset);
+    fprintf(stderr, "first reserved offset/addr is %d/0x%x\n",
+        startOffset, startAddr);
+    Elf32_Addr startPage = startAddr / pageSize * pageSize;
 
     /* Right now we assume that the section headers are somewhere near
        the end, which appears to be the case most of the time.
@@ -243,6 +236,7 @@ static void rewriteSections()
        sections. !!!  Fix this. */
     assert(hdr->e_shoff >= startOffset);
 
+    
     /* Compute the total space needed for the replaced sections, the
        ELF header, and the program headers. */
     off_t neededSpace = sizeof(Elf32_Ehdr) + phdrs.size() * sizeof(Elf32_Phdr);
@@ -263,10 +257,63 @@ static void rewriteSections()
         
         unsigned int neededPages = roundUp(neededSpace - startOffset, pageSize) / pageSize;
         fprintf(stderr, "needed pages is %d\n", neededPages);
+        if (neededPages * pageSize > startPage)
+            error("virtual address space underrun!");
+        startPage -= neededPages * pageSize;
 
-        shiftFile(neededPages);
-        
+        shiftFile(neededPages, startPage);
     }
+
+
+    /* Write out the replaced sections. */
+    Elf32_Off curOff = sizeof(Elf32_Ehdr) + phdrs.size() * sizeof(Elf32_Phdr);
+    for (ReplacedSections::iterator i = replacedSections.begin();
+         i != replacedSections.end(); ++i)
+    {
+        fprintf(stderr, "rewriting section `%s' to offset %d\n",
+            i->first.c_str(), curOff);
+        memcpy(contents + curOff, (unsigned char *) i->second.c_str(),
+            i->second.size());
+
+        /* Update the section header for this section. */
+        Elf32_Shdr & shdr = findSection(i->first);
+        shdr.sh_offset = curOff;
+        shdr.sh_addr = startPage + curOff;
+        shdr.sh_size = i->second.size();
+        shdr.sh_addralign = 4;
+
+        /* If this is the .interp section, then the PT_INTERP segment
+           has to be synced with it. */
+        for (int j = 0; j < phdrs.size(); ++j)
+            if (phdrs[j].p_type == PT_INTERP) {
+                phdrs[j].p_offset = shdr.sh_offset;
+                phdrs[j].p_vaddr = phdrs[j].p_paddr = shdr.sh_addr;
+                phdrs[j].p_filesz = phdrs[j].p_memsz = shdr.sh_size;
+            }
+            
+        curOff += roundUp(i->second.size(), 4);
+    }
+
+    assert(curOff == neededSpace);
+
+
+    /* Rewrite the program header table. */
+
+    /* If the is a segment for the program header table, update it.
+       (According to the ELF spec, it must be the first entry.) */
+    if (phdrs[0].p_type == PT_PHDR) {
+        phdrs[0].p_offset = hdr->e_phoff;
+        phdrs[0].p_vaddr = phdrs[0].p_paddr = startPage + hdr->e_phoff;
+        phdrs[0].p_filesz = phdrs[0].p_memsz = phdrs.size() * sizeof(Elf32_Phdr);
+    }
+
+    for (int i = 0; i < phdrs.size(); ++i)
+        * ((Elf32_Phdr *) (contents + hdr->e_phoff) + i) = phdrs[i];
+
+    /* Rewrite the section header table. */
+    assert(hdr->e_shnum == shdrs.size());
+    for (int i = 1; i < hdr->e_shnum; ++i)
+        * ((Elf32_Shdr *) (contents + hdr->e_shoff) + i) = shdrs[i];
 }
 
 
@@ -515,16 +562,22 @@ static void patchElf()
 
     parseElf();
 
-    /* Do what we're supposed to do. */
+
+    if (printInterpreter) {
+        Elf32_Shdr & shdr = findSection(".interp");
+        string interpreter((char *) contents + shdr.sh_offset, shdr.sh_size);
+        printf("%s\n", interpreter.c_str());
+    }
+    
     if (newInterpreter != "")
         setInterpreter(newInterpreter);
 
-    rewriteSections();
+    
+    if (changed){
+        rewriteSections();
 
-    if (changed)
         writeFile(fileName, fileMode);
-    else
-        fprintf(stderr, "nothing changed in `%s'\n", fileName.c_str());
+    }
     
 #if 0    
     /* Find the next free virtual address page so that we can add
@@ -546,17 +599,6 @@ static void patchElf()
     assert(!printInterpreter && !printRPath);
     
     if (rewriteHeaders) {
-        /* Rewrite the program header table. */
-        hdr->e_phoff = freeOffset;
-        freeOffset += hdr->e_phnum * sizeof(Elf32_Phdr);
-        assert(phdrs[0].p_type == PT_PHDR);
-        phdrs[0].p_offset = hdr->e_phoff;
-        phdrs[0].p_vaddr = phdrs[0].p_paddr = firstPage + hdr->e_phoff % 4096;
-        phdrs[0].p_filesz = phdrs[0].p_memsz = hdr->e_phnum * sizeof(Elf32_Phdr);
-        for (int i = 0; i < hdr->e_phnum; ++i)
-            * ((Elf32_Phdr *) (contents + hdr->e_phoff) + i) = phdrs[i];
-
-        /* Rewrite the section header table. */
         hdr->e_shoff = freeOffset;
         freeOffset += hdr->e_shnum * sizeof(Elf32_Shdr);
         for (int i = 0; i < hdr->e_shnum; ++i)

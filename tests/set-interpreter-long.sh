@@ -8,7 +8,7 @@ echo "current interpreter is $oldInterpreter"
 rm -rf scratch
 mkdir -p scratch
 
-newInterpreter=$(pwd)/scratch/iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
+newInterpreter=$(pwd)/scratch/iiii
 cp simple scratch/
 ../src/patchelf --interpreter "$newInterpreter" scratch/simple
 
