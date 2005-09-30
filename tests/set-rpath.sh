@@ -1,17 +1,16 @@
 #! /bin/sh -e
 
-oldInterpreter=$(../src/patchelf --print-interpreter ./simple)
-echo "current interpreter is $oldInterpreter"
-
 rm -rf scratch
 mkdir -p scratch
+mkdir -p scratch/libsA
+mkdir -p scratch/libsB
 
 cp main scratch/
-cp libfoo.so scratch/
-cp libbar.so scratch/
+cp libfoo.so scratch/libsA/
+cp libbar.so scratch/libsB/
 
-../src/patchelf --set-rpath $(pwd)/scratch scratch/main
-../src/patchelf --set-rpath $(pwd)/scratch scratch/libfoo.so
+../src/patchelf --set-rpath $(pwd)/scratch/libsA scratch/main
+../src/patchelf --set-rpath $(pwd)/scratch/libsB scratch/libsA/libfoo.so
 
 exitCode=0
 scratch/main || exitCode=$?

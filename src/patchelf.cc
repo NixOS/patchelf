@@ -437,15 +437,23 @@ static void modifyRPath(RPathOp op, string newRPath)
     }
 
     
-    if (string(rpath) != newRPath) {
-        assert(newRPath.size() <= strlen(rpath));
-        /* Zero out the previous rpath to prevent retained
-           dependencies in Nix. */
-        memset(rpath, 0, strlen(rpath));
+    if (string(rpath) == newRPath) return;
+
+    changed = true;
+    
+    /* Zero out the previous rpath to prevent retained
+       dependencies in Nix. */
+    unsigned int rpathSize = strlen(rpath);
+    memset(rpath, 0, rpathSize);
+
+    fprintf(stderr, "new rpath is `%s'\n", newRPath.c_str());
+    
+    if (newRPath.size() <= rpathSize) {
         strcpy(rpath, newRPath.c_str());
-        changed = true;
+        return;
     }
-        
+
+    fprintf(stderr, "rpath is too long, resizing...\n");
 }
 
 
@@ -499,11 +507,13 @@ static void parseElf()
 }
 
 
+static bool printInterpreter = false;
 static string newInterpreter;
 
 static bool shrinkRPath = false;
+static bool setRPath = false;
 static bool printRPath = false;
-static bool printInterpreter = false;
+static string newRPath;
 
 
 static void patchElf()
@@ -527,12 +537,14 @@ static void patchElf()
     if (newInterpreter != "")
         setInterpreter(newInterpreter);
 
-    if (shrinkRPath)
-        modifyRPath(rpShrink, "");
-    
     if (printRPath)
         modifyRPath(rpPrint, "");
 
+    if (shrinkRPath)
+        modifyRPath(rpShrink, "");
+    else if (setRPath)
+        modifyRPath(rpSet, newRPath);
+    
     
     if (changed){
         rewriteSections();
@@ -566,6 +578,11 @@ int main(int argc, char * * argv)
         }
         else if (arg == "--shrink-rpath") {
             shrinkRPath = true;
+        }
+        else if (arg == "--set-rpath") {
+            if (++i == argc) error("missing argument");
+            setRPath = true;
+            newRPath = argv[i];
         }
         else if (arg == "--print-rpath") {
             printRPath = true;
