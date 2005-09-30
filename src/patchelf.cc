@@ -65,7 +65,7 @@ static void readFile(char * fileName, mode_t * fileMode)
     *fileMode = st.st_mode;
     maxSize = fileSize + 128 * 1024;
     
-    contents = malloc(fileSize + maxSize);
+    contents = (unsigned char *) malloc(fileSize + maxSize);
     if (!contents) abort();
 
     int fd = open(fileName, O_RDONLY);
@@ -169,7 +169,7 @@ static void setInterpreter(void)
                 growFile(phdr->p_offset + interpSize);
                 phdr->p_vaddr = phdr->p_paddr = firstPage + interpOffset % 4096;
                 phdr->p_filesz = phdr->p_memsz = interpSize;
-                strncpy(contents + interpOffset,
+                strncpy((char *) contents + interpOffset,
                     newInterpreter, interpSize);
                 changed = 1;
                 break;
@@ -219,7 +219,7 @@ static void shrinkRPath(void)
             if (phdrs[i].p_vaddr <= strTabAddr &&
                 strTabAddr < phdrs[i].p_vaddr + phdrs[i].p_filesz)
             {
-                strTab = contents +
+                strTab = (char *) contents +
                     strTabAddr - phdrs[i].p_vaddr + phdrs[i].p_offset;
             }
 
@@ -257,7 +257,7 @@ static void shrinkRPath(void)
         for (i = 0; i < nrNeededLibs; ++i)
             neededLibFound[i] = 0;
 
-        char * newRPath = malloc(strlen(rpath) + 1);
+        char * newRPath = (char *) malloc(strlen(rpath) + 1);
         *newRPath = 0;
 
         char * pos = rpath;

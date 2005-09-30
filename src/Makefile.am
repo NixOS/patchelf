@@ -1,3 +1,3 @@
 bin_PROGRAMS = patchelf
 
-patchelf_SOURCES = patchelf.c
+patchelf_SOURCES = patchelf.cc
