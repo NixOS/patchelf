@@ -9,7 +9,7 @@ rm -rf scratch
 mkdir -p scratch
 
 cp simple scratch/
-../src/patchelf --interpreter /oops $(pwd)/scratch/i scratch/simple
+../src/patchelf --interpreter /oops scratch/simple
 
 echo "running with missing interpreter..."
 if scratch/simple; then
