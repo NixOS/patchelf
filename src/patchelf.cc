@@ -1,3 +1,6 @@
+#include <string>
+#include <vector>
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
@@ -12,37 +15,32 @@
 
 #include <elf.h>
 
-
-static char * fileName = 0;
-static char * newInterpreter = 0;
-static int doShrinkRPath = 0;
-static int printRPath = 0;
-static int printInterpreter = 0;
+using namespace std;
 
 
-#define MAX_PHEADERS 128
-#define MAX_SHEADERS 128
-#define MAX_NEEDED 1024
+static string fileName;
+static string newInterpreter;
+
+static bool doShrinkRPath = false;
+static bool printRPath = false;
+static bool printInterpreter = false;
 
 
 static off_t fileSize, maxSize;
 static unsigned char * contents = 0;
 static Elf32_Ehdr * hdr;
-static Elf32_Phdr phdrs[MAX_PHEADERS];
-static Elf32_Shdr shdrs[MAX_SHEADERS];
-static unsigned int nrNeededLibs = 0;
-static char * neededLibs[MAX_NEEDED];
-static int neededLibFound[MAX_NEEDED];
+static vector<Elf32_Phdr> phdrs;
+static vector<Elf32_Shdr> shdrs;
 static unsigned int freeOffset;
 static unsigned int firstPage;
 
-static int changed = 0;
-static int rewriteHeaders = 0;
+static bool changed = false;
+static bool rewriteHeaders = false;
 
 
-static void error(char * msg)
+static void error(string msg)
 {
-    if (errno) perror(msg); else printf("%s\n", msg);
+    if (errno) perror(msg.c_str()); else printf("%s\n", msg.c_str());
     exit(1);
 }
 
@@ -57,10 +55,10 @@ static void growFile(off_t newSize)
 }
 
 
-static void readFile(char * fileName, mode_t * fileMode)
+static void readFile(string fileName, mode_t * fileMode)
 {
     struct stat st;
-    if (stat(fileName, &st) != 0) error("stat");
+    if (stat(fileName.c_str(), &st) != 0) error("stat");
     fileSize = st.st_size;
     *fileMode = st.st_mode;
     maxSize = fileSize + 128 * 1024;
@@ -68,7 +66,7 @@ static void readFile(char * fileName, mode_t * fileMode)
     contents = (unsigned char *) malloc(fileSize + maxSize);
     if (!contents) abort();
 
-    int fd = open(fileName, O_RDONLY);
+    int fd = open(fileName.c_str(), O_RDONLY);
     if (fd == -1) error("open");
 
     if (read(fd, contents, fileSize) != fileSize) error("read");
@@ -77,23 +75,21 @@ static void readFile(char * fileName, mode_t * fileMode)
 }
 
 
-static void writeFile(char * fileName, mode_t fileMode)
+static void writeFile(string fileName, mode_t fileMode)
 {
-    char fileName2[PATH_MAX];
-    if (snprintf(fileName2, sizeof(fileName2),
-            "%s_patchelf_tmp", fileName) >= sizeof(fileName2))
-        error("file name too long");
+    string fileName2 = fileName + "_patchelf_tmp";
     
-    int fd = open(fileName2, O_CREAT | O_TRUNC | O_WRONLY, 0700);
+    int fd = open(fileName2.c_str(),
+        O_CREAT | O_TRUNC | O_WRONLY, 0700);
     if (fd == -1) error("open");
 
     if (write(fd, contents, fileSize) != fileSize) error("write");
     
     if (close(fd) != 0) error("close");
 
-    if (chmod(fileName2, fileMode) != 0) error("chmod");
+    if (chmod(fileName2.c_str(), fileMode) != 0) error("chmod");
 
-    if (rename(fileName2, fileName) != 0) error("rename");
+    if (rename(fileName2.c_str(), fileName.c_str()) != 0) error("rename");
 }
 
 
@@ -129,20 +125,21 @@ static void shiftFile(void)
        PT_INTERP segment into memory.  Otherwise glibc will choke. Add
        this after the PT_PHDR segment but before all other PT_LOAD
        segments. */
+    phdrs.resize(hdr->e_phnum + 1);
     for (i = hdr->e_phnum; i > 1; --i)
         phdrs[i] = phdrs[i - 1];
     hdr->e_phnum++;
-    Elf32_Phdr * phdr = phdrs + 1;
-    phdr->p_type = PT_LOAD;
-    phdr->p_offset = 0;
-    phdr->p_vaddr = phdr->p_paddr = firstPage;
-    phdr->p_filesz = phdr->p_memsz = 4096;
-    phdr->p_flags = PF_R;
-    phdr->p_align = 4096;
+    Elf32_Phdr & phdr = phdrs[1];
+    phdr.p_type = PT_LOAD;
+    phdr.p_offset = 0;
+    phdr.p_vaddr = phdr.p_paddr = firstPage;
+    phdr.p_filesz = phdr.p_memsz = 4096;
+    phdr.p_flags = PF_R;
+    phdr.p_align = 4096;
 
     freeOffset = sizeof(Elf32_Ehdr);
 
-    rewriteHeaders = 1;
+    rewriteHeaders = true;
 }
 
 
@@ -150,28 +147,28 @@ static void setInterpreter(void)
 {
     /* Find the PT_INTERP segment and replace it by a new one that
        contains the new interpreter name. */
-    if ((newInterpreter || printInterpreter) && hdr->e_type == ET_EXEC) {
+    if ((newInterpreter != "" || printInterpreter) && hdr->e_type == ET_EXEC) {
         shiftFile();
         int i;
         for (i = 0; i < hdr->e_phnum; ++i) {
-            Elf32_Phdr * phdr = phdrs + i;
-            if (phdr->p_type == PT_INTERP) {
+            Elf32_Phdr & phdr = phdrs[i];
+            if (phdr.p_type == PT_INTERP) {
                 if (printInterpreter) {
-                    printf("%s\n", (char *) (contents + phdr->p_offset));
+                    printf("%s\n", (char *) (contents + phdr.p_offset));
                     exit(0);
                 }
                 fprintf(stderr, "changing interpreter from `%s' to `%s'\n",
-                    (char *) (contents + phdr->p_offset), newInterpreter);
+                    (char *) (contents + phdr.p_offset), newInterpreter.c_str());
                 unsigned int interpOffset = freeOffset;
-                unsigned int interpSize = strlen(newInterpreter) + 1;
+                unsigned int interpSize = newInterpreter.size() + 1;
                 freeOffset += roundUp(interpSize, 4);
-                phdr->p_offset = interpOffset;
-                growFile(phdr->p_offset + interpSize);
-                phdr->p_vaddr = phdr->p_paddr = firstPage + interpOffset % 4096;
-                phdr->p_filesz = phdr->p_memsz = interpSize;
+                phdr.p_offset = interpOffset;
+                growFile(phdr.p_offset + interpSize);
+                phdr.p_vaddr = phdr.p_paddr = firstPage + interpOffset % 4096;
+                phdr.p_filesz = phdr.p_memsz = interpSize;
                 strncpy((char *) contents + interpOffset,
-                    newInterpreter, interpSize);
-                changed = 1;
+                    newInterpreter.c_str(), interpSize);
+                changed = true;
                 break;
             }
         }
@@ -179,10 +176,10 @@ static void setInterpreter(void)
 }
 
 
-static void concat(char * dst, char * src)
+static void concatToRPath(string & rpath, const string & path)
 {
-    if (*dst) strcat(dst, ":");
-    strcat(dst, src);
+    if (!rpath.empty()) rpath += ":";
+    rpath += path;
 }
 
 
@@ -191,6 +188,8 @@ static void shrinkRPath(void)
     /* Shrink the RPATH. */
     if (doShrinkRPath || printRPath) {
 
+        static vector<string> neededLibs;
+        
         /* Find the .dynamic section. */
         int i, dynSec = 0;
         for (i = 0; i < hdr->e_shnum; ++i)
@@ -235,11 +234,8 @@ static void shrinkRPath(void)
                 rpathEntry = dyn;
                 rpath = strTab + dyn->d_un.d_val;
             }
-            else if (dyn->d_tag == DT_NEEDED) {
-                if (nrNeededLibs == MAX_NEEDED)
-                    error("too many needed libraries");
-                neededLibs[nrNeededLibs++] = strTab + dyn->d_un.d_val;
-            }
+            else if (dyn->d_tag == DT_NEEDED)
+                neededLibs.push_back(string(strTab + dyn->d_un.d_val));
         }
 
         if (printRPath) {
@@ -254,11 +250,9 @@ static void shrinkRPath(void)
 
         /* For each directory in the RPATH, check if it contains any
            needed library. */
-        for (i = 0; i < nrNeededLibs; ++i)
-            neededLibFound[i] = 0;
+        static vector<bool> neededLibFound(neededLibs.size(), false);
 
-        char * newRPath = (char *) malloc(strlen(rpath) + 1);
-        *newRPath = 0;
+        string newRPath;
 
         char * pos = rpath;
         while (*pos) {
@@ -266,50 +260,44 @@ static void shrinkRPath(void)
             if (!end) end = strchr(pos, 0);
 
             /* Get the name of the directory. */
-            char dirName[PATH_MAX];
-            if (end - pos >= PATH_MAX) error("library name too long");
-            strncpy(dirName, pos, end - pos);
-            dirName[end - pos] = 0;
+            string dirName(pos, end - pos);
             if (*end == ':') ++end;
             pos = end;
 
             /* Non-absolute entries are allowed (e.g., the special
                "$ORIGIN" hack). */
-            if (*dirName != '/') {
-                concat(newRPath, dirName);
+            if (dirName[0] != '/') {
+                concatToRPath(newRPath, dirName);
                 continue;
             }
 
             /* For each library that we haven't found yet, see if it
                exists in this directory. */
             int j;
-            int libFound = 0;
-            for (j = 0; j < nrNeededLibs; ++j)
+            bool libFound = false;
+            for (j = 0; j < neededLibs.size(); ++j)
                 if (!neededLibFound[j]) {
-                    char libName[PATH_MAX];
-                    if (snprintf(libName, sizeof(libName), "%s/%s", dirName, neededLibs[j])
-                        >= sizeof(libName))
-                        error("file name too long");
+                    string libName = dirName + "/" + neededLibs[j];
                     struct stat st;
-                    if (stat(libName, &st) == 0) {
-                        neededLibFound[j] = 1;
-                        libFound = 1;
+                    if (stat(libName.c_str(), &st) == 0) {
+                        neededLibFound[j] = true;
+                        libFound = true;
                     }
                 }
 
             if (!libFound)
-                fprintf(stderr, "removing directory `%s' from RPATH\n", dirName);
+                fprintf(stderr, "removing directory `%s' from RPATH\n", dirName.c_str());
             else
-                concat(newRPath, dirName);
+                concatToRPath(newRPath, dirName);
         }
 
-        if (strcmp(rpath, newRPath) != 0) {
-            assert(strlen(newRPath) <= strlen(rpath));
+        if (string(rpath) != newRPath) {
+            assert(newRPath.size() <= strlen(rpath));
             /* Zero out the previous rpath to prevent retained
                dependencies in Nix. */
             memset(rpath, 0, strlen(rpath));
-            strcpy(rpath, newRPath);
-            changed = 1;
+            strcpy(rpath, newRPath.c_str());
+            changed = true;
         }
     }
 }
@@ -318,7 +306,7 @@ static void shrinkRPath(void)
 static void patchElf(void)
 {
     if (!printInterpreter && !printRPath)
-        fprintf(stderr, "patching ELF file `%s'\n", fileName);
+        fprintf(stderr, "patching ELF file `%s'\n", fileName.c_str());
 
     mode_t fileMode;
     
@@ -350,16 +338,19 @@ static void patchElf(void)
         error("program headers have wrong size");
 
     /* Copy the program and section headers. */
-    memcpy(phdrs, contents + hdr->e_phoff, hdr->e_phnum * sizeof(Elf32_Phdr));
-    memcpy(shdrs, contents + hdr->e_shoff, hdr->e_shnum * sizeof(Elf32_Shdr));
+    for (int i = 0; i < hdr->e_phnum; ++i)
+        phdrs.push_back(* ((Elf32_Phdr *) (contents + hdr->e_phoff) + i));
+    
+    for (int i = 0; i < hdr->e_shnum; ++i)
+        shdrs.push_back(* ((Elf32_Shdr *) (contents + hdr->e_shoff) + i));
 
     /* Find the next free virtual address page so that we can add
        segments without messing up other segments. */
     int i;
     unsigned int nextFreePage = 0;
     for (i = 0; i < hdr->e_phnum; ++i) {
-        Elf32_Phdr * phdr = phdrs + i;
-        unsigned int end = roundUp(phdr->p_vaddr + phdr->p_memsz, 4096);
+        Elf32_Phdr & phdr = phdrs[i];
+        unsigned int end = roundUp(phdr.p_vaddr + phdr.p_memsz, 4096);
         if (end > nextFreePage) nextFreePage = end;
     }
 
@@ -369,6 +360,8 @@ static void patchElf(void)
     setInterpreter();
     shrinkRPath();
 
+    assert(!printInterpreter && !printRPath);
+    
     if (rewriteHeaders) {
         /* Rewrite the program header table. */
         hdr->e_phoff = freeOffset;
@@ -377,12 +370,14 @@ static void patchElf(void)
         phdrs[0].p_offset = hdr->e_phoff;
         phdrs[0].p_vaddr = phdrs[0].p_paddr = firstPage + hdr->e_phoff % 4096;
         phdrs[0].p_filesz = phdrs[0].p_memsz = hdr->e_phnum * sizeof(Elf32_Phdr);
-        memcpy(contents + hdr->e_phoff, phdrs, hdr->e_phnum * sizeof(Elf32_Phdr));
+        for (int i = 0; i < hdr->e_phnum; ++i)
+            * ((Elf32_Phdr *) (contents + hdr->e_phoff) + i) = phdrs[i];
 
         /* Rewrite the section header table. */
         hdr->e_shoff = freeOffset;
         freeOffset += hdr->e_shnum * sizeof(Elf32_Shdr);
-        memcpy(contents + hdr->e_shoff, shdrs, hdr->e_shnum * sizeof(Elf32_Shdr));
+        for (int i = 0; i < hdr->e_shnum; ++i)
+            * ((Elf32_Shdr *) (contents + hdr->e_shoff) + i) = shdrs[i];
 
         if (freeOffset > 4096) error("ran out of space in page 0");
     }
@@ -390,7 +385,7 @@ static void patchElf(void)
     if (changed)
         writeFile(fileName, fileMode);
     else
-        fprintf(stderr, "nothing changed in `%s'\n", fileName);
+        fprintf(stderr, "nothing changed in `%s'\n", fileName.c_str());
 }
 
 
@@ -408,18 +403,19 @@ int main(int argc, char * * argv)
 
     int i;
     for (i = 1; i < argc; ++i) {
-        if (strcmp(argv[i], "--interpreter") == 0) {
+        string arg(argv[i]);
+        if (arg == "--interpreter") {
             if (++i == argc) error("missing argument");
             newInterpreter = argv[i];
         }
-        else if (strcmp(argv[i], "--print-interpreter") == 0) {
-            printInterpreter = 1;
+        else if (arg == "--print-interpreter") {
+            printInterpreter = true;
         }
-        else if (strcmp(argv[i], "--shrink-rpath") == 0) {
-            doShrinkRPath = 1;
+        else if (arg == "--shrink-rpath") {
+            doShrinkRPath = true;
         }
-        else if (strcmp(argv[i], "--print-rpath") == 0) {
-            printRPath = 1;
+        else if (arg == "--print-rpath") {
+            printRPath = true;
         }
         else break;
     }
