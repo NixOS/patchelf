@@ -337,40 +337,6 @@ static void setInterpreter(const string & newInterpreter)
 }
 
 
-#if 0
-static void setInterpreter()
-{
-    /* Find the PT_INTERP segment and replace it by a new one that
-       contains the new interpreter name. */
-    if ((newInterpreter != "" || printInterpreter) && hdr->e_type == ET_EXEC) {
-        shiftFile();
-        int i;
-        for (i = 0; i < hdr->e_phnum; ++i) {
-            Elf32_Phdr & phdr = phdrs[i];
-            if (phdr.p_type == PT_INTERP) {
-                if (printInterpreter) {
-                    printf("%s\n", (char *) (contents + phdr.p_offset));
-                    exit(0);
-                }
-                fprintf(stderr, "changing interpreter from `%s' to `%s'\n",
-                    (char *) (contents + phdr.p_offset), newInterpreter.c_str());
-                unsigned int interpOffset = freeOffset;
-                unsigned int interpSize = newInterpreter.size() + 1;
-                freeOffset += roundUp(interpSize, 4);
-                phdr.p_offset = interpOffset;
-                growFile(phdr.p_offset + interpSize);
-                phdr.p_vaddr = phdr.p_paddr = firstPage + interpOffset % 4096;
-                phdr.p_filesz = phdr.p_memsz = interpSize;
-                strncpy((char *) contents + interpOffset,
-                    newInterpreter.c_str(), interpSize);
-                changed = true;
-                break;
-            }
-        }
-    }
-}
-
-
 static void concatToRPath(string & rpath, const string & path)
 {
     if (!rpath.empty()) rpath += ":";
@@ -378,76 +344,59 @@ static void concatToRPath(string & rpath, const string & path)
 }
 
 
-static void shrinkRPath()
+typedef enum { rpPrint, rpShrink, rpSet } RPathOp;
+
+
+static void modifyRPath(RPathOp op, string newRPath)
 {
-    /* Shrink the RPATH. */
-    if (doShrinkRPath || printRPath) {
+    Elf32_Shdr & shdrDynamic = findSection(".dynamic");
 
-        static vector<string> neededLibs;
-        
-        /* Find the .dynamic section. */
-        int i, dynSec = 0;
-        for (i = 0; i < hdr->e_shnum; ++i)
-            if (shdrs[i].sh_type == SHT_DYNAMIC) dynSec = i;
-        
-        if (!dynSec) {
-            fprintf(stderr, "no dynamic section, so no RPATH to shrink\n");
-            return;
+    /* !!! We assume that the virtual address in the DT_STRTAB entry
+       of the dynamic section corresponds to the .dynstr section. */ 
+    Elf32_Shdr & shdrDynStr = findSection(".dynstr");
+    char * strTab = (char *) contents + shdrDynStr.sh_offset;
+
+    /* Find the DT_STRTAB entry in the dynamic section. */
+    Elf32_Dyn * dyn = (Elf32_Dyn *) (contents + shdrDynamic.sh_offset);
+    Elf32_Addr strTabAddr = 0;
+    for ( ; dyn->d_tag != DT_NULL; dyn++)
+        if (dyn->d_tag == DT_STRTAB) strTabAddr = dyn->d_un.d_ptr;
+    if (!strTabAddr) error("strange: no string table");
+
+    assert(strTabAddr == shdrDynStr.sh_addr);
+    
+    
+    /* Walk through the dynamic section, look for the RPATH entry. */
+    static vector<string> neededLibs;
+    dyn = (Elf32_Dyn *) (contents + shdrDynamic.sh_offset);
+    Elf32_Dyn * rpathEntry = 0;
+    char * rpath = 0;
+    for ( ; dyn->d_tag != DT_NULL; dyn++) {
+        if (dyn->d_tag == DT_RPATH) {
+            rpathEntry = dyn;
+            rpath = strTab + dyn->d_un.d_val;
         }
+        else if (dyn->d_tag == DT_NEEDED)
+            neededLibs.push_back(string(strTab + dyn->d_un.d_val));
+    }
 
-        /* Find the DT_STRTAB entry in the dynamic section. */
-        Elf32_Dyn * dyn = (Elf32_Dyn *) (contents + shdrs[dynSec].sh_offset);
-        Elf32_Addr strTabAddr = 0;
-        for ( ; dyn->d_tag != DT_NULL; dyn++)
-            if (dyn->d_tag == DT_STRTAB) strTabAddr = dyn->d_un.d_ptr;
+    if (op == rpPrint) {
+        printf("%s\n", rpath ? rpath : "");
+        return;
+    }
+    
+    if (op == rpShrink && !rpath) {
+        fprintf(stderr, "no RPATH to shrink\n");
+        return;
+    }
 
-        if (!strTabAddr) {
-            fprintf(stderr, "strange: no string table\n");
-            return;
-        }
-
-        /* Nasty: map the virtual address for the string table back to
-           a offset in the file. */
-        char * strTab = 0;
-        for (i = 0; i < hdr->e_phnum; ++i)
-            if (phdrs[i].p_vaddr <= strTabAddr &&
-                strTabAddr < phdrs[i].p_vaddr + phdrs[i].p_filesz)
-            {
-                strTab = (char *) contents +
-                    strTabAddr - phdrs[i].p_vaddr + phdrs[i].p_offset;
-            }
-
-        if (!strTab) error("could not reverse map DT_STRTAB");
-
-        /* Walk through the dynamic section, look for the RPATH
-           entry. */
-        dyn = (Elf32_Dyn *) (contents + shdrs[dynSec].sh_offset);
-        Elf32_Dyn * rpathEntry = 0;
-        char * rpath = 0;
-        for ( ; dyn->d_tag != DT_NULL; dyn++) {
-            if (dyn->d_tag == DT_RPATH) {
-                rpathEntry = dyn;
-                rpath = strTab + dyn->d_un.d_val;
-            }
-            else if (dyn->d_tag == DT_NEEDED)
-                neededLibs.push_back(string(strTab + dyn->d_un.d_val));
-        }
-
-        if (printRPath) {
-            printf("%s\n", rpath ? rpath : "");
-            exit(0);
-        }
-        
-        if (!rpath) {
-            fprintf(stderr, "no RPATH to shrink\n");
-            return;
-        }
-
-        /* For each directory in the RPATH, check if it contains any
-           needed library. */
+    
+    /* For each directory in the RPATH, check if it contains any
+       needed library. */
+    if (op == rpShrink) {
         static vector<bool> neededLibFound(neededLibs.size(), false);
 
-        string newRPath;
+        newRPath = "";
 
         char * pos = rpath;
         while (*pos) {
@@ -485,18 +434,19 @@ static void shrinkRPath()
             else
                 concatToRPath(newRPath, dirName);
         }
-
-        if (string(rpath) != newRPath) {
-            assert(newRPath.size() <= strlen(rpath));
-            /* Zero out the previous rpath to prevent retained
-               dependencies in Nix. */
-            memset(rpath, 0, strlen(rpath));
-            strcpy(rpath, newRPath.c_str());
-            changed = true;
-        }
     }
+
+    
+    if (string(rpath) != newRPath) {
+        assert(newRPath.size() <= strlen(rpath));
+        /* Zero out the previous rpath to prevent retained
+           dependencies in Nix. */
+        memset(rpath, 0, strlen(rpath));
+        strcpy(rpath, newRPath.c_str());
+        changed = true;
+    }
+        
 }
-#endif
 
 
 static void parseElf()
@@ -551,7 +501,7 @@ static void parseElf()
 
 static string newInterpreter;
 
-static bool doShrinkRPath = false;
+static bool shrinkRPath = false;
 static bool printRPath = false;
 static bool printInterpreter = false;
 
@@ -577,41 +527,18 @@ static void patchElf()
     if (newInterpreter != "")
         setInterpreter(newInterpreter);
 
+    if (shrinkRPath)
+        modifyRPath(rpShrink, "");
+    
+    if (printRPath)
+        modifyRPath(rpPrint, "");
+
     
     if (changed){
         rewriteSections();
 
         writeFile(fileName, fileMode);
     }
-    
-#if 0    
-    /* Find the next free virtual address page so that we can add
-       segments without messing up other segments. */
-    int i;
-    unsigned int nextFreePage = 0;
-    for (i = 0; i < hdr->e_phnum; ++i) {
-        Elf32_Phdr & phdr = phdrs[i];
-        unsigned int end = roundUp(phdr.p_vaddr + phdr.p_memsz, 4096);
-        if (end > nextFreePage) nextFreePage = end;
-    }
-
-    firstPage = 0x08047000;
-
-    /* Do what we're supposed to do. */
-    setInterpreter();
-    shrinkRPath();
-
-    assert(!printInterpreter && !printRPath);
-    
-    if (rewriteHeaders) {
-        hdr->e_shoff = freeOffset;
-        freeOffset += hdr->e_shnum * sizeof(Elf32_Shdr);
-        for (int i = 0; i < hdr->e_shnum; ++i)
-            * ((Elf32_Shdr *) (contents + hdr->e_shoff) + i) = shdrs[i];
-
-        if (freeOffset > 4096) error("ran out of space in page 0");
-    }
-#endif
 }
 
 
@@ -638,7 +565,7 @@ int main(int argc, char * * argv)
             printInterpreter = true;
         }
         else if (arg == "--shrink-rpath") {
-            doShrinkRPath = true;
+            shrinkRPath = true;
         }
         else if (arg == "--print-rpath") {
             printRPath = true;
