@@ -78,6 +78,63 @@ static void readFile(string fileName, mode_t * fileMode)
 }
 
 
+static void checkPointer(void * p, unsigned int size)
+{
+    unsigned char * q = (unsigned char *) p;
+    assert(q >= contents && q + size <= contents + fileSize);
+}
+
+
+static void parseElf()
+{
+    /* Check the ELF header for basic validity. */
+    if (fileSize < sizeof(Elf32_Ehdr)) error("missing ELF header");
+
+    hdr = (Elf32_Ehdr *) contents;
+
+    if (memcmp(hdr->e_ident, ELFMAG, 4) != 0)
+        error("not an ELF executable");
+
+    if (contents[EI_CLASS] != ELFCLASS32 ||
+        contents[EI_DATA] != ELFDATA2LSB ||
+        contents[EI_VERSION] != EV_CURRENT)
+        error("ELF executable is not 32-bit, little-endian, version 1");
+
+    if (hdr->e_type != ET_EXEC && hdr->e_type != ET_DYN)
+        error("wrong ELF type");
+    
+    if (hdr->e_phoff + hdr->e_phnum * hdr->e_phentsize > fileSize)
+        error("missing program headers");
+    
+    if (hdr->e_shoff + hdr->e_shnum * hdr->e_shentsize > fileSize)
+        error("missing section headers");
+
+    if (hdr->e_phentsize != sizeof(Elf32_Phdr))
+        error("program headers have wrong size");
+
+    /* Copy the program and section headers. */
+    for (int i = 0; i < hdr->e_phnum; ++i)
+        phdrs.push_back(* ((Elf32_Phdr *) (contents + hdr->e_phoff) + i));
+    
+    for (int i = 0; i < hdr->e_shnum; ++i)
+        shdrs.push_back(* ((Elf32_Shdr *) (contents + hdr->e_shoff) + i));
+
+    /* Get the section header string table section (".shstrtab").  Its
+       index in the section header table is given by e_shstrndx field
+       of the ELF header. */
+    unsigned int shstrtabIndex = hdr->e_shstrndx;
+    assert(shstrtabIndex < shdrs.size());
+    unsigned int shstrtabSize = shdrs[shstrtabIndex].sh_size;
+    char * shstrtab = (char * ) contents + shdrs[shstrtabIndex].sh_offset;
+    checkPointer(shstrtab, shstrtabSize);
+
+    assert(shstrtabSize > 0);
+    assert(shstrtab[shstrtabSize - 1] == 0);
+
+    sectionNames = string(shstrtab, shstrtabSize);
+}
+
+
 static void writeFile(string fileName, mode_t fileMode)
 {
     string fileName2 = fileName + "_patchelf_tmp";
@@ -133,15 +190,8 @@ static void shiftFile(unsigned int extraPages, Elf32_Addr startPage)
     phdr.p_offset = 0;
     phdr.p_vaddr = phdr.p_paddr = startPage;
     phdr.p_filesz = phdr.p_memsz = shift;
-    phdr.p_flags = PF_R;
+    phdr.p_flags = PF_R | PF_W;
     phdr.p_align = 4096;
-}
-
-
-static void checkPointer(void * p, unsigned int size)
-{
-    unsigned char * q = (unsigned char *) p;
-    assert(q >= contents && q + size <= contents + fileSize);
 }
 
 
@@ -185,8 +235,8 @@ static void rewriteSections()
 
     for (ReplacedSections::iterator i = replacedSections.begin();
          i != replacedSections.end(); ++i)
-        fprintf(stderr, "replacing section `%s' with size %d, content `%s'\n",
-            i->first.c_str(), i->second.size(), i->second.c_str());
+        fprintf(stderr, "replacing section `%s' with size %d\n",
+            i->first.c_str(), i->second.size());
 
     
     /* What is the index of the last replaced section? */
@@ -215,8 +265,8 @@ static void rewriteSections()
         string sectionName = getSectionName(shdr);
         fprintf(stderr, "looking at section `%s'\n", sectionName.c_str());
         if (replacedSections.find(sectionName) != replacedSections.end()) continue;
-        if (true /* XXX shdr.sh_type == SHT_PROGBITS && sectionName !=
-               ".interp" */) {
+        //if (shdr.sh_type == SHT_PROGBITS && sectionName != ".interp") {
+        if (true) {
             startOffset = shdr.sh_offset;
             startAddr = shdr.sh_addr;
             lastReplaced = i - 1;
@@ -274,23 +324,24 @@ static void rewriteSections()
 
     /* Write out the replaced sections. */
     for (ReplacedSections::iterator i = replacedSections.begin();
-         i != replacedSections.end(); ++i)
+         i != replacedSections.end(); )
     {
+        string sectionName = i->first;
         fprintf(stderr, "rewriting section `%s' to offset %d\n",
-            i->first.c_str(), curOff);
+            sectionName.c_str(), curOff);
         memcpy(contents + curOff, (unsigned char *) i->second.c_str(),
             i->second.size());
 
         /* Update the section header for this section. */
-        Elf32_Shdr & shdr = findSection(i->first);
+        Elf32_Shdr & shdr = findSection(sectionName);
         shdr.sh_offset = curOff;
         shdr.sh_addr = startPage + curOff;
         shdr.sh_size = i->second.size();
         shdr.sh_addralign = 4;
 
         /* If this is the .interp section, then the PT_INTERP segment
-           has to be sync'ed with it. */
-        if (i->first == ".interp") {
+           must be sync'ed with it. */
+        if (sectionName == ".interp") {
             for (int j = 0; j < phdrs.size(); ++j)
                 if (phdrs[j].p_type == PT_INTERP) {
                     phdrs[j].p_offset = shdr.sh_offset;
@@ -299,19 +350,24 @@ static void rewriteSections()
                 }
         }
 
-        /* If this is the .dynstr section, then the .dynamic section
-           has to be sync'ed with it. */
-        if (i->first == ".dynstr") {
-            Elf32_Shdr & shdrDynamic = findSection(".dynamic");
-            Elf32_Dyn * dyn = (Elf32_Dyn *) (contents + shdrDynamic.sh_offset);
-            for ( ; dyn->d_tag != DT_NULL; dyn++)
-                if (dyn->d_tag == DT_STRTAB)
-                    dyn->d_un.d_ptr = shdr.sh_addr;
+        /* If this is the .dynamic section, then the PT_DYNAMIC segment
+           must be sync'ed with it. */
+        if (sectionName == ".dynamic") {
+            for (int j = 0; j < phdrs.size(); ++j)
+                if (phdrs[j].p_type == PT_DYNAMIC) {
+                    phdrs[j].p_offset = shdr.sh_offset;
+                    phdrs[j].p_vaddr = phdrs[j].p_paddr = shdr.sh_addr;
+                    phdrs[j].p_filesz = phdrs[j].p_memsz = shdr.sh_size;
+                }
         }
-            
+
         curOff += roundUp(i->second.size(), 4);
+
+        ++i;
+        replacedSections.erase(sectionName);
     }
 
+    assert(replacedSections.empty());
     assert(curOff == neededSpace);
 
 
@@ -332,6 +388,30 @@ static void rewriteSections()
     assert(hdr->e_shnum == shdrs.size());
     for (int i = 1; i < hdr->e_shnum; ++i)
         * ((Elf32_Shdr *) (contents + hdr->e_shoff) + i) = shdrs[i];
+
+    /* Update all those nasty virtual addresses in the .dynamic
+       section. */
+    Elf32_Shdr & shdrDynamic = findSection(".dynamic");
+    Elf32_Dyn * dyn = (Elf32_Dyn *) (contents + shdrDynamic.sh_offset);
+    for ( ; dyn->d_tag != DT_NULL; dyn++)
+        if (dyn->d_tag == DT_STRTAB)
+            dyn->d_un.d_ptr = findSection(".dynstr").sh_addr;
+        else if (dyn->d_tag == DT_STRSZ)
+            dyn->d_un.d_val = findSection(".dynstr").sh_size;
+#if 0
+        else if (dyn->d_tag == DT_SYMTAB)
+            dyn->d_un.d_ptr = findSection(".dynsym").sh_addr;
+        else if (dyn->d_tag == DT_HASH)
+            dyn->d_un.d_ptr = findSection(".hash").sh_addr;
+        else if (dyn->d_tag == DT_JMPREL)
+            dyn->d_un.d_ptr = findSection(".rel.plt").sh_addr;
+        else if (dyn->d_tag == DT_REL)
+            dyn->d_un.d_ptr = findSection(".rel.dyn").sh_addr;
+        else if (dyn->d_tag == DT_VERNEED)
+            dyn->d_un.d_ptr = findSection(".gnu.version_r").sh_addr;
+        else if (dyn->d_tag == DT_VERSYM)
+            dyn->d_un.d_ptr = findSection(".gnu.version").sh_addr;
+#endif
 }
 
 
@@ -479,58 +559,32 @@ static void modifyRPath(RPathOp op, string newRPath)
     setSubstr(newDynStr, shdrDynStr.sh_size, newRPath + '\0');
 
     /* Update the DT_RPATH entry. */
-    assert(dynRPath != 0);
-    dynRPath->d_un.d_val = shdrDynStr.sh_size;
-}
+    if (dynRPath)
+        dynRPath->d_un.d_val = shdrDynStr.sh_size;
 
+    else {
+        /* There is no DT_RPATH entry in the .dynamic section, so we
+           have to grow the .dynamic section. */
+        string & newDynamic = replaceSection(".dynamic",
+            shdrDynamic.sh_size + sizeof(Elf32_Dyn));
 
-static void parseElf()
-{
-    /* Check the ELF header for basic validity. */
-    if (fileSize < sizeof(Elf32_Ehdr)) error("missing ELF header");
+        unsigned int idx = 0;
+        dyn = (Elf32_Dyn *) newDynamic.c_str();
+        for ( ; dyn->d_tag != DT_NULL; dyn++, idx++) ;
 
-    hdr = (Elf32_Ehdr *) contents;
+        fprintf(stderr, "DT_NULL index is %d\n", idx);
+        
+        Elf32_Dyn newDyn;
+        newDyn.d_tag = DT_RPATH;
+        newDyn.d_un.d_val = shdrDynStr.sh_size;
+        setSubstr(newDynamic, idx * sizeof(Elf32_Dyn),
+            string((char *) &newDyn, sizeof(Elf32_Dyn)));
 
-    if (memcmp(hdr->e_ident, ELFMAG, 4) != 0)
-        error("not an ELF executable");
-
-    if (contents[EI_CLASS] != ELFCLASS32 ||
-        contents[EI_DATA] != ELFDATA2LSB ||
-        contents[EI_VERSION] != EV_CURRENT)
-        error("ELF executable is not 32-bit, little-endian, version 1");
-
-    if (hdr->e_type != ET_EXEC && hdr->e_type != ET_DYN)
-        error("wrong ELF type");
-    
-    if (hdr->e_phoff + hdr->e_phnum * hdr->e_phentsize > fileSize)
-        error("missing program headers");
-    
-    if (hdr->e_shoff + hdr->e_shnum * hdr->e_shentsize > fileSize)
-        error("missing section headers");
-
-    if (hdr->e_phentsize != sizeof(Elf32_Phdr))
-        error("program headers have wrong size");
-
-    /* Copy the program and section headers. */
-    for (int i = 0; i < hdr->e_phnum; ++i)
-        phdrs.push_back(* ((Elf32_Phdr *) (contents + hdr->e_phoff) + i));
-    
-    for (int i = 0; i < hdr->e_shnum; ++i)
-        shdrs.push_back(* ((Elf32_Shdr *) (contents + hdr->e_shoff) + i));
-
-    /* Get the section header string table section (".shstrtab").  Its
-       index in the section header table is given by e_shstrndx field
-       of the ELF header. */
-    unsigned int shstrtabIndex = hdr->e_shstrndx;
-    assert(shstrtabIndex < shdrs.size());
-    unsigned int shstrtabSize = shdrs[shstrtabIndex].sh_size;
-    char * shstrtab = (char * ) contents + shdrs[shstrtabIndex].sh_offset;
-    checkPointer(shstrtab, shstrtabSize);
-
-    assert(shstrtabSize > 0);
-    assert(shstrtab[shstrtabSize - 1] == 0);
-
-    sectionNames = string(shstrtab, shstrtabSize);
+        newDyn.d_tag = DT_NULL;
+        newDyn.d_un.d_val = 0;
+        setSubstr(newDynamic, (idx + 1) * sizeof(Elf32_Dyn),
+            string((char *) &newDyn, sizeof(Elf32_Dyn)));
+    }
 }
 
 

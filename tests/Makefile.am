@@ -1,7 +1,7 @@
 check_PROGRAMS = main simple
 
 TESTS = plain-run.sh shrink.sh set-interpreter-short.sh \
-  set-interpreter-long.sh set-rpath.sh $(XFAIL_TESTS)
+  set-interpreter-long.sh set-rpath.sh no-rpath.sh $(XFAIL_TESTS)
 
 XFAIL_TESTS = plain-fail.sh
 
@@ -31,4 +31,4 @@ clean-local:
 	$(RM) *.o libfoo.so libbar.so main
 
 
-EXTRA_DIST = main.c foo.c bar.c $(TESTS)
+EXTRA_DIST = main.c foo.c bar.c no-rpath $(TESTS)
