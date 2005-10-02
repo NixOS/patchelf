@@ -64,7 +64,7 @@ static void readFile(string fileName, mode_t * fileMode)
     if (stat(fileName.c_str(), &st) != 0) error("stat");
     fileSize = st.st_size;
     *fileMode = st.st_mode;
-    maxSize = fileSize + 128 * 1024;
+    maxSize = fileSize + 4 * 1024 * 1024;
     
     contents = (unsigned char *) malloc(fileSize + maxSize);
     if (!contents) abort();
@@ -641,6 +641,7 @@ int main(int argc, char * * argv)
         fprintf(stderr, "syntax: %s\n\
   [--interpreter FILENAME]\n\
   [--print-interpreter]\n\
+  [--set-rpath RPATH]\n\
   [--shrink-rpath]\n\
   [--print-rpath]\n\
   FILENAME\n", argv[0]);
