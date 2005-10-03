@@ -260,27 +260,33 @@ static void rewriteSections()
     assert(lastReplaced + 1 < shdrs.size()); /* !!! I'm lazy. */
     off_t startOffset = shdrs[lastReplaced + 1].sh_offset;
     Elf32_Addr startAddr = shdrs[lastReplaced + 1].sh_addr;
+    string prevSection;
     for (unsigned int i = 1; i <= lastReplaced; ++i) {
         Elf32_Shdr & shdr(shdrs[i]);
         string sectionName = getSectionName(shdr);
         fprintf(stderr, "looking at section `%s'\n", sectionName.c_str());
-        if (replacedSections.find(sectionName) != replacedSections.end()) continue;
-        //if (shdr.sh_type == SHT_PROGBITS && sectionName != ".interp") {
-        if (true) {
+        if ((shdr.sh_type == SHT_PROGBITS && sectionName != ".interp") || prevSection == ".dynstr") {
+        //if (true) {
             startOffset = shdr.sh_offset;
             startAddr = shdr.sh_addr;
             lastReplaced = i - 1;
             break;
         } else {
-            fprintf(stderr, "replacing section `%s' which is in the way\n", sectionName.c_str());
-            replaceSection(sectionName, shdr.sh_size);
+            if (replacedSections.find(sectionName) == replacedSections.end()) {
+                fprintf(stderr, "replacing section `%s' which is in the way\n", sectionName.c_str());
+                replaceSection(sectionName, shdr.sh_size);
+            }
         }
+        prevSection = sectionName;
     }
 
-    fprintf(stderr, "first reserved offset/addr is %d/0x%x\n",
+    fprintf(stderr, "first reserved offset/addr is 0x%x/0x%x\n",
         startOffset, startAddr);
-    Elf32_Addr startPage = startAddr / pageSize * pageSize;
-
+    
+    assert(startAddr % pageSize == startOffset % pageSize);
+    Elf32_Addr firstPage = startAddr - startOffset;
+    fprintf(stderr, "first page is 0x%x\n", firstPage);
+        
     /* Right now we assume that the section headers are somewhere near
        the end, which appears to be the case most of the time.
        Therefore its not accidentally overwritten by the replaced
@@ -303,17 +309,18 @@ static void rewriteSections()
     if (neededSpace > startOffset) {
 
         /* We also need an additional program header, so adjust for that. */
-        if (neededSpace > startOffset) neededSpace += sizeof(Elf32_Phdr);
+        neededSpace += sizeof(Elf32_Phdr);
         fprintf(stderr, "needed space is %d\n", neededSpace);
         
         unsigned int neededPages = roundUp(neededSpace - startOffset, pageSize) / pageSize;
         fprintf(stderr, "needed pages is %d\n", neededPages);
-        if (neededPages * pageSize > startPage)
+        if (neededPages * pageSize > firstPage)
             error("virtual address space underrun!");
-        startPage -= neededPages * pageSize;
+        
+        firstPage -= neededPages * pageSize;
         startOffset += neededPages * pageSize;
 
-        shiftFile(neededPages, startPage);
+        shiftFile(neededPages, firstPage);
     }
 
 
@@ -335,7 +342,7 @@ static void rewriteSections()
         /* Update the section header for this section. */
         Elf32_Shdr & shdr = findSection(sectionName);
         shdr.sh_offset = curOff;
-        shdr.sh_addr = startPage + curOff;
+        shdr.sh_addr = firstPage + curOff;
         shdr.sh_size = i->second.size();
         shdr.sh_addralign = 4;
 
@@ -377,7 +384,7 @@ static void rewriteSections()
        (According to the ELF spec, it must be the first entry.) */
     if (phdrs[0].p_type == PT_PHDR) {
         phdrs[0].p_offset = hdr->e_phoff;
-        phdrs[0].p_vaddr = phdrs[0].p_paddr = startPage + hdr->e_phoff;
+        phdrs[0].p_vaddr = phdrs[0].p_paddr = firstPage + hdr->e_phoff;
         phdrs[0].p_filesz = phdrs[0].p_memsz = phdrs.size() * sizeof(Elf32_Phdr);
     }
 
@@ -398,7 +405,7 @@ static void rewriteSections()
             dyn->d_un.d_ptr = findSection(".dynstr").sh_addr;
         else if (dyn->d_tag == DT_STRSZ)
             dyn->d_un.d_val = findSection(".dynstr").sh_size;
-#if 0
+#if 1
         else if (dyn->d_tag == DT_SYMTAB)
             dyn->d_un.d_ptr = findSection(".dynsym").sh_addr;
         else if (dyn->d_tag == DT_HASH)
