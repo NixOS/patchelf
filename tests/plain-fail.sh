@@ -1,2 +1,4 @@
 #! /bin/sh
-./main
+if ./main; then
+    exit 1
+fi

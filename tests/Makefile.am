@@ -1,9 +1,7 @@
-check_PROGRAMS = main simple
+check_PROGRAMS = main simple big-dynstr
 
-TESTS = plain-run.sh shrink.sh set-interpreter-short.sh \
-  set-interpreter-long.sh set-rpath.sh no-rpath.sh $(XFAIL_TESTS)
-
-XFAIL_TESTS = plain-fail.sh
+TESTS = plain-fail.sh plain-run.sh shrink.sh set-interpreter-short.sh \
+  set-interpreter-long.sh set-rpath.sh no-rpath.sh big-dynstr.sh 
 
 
 simple_SOURCES = simple.c
@@ -27,8 +25,19 @@ libbar.so: bar.o
 bar.o: bar.c
 	$(CC) -fpic -o bar.o -c bar.c
 
+
+big_dynstr_SOURCES = big-dynstr.c
+
+big-dynstr: big-dynstr.o libfoo.so
+	LD_LIBRARY_PATH=. gcc -o big-dynstr big-dynstr.o -L . -lfoo
+
+big-dynstr.c: main.c
+	cat main.c > big-dynstr.c
+	for i in $$(seq 1 2000); do echo "void f$$i(void) { };" >> big-dynstr.c; done
+
+
 clean-local:
-	$(RM) *.o libfoo.so libbar.so main
+	$(RM) *.o libfoo.so libbar.so main big-dynstr big-dynstr.c
 
 
 EXTRA_DIST = main.c foo.c bar.c no-rpath $(TESTS)
