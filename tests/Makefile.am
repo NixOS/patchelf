@@ -3,6 +3,8 @@ check_PROGRAMS = main simple big-dynstr
 TESTS = plain-fail.sh plain-run.sh shrink.sh set-interpreter-short.sh \
   set-interpreter-long.sh set-rpath.sh no-rpath.sh big-dynstr.sh 
 
+TESTS_ENVIRONMENT = PATCHELF_DEBUG=1
+
 
 simple_SOURCES = simple.c
 

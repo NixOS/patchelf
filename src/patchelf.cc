@@ -5,6 +5,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <assert.h>
 #include <string.h>
 #include <errno.h>
@@ -23,6 +24,8 @@ using namespace std;
 const unsigned int pageSize = 4096;
 
 
+static bool debugMode = false;
+
 static string fileName;
 
 static off_t fileSize, maxSize;
@@ -39,6 +42,17 @@ typedef map<SectionName, string> ReplacedSections;
 static ReplacedSections replacedSections;
 
 static string sectionNames; /* content of the .shstrtab section */
+
+
+static void debug(const char * format, ...)
+{
+    if (debugMode) {
+        va_list ap;
+        va_start(ap, format);
+        vfprintf(stderr, format, ap);
+        va_end(ap);
+    }
+}
 
 
 static void error(string msg)
@@ -235,7 +249,7 @@ static void rewriteSections()
 
     for (ReplacedSections::iterator i = replacedSections.begin();
          i != replacedSections.end(); ++i)
-        fprintf(stderr, "replacing section `%s' with size %d\n",
+        debug("replacing section `%s' with size %d\n",
             i->first.c_str(), i->second.size());
 
     
@@ -251,7 +265,7 @@ static void rewriteSections()
 
     assert(lastReplaced != 0);
 
-    fprintf(stderr, "last replaced is %d\n", lastReplaced);
+    debug("last replaced is %d\n", lastReplaced);
     
     /* Try to replace all section before that, as far as possible.
        Stop when we reach an irreplacable section (such as one of type
@@ -264,7 +278,7 @@ static void rewriteSections()
     for (unsigned int i = 1; i <= lastReplaced; ++i) {
         Elf32_Shdr & shdr(shdrs[i]);
         string sectionName = getSectionName(shdr);
-        fprintf(stderr, "looking at section `%s'\n", sectionName.c_str());
+        debug("looking at section `%s'\n", sectionName.c_str());
         if ((shdr.sh_type == SHT_PROGBITS && sectionName != ".interp") || prevSection == ".dynstr") {
         //if (true) {
             startOffset = shdr.sh_offset;
@@ -273,19 +287,19 @@ static void rewriteSections()
             break;
         } else {
             if (replacedSections.find(sectionName) == replacedSections.end()) {
-                fprintf(stderr, "replacing section `%s' which is in the way\n", sectionName.c_str());
+                debug("replacing section `%s' which is in the way\n", sectionName.c_str());
                 replaceSection(sectionName, shdr.sh_size);
             }
         }
         prevSection = sectionName;
     }
 
-    fprintf(stderr, "first reserved offset/addr is 0x%x/0x%x\n",
+    debug("first reserved offset/addr is 0x%x/0x%x\n",
         startOffset, startAddr);
     
     assert(startAddr % pageSize == startOffset % pageSize);
     Elf32_Addr firstPage = startAddr - startOffset;
-    fprintf(stderr, "first page is 0x%x\n", firstPage);
+    debug("first page is 0x%x\n", firstPage);
         
     /* Right now we assume that the section headers are somewhere near
        the end, which appears to be the case most of the time.
@@ -301,7 +315,7 @@ static void rewriteSections()
          i != replacedSections.end(); ++i)
         neededSpace += roundUp(i->second.size(), 4);
 
-    fprintf(stderr, "needed space is %d\n", neededSpace);
+    debug("needed space is %d\n", neededSpace);
 
     /* If we need more space at the start of the file, then grow the
        file by the minimum number of pages and adjust internal
@@ -310,10 +324,10 @@ static void rewriteSections()
 
         /* We also need an additional program header, so adjust for that. */
         neededSpace += sizeof(Elf32_Phdr);
-        fprintf(stderr, "needed space is %d\n", neededSpace);
+        debug("needed space is %d\n", neededSpace);
         
         unsigned int neededPages = roundUp(neededSpace - startOffset, pageSize) / pageSize;
-        fprintf(stderr, "needed pages is %d\n", neededPages);
+        debug("needed pages is %d\n", neededPages);
         if (neededPages * pageSize > firstPage)
             error("virtual address space underrun!");
         
@@ -334,7 +348,7 @@ static void rewriteSections()
          i != replacedSections.end(); )
     {
         string sectionName = i->first;
-        fprintf(stderr, "rewriting section `%s' to offset %d\n",
+        debug("rewriting section `%s' to offset %d\n",
             sectionName.c_str(), curOff);
         memcpy(contents + curOff, (unsigned char *) i->second.c_str(),
             i->second.size());
@@ -488,7 +502,7 @@ static void modifyRPath(RPathOp op, string newRPath)
     }
     
     if (op == rpShrink && !rpath) {
-        fprintf(stderr, "no RPATH to shrink\n");
+        debug("no RPATH to shrink\n");
         return;
     }
 
@@ -532,7 +546,7 @@ static void modifyRPath(RPathOp op, string newRPath)
                 }
 
             if (!libFound)
-                fprintf(stderr, "removing directory `%s' from RPATH\n", dirName.c_str());
+                debug("removing directory `%s' from RPATH\n", dirName.c_str());
             else
                 concatToRPath(newRPath, dirName);
         }
@@ -551,7 +565,7 @@ static void modifyRPath(RPathOp op, string newRPath)
         memset(rpath, 'X', rpathSize);
     }
 
-    fprintf(stderr, "new rpath is `%s'\n", newRPath.c_str());
+    debug("new rpath is `%s'\n", newRPath.c_str());
     
     if (newRPath.size() <= rpathSize) {
         strcpy(rpath, newRPath.c_str());
@@ -559,7 +573,7 @@ static void modifyRPath(RPathOp op, string newRPath)
     }
 
     /* Grow the .dynstr section to make room for the new RPATH. */
-    fprintf(stderr, "rpath is too long, resizing...\n");
+    debug("rpath is too long, resizing...\n");
 
     string & newDynStr = replaceSection(".dynstr",
         shdrDynStr.sh_size + newRPath.size() + 1);
@@ -579,7 +593,7 @@ static void modifyRPath(RPathOp op, string newRPath)
         dyn = (Elf32_Dyn *) newDynamic.c_str();
         for ( ; dyn->d_tag != DT_NULL; dyn++, idx++) ;
 
-        fprintf(stderr, "DT_NULL index is %d\n", idx);
+        debug("DT_NULL index is %d\n", idx);
         
         Elf32_Dyn newDyn;
         newDyn.d_tag = DT_RPATH;
@@ -607,7 +621,7 @@ static string newRPath;
 static void patchElf()
 {
     if (!printInterpreter && !printRPath)
-        fprintf(stderr, "patching ELF file `%s'\n", fileName.c_str());
+        debug("patching ELF file `%s'\n", fileName.c_str());
 
     mode_t fileMode;
     
@@ -651,9 +665,12 @@ int main(int argc, char * * argv)
   [--set-rpath RPATH]\n\
   [--shrink-rpath]\n\
   [--print-rpath]\n\
+  [--debug]\n\
   FILENAME\n", argv[0]);
         return 1;
     }
+
+    if (getenv("PATCHELF_DEBUG") != 0) debugMode = true;
 
     int i;
     for (i = 1; i < argc; ++i) {
@@ -675,6 +692,9 @@ int main(int argc, char * * argv)
         }
         else if (arg == "--print-rpath") {
             printRPath = true;
+        }
+        else if (arg == "--debug") {
+            debugMode = true;
         }
         else break;
     }
