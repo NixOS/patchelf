@@ -1,0 +1,37 @@
+PatchELF is simple utility for modifing existing ELF executables and
+libraries.  In particular, it can do the following:
+
+* Change the dynamic loader ("ELF interpreter") of executables:
+
+  $ patchelf --interpreter /lib/my-ld-linux.so.2 my-program
+
+* Change the RPATH of executables and libraries:
+
+  $ patchelf --set-rpath /opt/my-libs/lib:/other-libs my-program
+
+* Shrink the RPATH of executables and libraries:
+
+  $ patchelf --shrink-rpath /opt/my-libs/lib:/other-libs my-program
+
+  This removes from the RPATH all directories that do not contain a
+  library referenced by DT_NEEDED fields of the executable or library.
+  For instance, if an executable references one library libfoo.so, has
+  an RPATH "/lib:/usr/lib:/foo/lib", and libfoo.so can only be found
+  in /foo/lib, then the new RPATH will be "/foo/lib".
+
+
+AUTHOR
+
+Copyright 2004, 2005, Eelco Dolstra <eelco@cs.uu.nl>.  See COPYING for
+the license.
+
+
+HOMEPAGE
+
+http://nix.cs.uu.nl/
+
+
+BUGS
+
+Currently setting the RPATH on libraries ("--set-rpath") will usually
+fail if the new RPATH is longer then the old RPATH.
