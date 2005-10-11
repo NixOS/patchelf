@@ -660,7 +660,7 @@ int main(int argc, char * * argv)
 {
     if (argc <= 1) {
         fprintf(stderr, "syntax: %s\n\
-  [--interpreter FILENAME]\n\
+  [--set-interpreter FILENAME]\n\
   [--print-interpreter]\n\
   [--set-rpath RPATH]\n\
   [--shrink-rpath]\n\
@@ -675,7 +675,7 @@ int main(int argc, char * * argv)
     int i;
     for (i = 1; i < argc; ++i) {
         string arg(argv[i]);
-        if (arg == "--interpreter") {
+        if (arg == "--set-interpreter" || arg == "--interpreter") {
             if (++i == argc) error("missing argument");
             newInterpreter = argv[i];
         }

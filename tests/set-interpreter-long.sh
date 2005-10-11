@@ -10,7 +10,7 @@ mkdir -p scratch
 
 newInterpreter=$(pwd)/scratch/iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
 cp simple scratch/
-../src/patchelf --interpreter "$newInterpreter" scratch/simple
+../src/patchelf --set-interpreter "$newInterpreter" scratch/simple
 
 echo "running with missing interpreter..."
 if scratch/simple; then

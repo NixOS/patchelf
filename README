@@ -3,7 +3,7 @@ libraries.  In particular, it can do the following:
 
 * Change the dynamic loader ("ELF interpreter") of executables:
 
-  $ patchelf --interpreter /lib/my-ld-linux.so.2 my-program
+  $ patchelf --set-interpreter /lib/my-ld-linux.so.2 my-program
 
 * Change the RPATH of executables and libraries:
 
