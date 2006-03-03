@@ -215,11 +215,20 @@ static string getSectionName(const Elf32_Shdr & shdr)
 }
 
 
-static Elf32_Shdr & findSection(const SectionName & sectionName)
+static Elf32_Shdr * findSection2(const SectionName & sectionName)
 {
     for (unsigned int i = 1; i < hdr->e_shnum; ++i)
-        if (getSectionName(shdrs[i]) == sectionName) return shdrs[i];
-    error("cannot find section");
+        if (getSectionName(shdrs[i]) == sectionName) return &shdrs[i];
+    return 0;
+}
+
+
+static Elf32_Shdr & findSection(const SectionName & sectionName)
+{
+    Elf32_Shdr * shdr = findSection2(sectionName);
+    if (!shdr)
+        error("cannot find section " + sectionName);
+    return *shdr;
 }
 
 
@@ -426,8 +435,14 @@ static void rewriteSections()
             dyn->d_un.d_ptr = findSection(".hash").sh_addr;
         else if (dyn->d_tag == DT_JMPREL)
             dyn->d_un.d_ptr = findSection(".rel.plt").sh_addr;
-        else if (dyn->d_tag == DT_REL)
-            dyn->d_un.d_ptr = findSection(".rel.dyn").sh_addr;
+        else if (dyn->d_tag == DT_REL) { /* !!! hack! */
+            Elf32_Shdr * shdr = findSection2(".rel.dyn");
+            /* no idea if this makes sense, but it was needed for some
+               program*/
+            if (!shdr) shdr = findSection2(".rel.got");
+            if (!shdr) error("cannot find .rel.dyn or .rel.got");
+            dyn->d_un.d_ptr = shdr->sh_addr;
+        }
         else if (dyn->d_tag == DT_VERNEED)
             dyn->d_un.d_ptr = findSection(".gnu.version_r").sh_addr;
         else if (dyn->d_tag == DT_VERSYM)
