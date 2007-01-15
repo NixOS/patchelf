@@ -35,3 +35,15 @@ BUGS
 
 Currently setting the RPATH on libraries ("--set-rpath") will usually
 fail if the new RPATH is longer then the old RPATH.
+
+
+RELEASE HISTORY
+
+0.2 (January 15, 2007):
+
+* Provides a hack to get certain programs (such as the
+  Belastingaangifte 2005) to work.
+
+0.1 (October 11, 2005):
+
+* Initial release.
