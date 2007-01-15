@@ -1,4 +1,4 @@
-AC_INIT(patchelf, "0.2")
+AC_INIT(patchelf, "0.3")
 AC_CONFIG_SRCDIR(Makefile.am)
 AM_INIT_AUTOMAKE([dist-bzip2 foreign])
 
