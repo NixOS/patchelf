@@ -4,7 +4,7 @@ AM_INIT_AUTOMAKE([dist-bzip2 foreign])
 
 # Change to `1' to produce a `stable' release (i.e., the `preREVISION'
 # suffix is not added).
-STABLE=1
+STABLE=0
 
 # Put the revision number in the version.
 if test "$STABLE" != "1"; then
