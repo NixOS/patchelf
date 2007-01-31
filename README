@@ -43,6 +43,8 @@ RELEASE HISTORY
 
 * Support for 64-bit ELF binaries.
 
+* Support for big-endian binaries (such as on powerpc-linux).
+
 0.2 (January 15, 2007):
 
 * Provides a hack to get certain programs (such as the
