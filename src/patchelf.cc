@@ -152,13 +152,8 @@ void ElfFile<ElfFileParamNames>::parse()
 
     hdr = (Elf_Ehdr *) contents;
 
-    if (memcmp(hdr->e_ident, ELFMAG, 4) != 0)
+    if (memcmp(hdr->e_ident, ELFMAG, SELFMAG) != 0)
         error("not an ELF executable");
-
-    if (contents[EI_CLASS] != ELFCLASS32 ||
-        contents[EI_DATA] != ELFDATA2LSB ||
-        contents[EI_VERSION] != EV_CURRENT)
-        error("ELF executable is not 32-bit, little-endian, version 1");
 
     if (hdr->e_type != ET_EXEC && hdr->e_type != ET_DYN)
         error("wrong ELF type");
@@ -692,17 +687,9 @@ static bool printRPath = false;
 static string newRPath;
 
 
-static void patchElf()
+template<class ElfFile>
+static void patchElf2(ElfFile & elfFile, mode_t fileMode)
 {
-    if (!printInterpreter && !printRPath)
-        debug("patching ELF file `%s'\n", fileName.c_str());
-
-    mode_t fileMode;
-    
-    readFile(fileName, &fileMode);
-
-    ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn> elfFile;
-
     elfFile.parse();
 
 
@@ -724,6 +711,42 @@ static void patchElf()
     if (elfFile.isChanged()){
         elfFile.rewriteSections();
         writeFile(fileName, fileMode);
+    }
+}
+
+    
+static void patchElf()
+{
+    if (!printInterpreter && !printRPath)
+        debug("patching ELF file `%s'\n", fileName.c_str());
+
+    mode_t fileMode;
+    
+    readFile(fileName, &fileMode);
+
+
+    /* Check the ELF header for basic validity. */
+    if (fileSize < sizeof(Elf32_Ehdr)) error("missing ELF header");
+
+    if (memcmp(contents, ELFMAG, SELFMAG) != 0)
+        error("not an ELF executable");
+    
+    if (contents[EI_CLASS] == ELFCLASS32 &&
+        contents[EI_DATA] == ELFDATA2LSB &&
+        contents[EI_VERSION] == EV_CURRENT)
+    {
+        ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn> elfFile;
+        patchElf2(elfFile, fileMode);
+    }
+    else if (contents[EI_CLASS] == ELFCLASS64 &&
+        contents[EI_DATA] == ELFDATA2LSB &&
+        contents[EI_VERSION] == EV_CURRENT)
+    {
+        ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn> elfFile;
+        patchElf2(elfFile, fileMode);
+    }
+    else {
+        error("ELF executable is not 32/64-bit, little-endian, version 1");
     }
 }
 

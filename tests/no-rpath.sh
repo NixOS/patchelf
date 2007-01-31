@@ -18,4 +18,7 @@ if ! echo "$newRPath" | grep -q '/foo:/bar'; then
 fi
 
 exitCode=0
-cd scratch && ./no-rpath
+
+# !!! disabled running no-rpath for now, since it won't work on 64-bit
+# Linux (the interpreter will be 64 bits).
+#cd scratch && ./no-rpath

@@ -19,3 +19,4 @@ if echo "$rpath" | grep -q /no-such-path; then
     exit 1
 fi
 
+LD_LIBRARY_PATH=. ./main
