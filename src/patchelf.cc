@@ -480,8 +480,12 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
             dyn->d_un.d_ptr = findSection(".dynsym").sh_addr;
         else if (dyn->d_tag == DT_HASH)
             dyn->d_un.d_ptr = findSection(".hash").sh_addr;
-        else if (dyn->d_tag == DT_JMPREL)
-            dyn->d_un.d_ptr = findSection(".rel.plt").sh_addr;
+        else if (dyn->d_tag == DT_JMPREL) {
+            Elf_Shdr * shdr = findSection2(".rel.plt");
+            if (!shdr) shdr = findSection2(".rela.plt"); /* 64-bit Linux */
+            if (!shdr) error("cannot find .rel.plt or .rela.plt");
+            dyn->d_un.d_ptr = shdr->sh_addr;
+        }
         else if (dyn->d_tag == DT_REL) { /* !!! hack! */
             Elf_Shdr * shdr = findSection2(".rel.dyn");
             /* no idea if this makes sense, but it was needed for some

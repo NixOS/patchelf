@@ -19,4 +19,12 @@ if echo "$rpath" | grep -q /no-such-path; then
     exit 1
 fi
 
-LD_LIBRARY_PATH=. ./main
+cp libfoo.so scratch/
+
+exitCode=0
+cd scratch && LD_LIBRARY_PATH=. ../main || exitCode=$?
+
+if test "$exitCode" != 46; then
+    echo "bad exit code!"
+    exit 1
+fi
