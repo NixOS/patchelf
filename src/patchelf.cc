@@ -33,10 +33,15 @@ off_t fileSize, maxSize;
 unsigned char * contents = 0;
 
 
+#define ElfFileParams class Elf_Ehdr, class Elf_Phdr, class Elf_Shdr, class Elf_Addr, class Elf_Off, class Elf_Dyn
+#define ElfFileParamNames Elf_Ehdr, Elf_Phdr, Elf_Shdr, Elf_Addr, Elf_Off, Elf_Dyn
+
+
+template<ElfFileParams>
 class ElfFile {
-    Elf32_Ehdr * hdr;
-    vector<Elf32_Phdr> phdrs;
-    vector<Elf32_Shdr> shdrs;
+    Elf_Ehdr * hdr;
+    vector<Elf_Phdr> phdrs;
+    vector<Elf_Shdr> shdrs;
 
     bool changed;
 
@@ -61,13 +66,13 @@ public:
     
     void parse();
 
-    void shiftFile(unsigned int extraPages, Elf32_Addr startPage);
+    void shiftFile(unsigned int extraPages, Elf_Addr startPage);
 
-    string getSectionName(const Elf32_Shdr & shdr);
+    string getSectionName(const Elf_Shdr & shdr);
 
-    Elf32_Shdr * findSection2(const SectionName & sectionName);
+    Elf_Shdr * findSection2(const SectionName & sectionName);
 
-    Elf32_Shdr & findSection(const SectionName & sectionName);
+    Elf_Shdr & findSection(const SectionName & sectionName);
     
     string & replaceSection(const SectionName & sectionName,
         unsigned int size);
@@ -139,12 +144,13 @@ static void checkPointer(void * p, unsigned int size)
 }
 
 
-void ElfFile::parse()
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::parse()
 {
     /* Check the ELF header for basic validity. */
-    if (fileSize < sizeof(Elf32_Ehdr)) error("missing ELF header");
+    if (fileSize < sizeof(Elf_Ehdr)) error("missing ELF header");
 
-    hdr = (Elf32_Ehdr *) contents;
+    hdr = (Elf_Ehdr *) contents;
 
     if (memcmp(hdr->e_ident, ELFMAG, 4) != 0)
         error("not an ELF executable");
@@ -163,15 +169,15 @@ void ElfFile::parse()
     if (hdr->e_shoff + hdr->e_shnum * hdr->e_shentsize > fileSize)
         error("missing section headers");
 
-    if (hdr->e_phentsize != sizeof(Elf32_Phdr))
+    if (hdr->e_phentsize != sizeof(Elf_Phdr))
         error("program headers have wrong size");
 
     /* Copy the program and section headers. */
     for (int i = 0; i < hdr->e_phnum; ++i)
-        phdrs.push_back(* ((Elf32_Phdr *) (contents + hdr->e_phoff) + i));
+        phdrs.push_back(* ((Elf_Phdr *) (contents + hdr->e_phoff) + i));
     
     for (int i = 0; i < hdr->e_shnum; ++i)
-        shdrs.push_back(* ((Elf32_Shdr *) (contents + hdr->e_shoff) + i));
+        shdrs.push_back(* ((Elf_Shdr *) (contents + hdr->e_shoff) + i));
 
     /* Get the section header string table section (".shstrtab").  Its
        index in the section header table is given by e_shstrndx field
@@ -213,7 +219,8 @@ static unsigned int roundUp(unsigned int n, unsigned int m)
 }
 
 
-void ElfFile::shiftFile(unsigned int extraPages, Elf32_Addr startPage)
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, Elf_Addr startPage)
 {
     /* Move the entire contents of the file `extraPages' pages
        further. */
@@ -221,10 +228,10 @@ void ElfFile::shiftFile(unsigned int extraPages, Elf32_Addr startPage)
     unsigned int shift = extraPages * pageSize;
     growFile(fileSize + extraPages * pageSize);
     memmove(contents + extraPages * pageSize, contents, oldSize);
-    memset(contents + sizeof(Elf32_Ehdr), 0, shift - sizeof(Elf32_Ehdr));
+    memset(contents + sizeof(Elf_Ehdr), 0, shift - sizeof(Elf_Ehdr));
 
     /* Adjust the ELF header. */
-    hdr->e_phoff = sizeof(Elf32_Ehdr);
+    hdr->e_phoff = sizeof(Elf_Ehdr);
     hdr->e_shoff += shift;
     
     /* Update the offsets in the section headers. */
@@ -239,7 +246,7 @@ void ElfFile::shiftFile(unsigned int extraPages, Elf32_Addr startPage)
        PT_INTERP segment into memory.  Otherwise glibc will choke. */
     phdrs.resize(hdr->e_phnum + 1);
     hdr->e_phnum++;
-    Elf32_Phdr & phdr = phdrs[hdr->e_phnum - 1];
+    Elf_Phdr & phdr = phdrs[hdr->e_phnum - 1];
     phdr.p_type = PT_LOAD;
     phdr.p_offset = 0;
     phdr.p_vaddr = phdr.p_paddr = startPage;
@@ -249,13 +256,15 @@ void ElfFile::shiftFile(unsigned int extraPages, Elf32_Addr startPage)
 }
 
 
-string ElfFile::getSectionName(const Elf32_Shdr & shdr)
+template<ElfFileParams>
+string ElfFile<ElfFileParamNames>::getSectionName(const Elf_Shdr & shdr)
 {
     return string(sectionNames.c_str() + shdr.sh_name);
 }
 
 
-Elf32_Shdr * ElfFile::findSection2(const SectionName & sectionName)
+template<ElfFileParams>
+Elf_Shdr * ElfFile<ElfFileParamNames>::findSection2(const SectionName & sectionName)
 {
     for (unsigned int i = 1; i < hdr->e_shnum; ++i)
         if (getSectionName(shdrs[i]) == sectionName) return &shdrs[i];
@@ -263,16 +272,18 @@ Elf32_Shdr * ElfFile::findSection2(const SectionName & sectionName)
 }
 
 
-Elf32_Shdr & ElfFile::findSection(const SectionName & sectionName)
+template<ElfFileParams>
+Elf_Shdr & ElfFile<ElfFileParamNames>::findSection(const SectionName & sectionName)
 {
-    Elf32_Shdr * shdr = findSection2(sectionName);
+    Elf_Shdr * shdr = findSection2(sectionName);
     if (!shdr)
         error("cannot find section " + sectionName);
     return *shdr;
 }
 
 
-string & ElfFile::replaceSection(const SectionName & sectionName,
+template<ElfFileParams>
+string & ElfFile<ElfFileParamNames>::replaceSection(const SectionName & sectionName,
     unsigned int size)
 {
     ReplacedSections::iterator i = replacedSections.find(sectionName);
@@ -281,7 +292,7 @@ string & ElfFile::replaceSection(const SectionName & sectionName,
     if (i != replacedSections.end()) {
         s = string(i->second);
     } else {
-        Elf32_Shdr & shdr = findSection(sectionName);
+        Elf_Shdr & shdr = findSection(sectionName);
         s = string((char *) contents + shdr.sh_offset, shdr.sh_size);
     }
     
@@ -292,7 +303,8 @@ string & ElfFile::replaceSection(const SectionName & sectionName,
 }
 
 
-void ElfFile::rewriteSections()
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::rewriteSections()
 {
     if (replacedSections.empty()) return;
 
@@ -322,10 +334,10 @@ void ElfFile::rewriteSections()
        since that would invalidate absolute references to them. */
     assert(lastReplaced + 1 < shdrs.size()); /* !!! I'm lazy. */
     off_t startOffset = shdrs[lastReplaced + 1].sh_offset;
-    Elf32_Addr startAddr = shdrs[lastReplaced + 1].sh_addr;
+    Elf_Addr startAddr = shdrs[lastReplaced + 1].sh_addr;
     string prevSection;
     for (unsigned int i = 1; i <= lastReplaced; ++i) {
-        Elf32_Shdr & shdr(shdrs[i]);
+        Elf_Shdr & shdr(shdrs[i]);
         string sectionName = getSectionName(shdr);
         debug("looking at section `%s'\n", sectionName.c_str());
         if ((shdr.sh_type == SHT_PROGBITS && sectionName != ".interp") || prevSection == ".dynstr") {
@@ -347,7 +359,7 @@ void ElfFile::rewriteSections()
         startOffset, startAddr);
     
     assert(startAddr % pageSize == startOffset % pageSize);
-    Elf32_Addr firstPage = startAddr - startOffset;
+    Elf_Addr firstPage = startAddr - startOffset;
     debug("first page is 0x%x\n", firstPage);
         
     /* Right now we assume that the section headers are somewhere near
@@ -359,7 +371,7 @@ void ElfFile::rewriteSections()
     
     /* Compute the total space needed for the replaced sections, the
        ELF header, and the program headers. */
-    off_t neededSpace = sizeof(Elf32_Ehdr) + phdrs.size() * sizeof(Elf32_Phdr);
+    off_t neededSpace = sizeof(Elf_Ehdr) + phdrs.size() * sizeof(Elf_Phdr);
     for (ReplacedSections::iterator i = replacedSections.begin();
          i != replacedSections.end(); ++i)
         neededSpace += roundUp(i->second.size(), 4);
@@ -372,7 +384,7 @@ void ElfFile::rewriteSections()
     if (neededSpace > startOffset) {
 
         /* We also need an additional program header, so adjust for that. */
-        neededSpace += sizeof(Elf32_Phdr);
+        neededSpace += sizeof(Elf_Phdr);
         debug("needed space is %d\n", neededSpace);
         
         unsigned int neededPages = roundUp(neededSpace - startOffset, pageSize) / pageSize;
@@ -388,7 +400,7 @@ void ElfFile::rewriteSections()
 
 
     /* Clear out the free space. */
-    Elf32_Off curOff = sizeof(Elf32_Ehdr) + phdrs.size() * sizeof(Elf32_Phdr);
+    Elf_Off curOff = sizeof(Elf_Ehdr) + phdrs.size() * sizeof(Elf_Phdr);
     memset(contents + curOff, 0, startOffset - curOff);
     
 
@@ -403,7 +415,7 @@ void ElfFile::rewriteSections()
             i->second.size());
 
         /* Update the section header for this section. */
-        Elf32_Shdr & shdr = findSection(sectionName);
+        Elf_Shdr & shdr = findSection(sectionName);
         shdr.sh_offset = curOff;
         shdr.sh_addr = firstPage + curOff;
         shdr.sh_size = i->second.size();
@@ -448,21 +460,21 @@ void ElfFile::rewriteSections()
     if (phdrs[0].p_type == PT_PHDR) {
         phdrs[0].p_offset = hdr->e_phoff;
         phdrs[0].p_vaddr = phdrs[0].p_paddr = firstPage + hdr->e_phoff;
-        phdrs[0].p_filesz = phdrs[0].p_memsz = phdrs.size() * sizeof(Elf32_Phdr);
+        phdrs[0].p_filesz = phdrs[0].p_memsz = phdrs.size() * sizeof(Elf_Phdr);
     }
 
     for (int i = 0; i < phdrs.size(); ++i)
-        * ((Elf32_Phdr *) (contents + hdr->e_phoff) + i) = phdrs[i];
+        * ((Elf_Phdr *) (contents + hdr->e_phoff) + i) = phdrs[i];
 
     /* Rewrite the section header table. */
     assert(hdr->e_shnum == shdrs.size());
     for (int i = 1; i < hdr->e_shnum; ++i)
-        * ((Elf32_Shdr *) (contents + hdr->e_shoff) + i) = shdrs[i];
+        * ((Elf_Shdr *) (contents + hdr->e_shoff) + i) = shdrs[i];
 
     /* Update all those nasty virtual addresses in the .dynamic
        section. */
-    Elf32_Shdr & shdrDynamic = findSection(".dynamic");
-    Elf32_Dyn * dyn = (Elf32_Dyn *) (contents + shdrDynamic.sh_offset);
+    Elf_Shdr & shdrDynamic = findSection(".dynamic");
+    Elf_Dyn * dyn = (Elf_Dyn *) (contents + shdrDynamic.sh_offset);
     for ( ; dyn->d_tag != DT_NULL; dyn++)
         if (dyn->d_tag == DT_STRTAB)
             dyn->d_un.d_ptr = findSection(".dynstr").sh_addr;
@@ -476,7 +488,7 @@ void ElfFile::rewriteSections()
         else if (dyn->d_tag == DT_JMPREL)
             dyn->d_un.d_ptr = findSection(".rel.plt").sh_addr;
         else if (dyn->d_tag == DT_REL) { /* !!! hack! */
-            Elf32_Shdr * shdr = findSection2(".rel.dyn");
+            Elf_Shdr * shdr = findSection2(".rel.dyn");
             /* no idea if this makes sense, but it was needed for some
                program*/
             if (!shdr) shdr = findSection2(".rel.got");
@@ -498,14 +510,16 @@ static void setSubstr(string & s, unsigned int pos, const string & t)
 }
 
 
-string ElfFile::getInterpreter()
+template<ElfFileParams>
+string ElfFile<ElfFileParamNames>::getInterpreter()
 {
-    Elf32_Shdr & shdr = findSection(".interp");
+    Elf_Shdr & shdr = findSection(".interp");
     return string((char *) contents + shdr.sh_offset, shdr.sh_size);
 }
 
 
-void ElfFile::setInterpreter(const string & newInterpreter)
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::setInterpreter(const string & newInterpreter)
 {
     string & section = replaceSection(".interp", newInterpreter.size() + 1);
     setSubstr(section, 0, newInterpreter + '\0');
@@ -520,18 +534,19 @@ static void concatToRPath(string & rpath, const string & path)
 }
 
 
-void ElfFile::modifyRPath(RPathOp op, string newRPath)
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
 {
-    Elf32_Shdr & shdrDynamic = findSection(".dynamic");
+    Elf_Shdr & shdrDynamic = findSection(".dynamic");
 
     /* !!! We assume that the virtual address in the DT_STRTAB entry
        of the dynamic section corresponds to the .dynstr section. */ 
-    Elf32_Shdr & shdrDynStr = findSection(".dynstr");
+    Elf_Shdr & shdrDynStr = findSection(".dynstr");
     char * strTab = (char *) contents + shdrDynStr.sh_offset;
 
     /* Find the DT_STRTAB entry in the dynamic section. */
-    Elf32_Dyn * dyn = (Elf32_Dyn *) (contents + shdrDynamic.sh_offset);
-    Elf32_Addr strTabAddr = 0;
+    Elf_Dyn * dyn = (Elf_Dyn *) (contents + shdrDynamic.sh_offset);
+    Elf_Addr strTabAddr = 0;
     for ( ; dyn->d_tag != DT_NULL; dyn++)
         if (dyn->d_tag == DT_STRTAB) strTabAddr = dyn->d_un.d_ptr;
     if (!strTabAddr) error("strange: no string table");
@@ -541,9 +556,9 @@ void ElfFile::modifyRPath(RPathOp op, string newRPath)
     
     /* Walk through the dynamic section, look for the RPATH entry. */
     static vector<string> neededLibs;
-    dyn = (Elf32_Dyn *) (contents + shdrDynamic.sh_offset);
-    Elf32_Dyn * dynRPath = 0;
-    Elf32_Dyn * rpathEntry = 0;
+    dyn = (Elf_Dyn *) (contents + shdrDynamic.sh_offset);
+    Elf_Dyn * dynRPath = 0;
+    Elf_Dyn * rpathEntry = 0;
     char * rpath = 0;
     for ( ; dyn->d_tag != DT_NULL; dyn++) {
         if (dyn->d_tag == DT_RPATH) {
@@ -646,24 +661,24 @@ void ElfFile::modifyRPath(RPathOp op, string newRPath)
         /* There is no DT_RPATH entry in the .dynamic section, so we
            have to grow the .dynamic section. */
         string & newDynamic = replaceSection(".dynamic",
-            shdrDynamic.sh_size + sizeof(Elf32_Dyn));
+            shdrDynamic.sh_size + sizeof(Elf_Dyn));
 
         unsigned int idx = 0;
-        dyn = (Elf32_Dyn *) newDynamic.c_str();
+        dyn = (Elf_Dyn *) newDynamic.c_str();
         for ( ; dyn->d_tag != DT_NULL; dyn++, idx++) ;
 
         debug("DT_NULL index is %d\n", idx);
         
-        Elf32_Dyn newDyn;
+        Elf_Dyn newDyn;
         newDyn.d_tag = DT_RPATH;
         newDyn.d_un.d_val = shdrDynStr.sh_size;
-        setSubstr(newDynamic, idx * sizeof(Elf32_Dyn),
-            string((char *) &newDyn, sizeof(Elf32_Dyn)));
+        setSubstr(newDynamic, idx * sizeof(Elf_Dyn),
+            string((char *) &newDyn, sizeof(Elf_Dyn)));
 
         newDyn.d_tag = DT_NULL;
         newDyn.d_un.d_val = 0;
-        setSubstr(newDynamic, (idx + 1) * sizeof(Elf32_Dyn),
-            string((char *) &newDyn, sizeof(Elf32_Dyn)));
+        setSubstr(newDynamic, (idx + 1) * sizeof(Elf_Dyn),
+            string((char *) &newDyn, sizeof(Elf_Dyn)));
     }
 }
 
@@ -686,7 +701,7 @@ static void patchElf()
     
     readFile(fileName, &fileMode);
 
-    ElfFile elfFile;
+    ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn> elfFile;
 
     elfFile.parse();
 
@@ -698,12 +713,12 @@ static void patchElf()
         elfFile.setInterpreter(newInterpreter);
 
     if (printRPath)
-        elfFile.modifyRPath(ElfFile::rpPrint, "");
+        elfFile.modifyRPath(elfFile.rpPrint, "");
 
     if (shrinkRPath)
-        elfFile.modifyRPath(ElfFile::rpShrink, "");
+        elfFile.modifyRPath(elfFile.rpShrink, "");
     else if (setRPath)
-        elfFile.modifyRPath(ElfFile::rpSet, newRPath);
+        elfFile.modifyRPath(elfFile.rpSet, newRPath);
     
     
     if (elfFile.isChanged()){
