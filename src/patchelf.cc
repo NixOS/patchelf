@@ -57,7 +57,7 @@ static void debug(const char * format, ...)
 
 static void error(string msg)
 {
-    if (errno) perror(msg.c_str()); else printf("%s\n", msg.c_str());
+    if (errno) perror(msg.c_str()); else fprintf(stderr, "%s\n", msg.c_str());
     exit(1);
 }
 
@@ -267,7 +267,7 @@ static void rewriteSections()
     for (unsigned int i = 1; i < hdr->e_shnum; ++i) {
         string sectionName = getSectionName(shdrs[i]);
         if (replacedSections.find(sectionName) != replacedSections.end()) {
-            printf("using replaced section `%s'\n", sectionName.c_str());
+            fprintf(stderr, "using replaced section `%s'\n", sectionName.c_str());
             lastReplaced = i;
         }
     }
