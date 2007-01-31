@@ -39,6 +39,10 @@ fail if the new RPATH is longer then the old RPATH.
 
 RELEASE HISTORY
 
+0.3 (TBD):
+
+* Support for 64-bit ELF binaries.
+
 0.2 (January 15, 2007):
 
 * Provides a hack to get certain programs (such as the
