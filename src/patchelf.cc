@@ -28,20 +28,60 @@ static bool debugMode = false;
 
 static string fileName;
 
-static off_t fileSize, maxSize;
-static unsigned char * contents = 0;
-static Elf32_Ehdr * hdr;
-static vector<Elf32_Phdr> phdrs;
-static vector<Elf32_Shdr> shdrs;
 
-static bool changed = false;
+off_t fileSize, maxSize;
+unsigned char * contents = 0;
 
-typedef string SectionName;
-typedef map<SectionName, string> ReplacedSections;
 
-static ReplacedSections replacedSections;
+class ElfFile {
+    Elf32_Ehdr * hdr;
+    vector<Elf32_Phdr> phdrs;
+    vector<Elf32_Shdr> shdrs;
 
-static string sectionNames; /* content of the .shstrtab section */
+    bool changed;
+
+    typedef string SectionName;
+    typedef map<SectionName, string> ReplacedSections;
+
+    ReplacedSections replacedSections;
+
+    string sectionNames; /* content of the .shstrtab section */
+
+public:
+
+    ElfFile() 
+    {
+        changed = false;
+    }
+
+    bool isChanged()
+    {
+        return changed;
+    }
+    
+    void parse();
+
+    void shiftFile(unsigned int extraPages, Elf32_Addr startPage);
+
+    string getSectionName(const Elf32_Shdr & shdr);
+
+    Elf32_Shdr * findSection2(const SectionName & sectionName);
+
+    Elf32_Shdr & findSection(const SectionName & sectionName);
+    
+    string & replaceSection(const SectionName & sectionName,
+        unsigned int size);
+
+    void rewriteSections();
+
+    string getInterpreter();
+
+    void setInterpreter(const string & newInterpreter);
+
+    typedef enum { rpPrint, rpShrink, rpSet } RPathOp;
+
+    void modifyRPath(RPathOp op, string newRPath);
+};
 
 
 static void debug(const char * format, ...)
@@ -99,7 +139,7 @@ static void checkPointer(void * p, unsigned int size)
 }
 
 
-static void parseElf()
+void ElfFile::parse()
 {
     /* Check the ELF header for basic validity. */
     if (fileSize < sizeof(Elf32_Ehdr)) error("missing ELF header");
@@ -173,7 +213,7 @@ static unsigned int roundUp(unsigned int n, unsigned int m)
 }
 
 
-static void shiftFile(unsigned int extraPages, Elf32_Addr startPage)
+void ElfFile::shiftFile(unsigned int extraPages, Elf32_Addr startPage)
 {
     /* Move the entire contents of the file `extraPages' pages
        further. */
@@ -209,13 +249,13 @@ static void shiftFile(unsigned int extraPages, Elf32_Addr startPage)
 }
 
 
-static string getSectionName(const Elf32_Shdr & shdr)
+string ElfFile::getSectionName(const Elf32_Shdr & shdr)
 {
     return string(sectionNames.c_str() + shdr.sh_name);
 }
 
 
-static Elf32_Shdr * findSection2(const SectionName & sectionName)
+Elf32_Shdr * ElfFile::findSection2(const SectionName & sectionName)
 {
     for (unsigned int i = 1; i < hdr->e_shnum; ++i)
         if (getSectionName(shdrs[i]) == sectionName) return &shdrs[i];
@@ -223,7 +263,7 @@ static Elf32_Shdr * findSection2(const SectionName & sectionName)
 }
 
 
-static Elf32_Shdr & findSection(const SectionName & sectionName)
+Elf32_Shdr & ElfFile::findSection(const SectionName & sectionName)
 {
     Elf32_Shdr * shdr = findSection2(sectionName);
     if (!shdr)
@@ -232,7 +272,7 @@ static Elf32_Shdr & findSection(const SectionName & sectionName)
 }
 
 
-static string & replaceSection(const SectionName & sectionName,
+string & ElfFile::replaceSection(const SectionName & sectionName,
     unsigned int size)
 {
     ReplacedSections::iterator i = replacedSections.find(sectionName);
@@ -252,7 +292,7 @@ static string & replaceSection(const SectionName & sectionName,
 }
 
 
-static void rewriteSections()
+void ElfFile::rewriteSections()
 {
     if (replacedSections.empty()) return;
 
@@ -458,7 +498,14 @@ static void setSubstr(string & s, unsigned int pos, const string & t)
 }
 
 
-static void setInterpreter(const string & newInterpreter)
+string ElfFile::getInterpreter()
+{
+    Elf32_Shdr & shdr = findSection(".interp");
+    return string((char *) contents + shdr.sh_offset, shdr.sh_size);
+}
+
+
+void ElfFile::setInterpreter(const string & newInterpreter)
 {
     string & section = replaceSection(".interp", newInterpreter.size() + 1);
     setSubstr(section, 0, newInterpreter + '\0');
@@ -473,10 +520,7 @@ static void concatToRPath(string & rpath, const string & path)
 }
 
 
-typedef enum { rpPrint, rpShrink, rpSet } RPathOp;
-
-
-static void modifyRPath(RPathOp op, string newRPath)
+void ElfFile::modifyRPath(RPathOp op, string newRPath)
 {
     Elf32_Shdr & shdrDynamic = findSection(".dynamic");
 
@@ -642,30 +686,28 @@ static void patchElf()
     
     readFile(fileName, &fileMode);
 
-    parseElf();
+    ElfFile elfFile;
+
+    elfFile.parse();
 
 
-    if (printInterpreter) {
-        Elf32_Shdr & shdr = findSection(".interp");
-        string interpreter((char *) contents + shdr.sh_offset, shdr.sh_size);
-        printf("%s\n", interpreter.c_str());
-    }
+    if (printInterpreter)
+        printf("%s\n", elfFile.getInterpreter().c_str());
     
     if (newInterpreter != "")
-        setInterpreter(newInterpreter);
+        elfFile.setInterpreter(newInterpreter);
 
     if (printRPath)
-        modifyRPath(rpPrint, "");
+        elfFile.modifyRPath(ElfFile::rpPrint, "");
 
     if (shrinkRPath)
-        modifyRPath(rpShrink, "");
+        elfFile.modifyRPath(ElfFile::rpShrink, "");
     else if (setRPath)
-        modifyRPath(rpSet, newRPath);
+        elfFile.modifyRPath(ElfFile::rpSet, newRPath);
     
     
-    if (changed){
-        rewriteSections();
-
+    if (elfFile.isChanged()){
+        elfFile.rewriteSections();
         writeFile(fileName, fileMode);
     }
 }
