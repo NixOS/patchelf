@@ -86,10 +86,12 @@ private:
 
     string getSectionName(const Elf_Shdr & shdr);
 
-    Elf_Shdr * findSection2(const SectionName & sectionName);
-
     Elf_Shdr & findSection(const SectionName & sectionName);
     
+    Elf_Shdr * findSection2(const SectionName & sectionName);
+
+    unsigned int findSection3(const SectionName & sectionName);
+
     string & replaceSection(const SectionName & sectionName,
         unsigned int size);
 
@@ -242,9 +244,38 @@ void ElfFile<ElfFileParamNames>::parse()
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::sortShdrs()
 {
+    /* Translate sh_link mappings to section names, since sorting the
+       sections will invalidate the sh_link fields. */
+    map<SectionName, SectionName> linkage;
+    for (unsigned int i = 1; i < rdi(hdr->e_shnum); ++i)
+        if (rdi(shdrs[i].sh_link) != 0)
+            linkage[getSectionName(shdrs[i])] = getSectionName(shdrs[rdi(shdrs[i].sh_link)]);
+
+    /* Idem for sh_info on certain sections. */
+    map<SectionName, SectionName> info;
+    for (unsigned int i = 1; i < rdi(hdr->e_shnum); ++i)
+        if (rdi(shdrs[i].sh_info) != 0 &&
+            (rdi(shdrs[i].sh_type) == SHT_REL || rdi(shdrs[i].sh_type) == SHT_RELA))
+            info[getSectionName(shdrs[i])] = getSectionName(shdrs[rdi(shdrs[i].sh_info)]);
+
+    /* Sort the sections by offset. */
     CompShdr comp;
     comp.elfFile = this;
     sort(shdrs.begin(), shdrs.end(), comp);
+
+    /* Restore the sh_link mappings. */
+    for (unsigned int i = 1; i < rdi(hdr->e_shnum); ++i)
+        if (rdi(shdrs[i].sh_link) != 0)
+            wri(shdrs[i].sh_link,
+                findSection3(linkage[getSectionName(shdrs[i])]));
+
+    /* And the st_info mappings. */
+    for (unsigned int i = 1; i < rdi(hdr->e_shnum); ++i)
+        if (rdi(shdrs[i].sh_info) != 0 &&
+            (rdi(shdrs[i].sh_type) == SHT_REL || rdi(shdrs[i].sh_type) == SHT_RELA))
+            wri(shdrs[i].sh_info,
+                findSection3(info[getSectionName(shdrs[i])]));
+
 }
 
 
@@ -317,21 +348,29 @@ string ElfFile<ElfFileParamNames>::getSectionName(const Elf_Shdr & shdr)
 
 
 template<ElfFileParams>
-Elf_Shdr * ElfFile<ElfFileParamNames>::findSection2(const SectionName & sectionName)
-{
-    for (unsigned int i = 1; i < rdi(hdr->e_shnum); ++i)
-        if (getSectionName(shdrs[i]) == sectionName) return &shdrs[i];
-    return 0;
-}
-
-
-template<ElfFileParams>
 Elf_Shdr & ElfFile<ElfFileParamNames>::findSection(const SectionName & sectionName)
 {
     Elf_Shdr * shdr = findSection2(sectionName);
     if (!shdr)
         error("cannot find section " + sectionName);
     return *shdr;
+}
+
+
+template<ElfFileParams>
+Elf_Shdr * ElfFile<ElfFileParamNames>::findSection2(const SectionName & sectionName)
+{
+    unsigned int i = findSection3(sectionName);
+    return i ? &shdrs[i] : 0;
+}
+
+
+template<ElfFileParams>
+unsigned int ElfFile<ElfFileParamNames>::findSection3(const SectionName & sectionName)
+{
+    for (unsigned int i = 1; i < rdi(hdr->e_shnum); ++i)
+        if (getSectionName(shdrs[i]) == sectionName) return i;
+    return 0;
 }
 
 
