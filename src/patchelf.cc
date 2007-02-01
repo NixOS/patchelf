@@ -38,7 +38,8 @@ unsigned char * contents = 0;
 
 
 template<ElfFileParams>
-class ElfFile {
+class ElfFile
+{
     Elf_Ehdr * hdr;
     vector<Elf_Phdr> phdrs;
     vector<Elf_Shdr> shdrs;
@@ -68,6 +69,19 @@ public:
     
     void parse();
 
+private:
+
+    struct CompShdr 
+    {
+        ElfFile * elfFile;
+        bool operator ()(const Elf_Shdr & x, const Elf_Shdr & y)
+        {
+            return elfFile->rdi(x.sh_offset) < elfFile->rdi(y.sh_offset);
+        }
+    };
+    
+    void sortShdrs();
+
     void shiftFile(unsigned int extraPages, Elf_Addr startPage);
 
     string getSectionName(const Elf_Shdr & shdr);
@@ -79,6 +93,8 @@ public:
     string & replaceSection(const SectionName & sectionName,
         unsigned int size);
 
+public:
+
     void rewriteSections();
 
     string getInterpreter();
@@ -89,6 +105,11 @@ public:
 
     void modifyRPath(RPathOp op, string newRPath);
 
+private:
+    
+    /* Convert an integer in big or little endian representation (as
+       specified by the ELF header) to this platform's integer
+       representation. */
     template<class I>
     I rdi(I i) 
     {
@@ -105,6 +126,7 @@ public:
 	return r;
     }
 
+    /* Convert back to the ELF representation. */
     template<class I>
     I wri(I & t, unsigned int i) 
     {
@@ -217,6 +239,15 @@ void ElfFile<ElfFileParamNames>::parse()
 }
 
 
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::sortShdrs()
+{
+    CompShdr comp;
+    comp.elfFile = this;
+    sort(shdrs.begin(), shdrs.end(), comp);
+}
+
+
 static void writeFile(string fileName, mode_t fileMode)
 {
     string fileName2 = fileName + "_patchelf_tmp";
@@ -257,7 +288,7 @@ void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, Elf_Addr sta
     wri(hdr->e_shoff, rdi(hdr->e_shoff) + shift);
     
     /* Update the offsets in the section headers. */
-    for (int i = 0; i < rdi(hdr->e_shnum); ++i)
+    for (int i = 1; i < rdi(hdr->e_shnum); ++i)
         wri(shdrs[i].sh_offset, rdi(shdrs[i].sh_offset) + shift);
     
     /* Update the offsets in the program headers. */
@@ -336,10 +367,16 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
             i->first.c_str(), i->second.size());
 
 
-    // Align on 4 or 8 bytes boundaries on 32- or 64-bit platforms respectively.
+    /* Align on 4 or 8 bytes boundaries on 32- or 64-bit platforms
+       respectively. */
     unsigned int sectionAlignment = sizeof(Elf_Off);
 
+
+    /* Sort the sections by offset, otherwise we won't correctly find
+       all the sections before the last replaced section. */
+    sortShdrs();
     
+
     /* What is the index of the last replaced section? */
     unsigned int lastReplaced = 0;
     for (unsigned int i = 1; i < rdi(hdr->e_shnum); ++i) {
@@ -354,7 +391,7 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
 
     debug("last replaced is %d\n", lastReplaced);
     
-    /* Try to replace all section before that, as far as possible.
+    /* Try to replace all sections before that, as far as possible.
        Stop when we reach an irreplacable section (such as one of type
        SHT_PROGBITS).  These cannot be moved in virtual address space
        since that would invalidate absolute references to them. */
@@ -366,7 +403,11 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
         Elf_Shdr & shdr(shdrs[i]);
         string sectionName = getSectionName(shdr);
         debug("looking at section `%s'\n", sectionName.c_str());
-        if ((shdr.sh_type == rdi(SHT_PROGBITS) && sectionName != ".interp") || prevSection == ".dynstr") {
+        /* !!! Why do we stop after a .dynstr section? I can't
+           remember! */
+        if ((shdr.sh_type == rdi(SHT_PROGBITS) && sectionName != ".interp")
+            || prevSection == ".dynstr")
+        {
             startOffset = rdi(shdr.sh_offset);
             startAddr = rdi(shdr.sh_addr);
             lastReplaced = i - 1;
@@ -426,6 +467,7 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
 
     /* Clear out the free space. */
     Elf_Off curOff = sizeof(Elf_Ehdr) + phdrs.size() * sizeof(Elf_Phdr);
+    debug("clearing first %d bytes\n", startOffset - curOff);
     memset(contents + curOff, 0, startOffset - curOff);
     
 
@@ -491,8 +533,10 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
     for (int i = 0; i < phdrs.size(); ++i)
         * ((Elf_Phdr *) (contents + rdi(hdr->e_phoff)) + i) = phdrs[i];
 
-    /* Rewrite the section header table. */
+    /* Rewrite the section header table.  For neatness, keep the
+       sections sorted. */
     assert(rdi(hdr->e_shnum) == shdrs.size());
+    sortShdrs();
     for (int i = 1; i < rdi(hdr->e_shnum); ++i)
         * ((Elf_Shdr *) (contents + rdi(hdr->e_shoff)) + i) = shdrs[i];
 
