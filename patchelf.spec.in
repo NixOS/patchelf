@@ -1,0 +1,34 @@
+Summary: A utility for patching ELF binaries
+Name: patchelf
+Version: @version@
+Release: 1
+License: GPL
+URL: http://nix.cs.uu.nl/patchelf.html
+Source0: %{name}-@version@.tar.bz2
+BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
+Prefix: /usr
+
+%description
+
+PatchELF is simple utility for modifing existing ELF executables and
+libraries.  It can change the dynamic loader ("ELF interpreter") of
+executables and change the RPATH of executables and libraries.
+
+%prep
+%setup -q
+
+%build
+./configure --prefix=%{_prefix}
+make
+make check
+
+%install
+rm -rf $RPM_BUILD_ROOT
+make DESTDIR=$RPM_BUILD_ROOT install
+strip $RPM_BUILD_ROOT/%{_prefix}/bin/* || true
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+%files
+/
