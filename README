@@ -22,13 +22,13 @@ libraries.  In particular, it can do the following:
 
 AUTHOR
 
-Copyright 2004, 2005, Eelco Dolstra <eelco@cs.uu.nl>.  See COPYING for
-the license.
+Copyright 2004, 2005, 2006, 2007 Eelco Dolstra <eelco@cs.uu.nl>.  See
+COPYING for the license.
 
 
 HOMEPAGE
 
-http://nix.cs.uu.nl/patchelf
+http://nix.cs.uu.nl/patchelf.html
 
 
 BUGS
@@ -39,11 +39,13 @@ fail if the new RPATH is longer then the old RPATH.
 
 RELEASE HISTORY
 
-0.3 (TBD):
+0.3 (May 24, 2007):
 
-* Support for 64-bit ELF binaries.
+* Support for 64-bit ELF binaries (such as on x86_64-linux).
 
-* Support for big-endian binaries (such as on powerpc-linux).
+* Support for big-endian ELF binaries (such as on powerpc-linux).
+
+* Various bugfixes.
 
 0.2 (January 15, 2007):
 
