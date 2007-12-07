@@ -118,11 +118,11 @@ private:
 	I r = 0;
 	if (littleEndian) {
 	    for (unsigned int n = 0; n < sizeof(I); ++n) {
-		r |= *(((unsigned char *) &i) + n) << (n * 8);
+		r |= ((I) *(((unsigned char *) &i) + n)) << (n * 8);
 	    }
         } else {
 	    for (unsigned int n = 0; n < sizeof(I); ++n) {
-		r |= *(((unsigned char *) &i) + n) << ((sizeof(I) - n - 1) * 8);
+		r |= ((I) *(((unsigned char *) &i) + n)) << ((sizeof(I) - n - 1) * 8);
 	    }
 	}
 	return r;
@@ -130,9 +130,9 @@ private:
 
     /* Convert back to the ELF representation. */
     template<class I>
-    I wri(I & t, unsigned int i) 
+    I wri(I & t, unsigned long long i) 
     {
-	t = rdi((I) i);
+	t = rdi(i);
         return i;
     }
 };
@@ -197,7 +197,7 @@ template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::parse()
 {
     /* Check the ELF header for basic validity. */
-    if (fileSize < sizeof(Elf_Ehdr)) error("missing ELF header");
+    if (fileSize < (off_t) sizeof(Elf_Ehdr)) error("missing ELF header");
 
     hdr = (Elf_Ehdr *) contents;
 
@@ -209,10 +209,10 @@ void ElfFile<ElfFileParamNames>::parse()
     if (rdi(hdr->e_type) != ET_EXEC && rdi(hdr->e_type) != ET_DYN)
         error("wrong ELF type");
 
-    if (rdi(hdr->e_phoff) + rdi(hdr->e_phnum) * rdi(hdr->e_phentsize) > fileSize)
+    if ((off_t) (rdi(hdr->e_phoff) + rdi(hdr->e_phnum) * rdi(hdr->e_phentsize)) > fileSize)
         error("missing program headers");
     
-    if (rdi(hdr->e_shoff) + rdi(hdr->e_shnum) * rdi(hdr->e_shentsize) > fileSize)
+    if ((off_t) (rdi(hdr->e_shoff) + rdi(hdr->e_shnum) * rdi(hdr->e_shentsize)) > fileSize)
         error("missing section headers");
 
     if (rdi(hdr->e_phentsize) != sizeof(Elf_Phdr))
@@ -421,12 +421,14 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
     for (unsigned int i = 1; i < rdi(hdr->e_shnum); ++i) {
         string sectionName = getSectionName(shdrs[i]);
         if (replacedSections.find(sectionName) != replacedSections.end()) {
-            fprintf(stderr, "using replaced section `%s'\n", sectionName.c_str());
+            debug("using replaced section `%s'\n", sectionName.c_str());
             lastReplaced = i;
         }
     }
 
     assert(lastReplaced != 0);
+
+    debug("ptr size %d %d\n", sizeof(off_t), sizeof(Elf_Addr));
 
     debug("last replaced is %d\n", lastReplaced);
     
@@ -444,7 +446,7 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
         debug("looking at section `%s'\n", sectionName.c_str());
         /* !!! Why do we stop after a .dynstr section? I can't
            remember! */
-        if ((shdr.sh_type == rdi(SHT_PROGBITS) && sectionName != ".interp")
+        if ((rdi(shdr.sh_type) == SHT_PROGBITS && sectionName != ".interp")
             || prevSection == ".dynstr")
         {
             startOffset = rdi(shdr.sh_offset);
@@ -460,18 +462,18 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
         prevSection = sectionName;
     }
 
-    debug("first reserved offset/addr is 0x%x/0x%x\n",
-        startOffset, startAddr);
+    debug("first reserved offset/addr is 0x%x/0x%llx\n",
+        startOffset, (unsigned long long) startAddr);
     
     assert(startAddr % pageSize == startOffset % pageSize);
     Elf_Addr firstPage = startAddr - startOffset;
-    debug("first page is 0x%x\n", firstPage);
+    debug("first page is 0x%llx\n", (unsigned long long) firstPage);
         
     /* Right now we assume that the section headers are somewhere near
        the end, which appears to be the case most of the time.
        Therefore its not accidentally overwritten by the replaced
        sections. !!!  Fix this. */
-    assert(rdi(hdr->e_shoff) >= startOffset);
+    assert((off_t) rdi(hdr->e_shoff) >= startOffset);
 
     
     /* Compute the total space needed for the replaced sections, the
@@ -524,13 +526,14 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
         Elf_Shdr & shdr = findSection(sectionName);
         wri(shdr.sh_offset, curOff);
         wri(shdr.sh_addr, firstPage + curOff);
+        debug("feep %llx %llx %llx %d\n", firstPage, firstPage + curOff, shdr.sh_addr, sizeof shdr.sh_addr);
         wri(shdr.sh_size, i->second.size());
         wri(shdr.sh_addralign, sectionAlignment);
 
         /* If this is the .interp section, then the PT_INTERP segment
            must be sync'ed with it. */
         if (sectionName == ".interp") {
-            for (int j = 0; j < phdrs.size(); ++j)
+            for (unsigned int j = 0; j < phdrs.size(); ++j)
                 if (rdi(phdrs[j].p_type) == PT_INTERP) {
                     phdrs[j].p_offset = shdr.sh_offset;
                     phdrs[j].p_vaddr = phdrs[j].p_paddr = shdr.sh_addr;
@@ -541,7 +544,7 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
         /* If this is the .dynamic section, then the PT_DYNAMIC segment
            must be sync'ed with it. */
         if (sectionName == ".dynamic") {
-            for (int j = 0; j < phdrs.size(); ++j)
+            for (unsigned int j = 0; j < phdrs.size(); ++j)
                 if (rdi(phdrs[j].p_type) == PT_DYNAMIC) {
                     phdrs[j].p_offset = shdr.sh_offset;
                     phdrs[j].p_vaddr = phdrs[j].p_paddr = shdr.sh_addr;
@@ -556,7 +559,7 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
     }
 
     assert(replacedSections.empty());
-    assert(curOff == neededSpace);
+    assert((off_t) curOff == neededSpace);
 
 
     /* Rewrite the program header table. */
@@ -569,14 +572,14 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
         wri(phdrs[0].p_filesz, wri(phdrs[0].p_memsz, phdrs.size() * sizeof(Elf_Phdr)));
     }
 
-    for (int i = 0; i < phdrs.size(); ++i)
+    for (unsigned int i = 0; i < phdrs.size(); ++i)
         * ((Elf_Phdr *) (contents + rdi(hdr->e_phoff)) + i) = phdrs[i];
 
     /* Rewrite the section header table.  For neatness, keep the
        sections sorted. */
     assert(rdi(hdr->e_shnum) == shdrs.size());
     sortShdrs();
-    for (int i = 1; i < rdi(hdr->e_shnum); ++i)
+    for (unsigned int i = 1; i < rdi(hdr->e_shnum); ++i)
         * ((Elf_Shdr *) (contents + rdi(hdr->e_shoff)) + i) = shdrs[i];
 
     /* Update all those nasty virtual addresses in the .dynamic
@@ -595,18 +598,20 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
             dyn->d_un.d_ptr = findSection(".hash").sh_addr;
         else if (d_tag == DT_JMPREL) {
             Elf_Shdr * shdr = findSection2(".rel.plt");
-            if (!shdr) shdr = findSection2(".rela.plt"); /* 64-bit Linux */
-            if (!shdr) error("cannot find .rel.plt or .rela.plt");
+            if (!shdr) shdr = findSection2(".rela.plt"); /* 64-bit Linux, x86-64 */
+            if (!shdr) shdr = findSection2(".rela.IA_64.pltoff"); /* 64-bit Linux, IA-64 */
+            if (!shdr) error("cannot find section corresponding to DT_JMPREL");
             dyn->d_un.d_ptr = shdr->sh_addr;
         }
         else if (d_tag == DT_REL) { /* !!! hack! */
             Elf_Shdr * shdr = findSection2(".rel.dyn");
             /* no idea if this makes sense, but it was needed for some
-               program*/
+               program */
             if (!shdr) shdr = findSection2(".rel.got");
             if (!shdr) error("cannot find .rel.dyn or .rel.got");
             dyn->d_un.d_ptr = shdr->sh_addr;
         }
+        /* should probably update DT_RELA */
         else if (d_tag == DT_VERNEED)
             dyn->d_un.d_ptr = findSection(".gnu.version_r").sh_addr;
         else if (d_tag == DT_VERSYM)
@@ -718,9 +723,8 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
 
             /* For each library that we haven't found yet, see if it
                exists in this directory. */
-            int j;
             bool libFound = false;
-            for (j = 0; j < neededLibs.size(); ++j)
+            for (unsigned int j = 0; j < neededLibs.size(); ++j)
                 if (!neededLibFound[j]) {
                     string libName = dirName + "/" + neededLibs[j];
                     struct stat st;
@@ -842,7 +846,7 @@ static void patchElf()
 
 
     /* Check the ELF header for basic validity. */
-    if (fileSize < sizeof(Elf32_Ehdr)) error("missing ELF header");
+    if (fileSize < (off_t) sizeof(Elf32_Ehdr)) error("missing ELF header");
 
     if (memcmp(contents, ELFMAG, SELFMAG) != 0)
         error("not an ELF executable");
