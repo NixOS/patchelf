@@ -428,8 +428,6 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
 
     assert(lastReplaced != 0);
 
-    debug("ptr size %d %d\n", sizeof(off_t), sizeof(Elf_Addr));
-
     debug("last replaced is %d\n", lastReplaced);
     
     /* Try to replace all sections before that, as far as possible.
@@ -526,7 +524,6 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
         Elf_Shdr & shdr = findSection(sectionName);
         wri(shdr.sh_offset, curOff);
         wri(shdr.sh_addr, firstPage + curOff);
-        debug("feep %llx %llx %llx %d\n", firstPage, firstPage + curOff, shdr.sh_addr, sizeof shdr.sh_addr);
         wri(shdr.sh_size, i->second.size());
         wri(shdr.sh_addralign, sectionAlignment);
 
