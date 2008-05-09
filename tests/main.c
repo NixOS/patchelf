@@ -6,8 +6,9 @@ int foo();
 
 int main(int argc, char * * argv)
 {
+    int x;
     printf("Hello World\n");
-    int x = foo();
+    x = foo();
     printf("Result is %d\n", x);
     return x;
 }

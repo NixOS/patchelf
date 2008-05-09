@@ -13,6 +13,10 @@ oldRPath=$(../src/patchelf --print-rpath scratch/big-dynstr)
 if test -z "$oldRPath"; then oldRPath="/oops"; fi
 ../src/patchelf --set-rpath $oldRPath:$(pwd)/scratch/libsA:$(pwd)/scratch/libsB scratch/big-dynstr
 
+if test "$(uname)" = FreeBSD; then
+    export LD_LIBRARY_PATH=$(pwd)/scratch/libsB
+fi
+
 exitCode=0
 cd scratch && ./big-dynstr || exitCode=$?
 
