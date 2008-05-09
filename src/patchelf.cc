@@ -80,6 +80,8 @@ private:
         }
     };
     
+    friend CompShdr;
+
     void sortShdrs();
 
     void shiftFile(unsigned int extraPages, Elf_Addr startPage);
@@ -136,6 +138,26 @@ private:
         return i;
     }
 };
+
+
+/* Some old versions of elf.h lack some required macros, so define
+   them if they're missing. */
+#ifndef ELFMAG
+#define ELFMAG          "\177ELF"
+#define SELFMAG         4
+#endif
+
+#ifndef DT_VERNEED
+#define DT_VERNEED      0x6ffffffe
+#endif
+
+#ifndef DT_VERNEEDNUM
+#define DT_VERNEEDNUM   0x6fffffff
+#endif
+
+#ifndef DT_VERSYM
+#define DT_VERSYM       0x6ffffff0
+#endif
 
 
 static void debug(const char * format, ...)
