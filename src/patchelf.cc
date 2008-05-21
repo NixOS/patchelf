@@ -80,7 +80,7 @@ private:
         }
     };
     
-    friend CompShdr;
+    friend struct CompShdr;
 
     void sortShdrs();
 
