@@ -491,7 +491,7 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
         
     /* Right now we assume that the section headers are somewhere near
        the end, which appears to be the case most of the time.
-       Therefore its not accidentally overwritten by the replaced
+       Therefore they're not accidentally overwritten by the replaced
        sections. !!!  Fix this. */
     assert((off_t) rdi(hdr->e_shoff) >= startOffset);
 
@@ -583,7 +583,7 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
 
     /* Rewrite the program header table. */
 
-    /* If the is a segment for the program header table, update it.
+    /* If there is a segment for the program header table, update it.
        (According to the ELF spec, it must be the first entry.) */
     if (rdi(phdrs[0].p_type) == PT_PHDR) {
         phdrs[0].p_offset = hdr->e_phoff;
