@@ -26,6 +26,8 @@ const unsigned int pageSize = 4096;
 
 static bool debugMode = false;
 
+static bool forceRPath = false;
+
 static string fileName;
 
 
@@ -715,16 +717,31 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
     assert(strTabAddr == rdi(shdrDynStr.sh_addr));
     
     
-    /* Walk through the dynamic section, look for the RPATH entry. */
+    /* Walk through the dynamic section, look for the RPATH/RUNPATH
+       entry.
+
+       According to the ld.so docs, DT_RPATH is obsolete, we should
+       use DT_RUNPATH.  DT_RUNPATH has two advantages: it can be
+       overriden by LD_LIBRARY_PATH, and it's scoped (the DT_RUNPATH
+       for an executable or library doesn't affect the search path for
+       libraries used by it).  DT_RPATH is ignored if DT_RUNPATH is
+       present.  The binutils `ld' still generates only DT_RPATH,
+       unless you use its `--enable-new-dtag' option, in which case it
+       generates a DT_RPATH and DT_RUNPATH pointing at the same
+       string. */
     static vector<string> neededLibs;
     dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
-    Elf_Dyn * dynRPath = 0;
-    Elf_Dyn * rpathEntry = 0;
+    Elf_Dyn * dynRPath = 0, * dynRunPath = 0;
     char * rpath = 0;
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_RPATH) {
             dynRPath = dyn;
-            rpathEntry = dyn;
+            /* Only use DT_RPATH if there is no DT_RUNPATH. */
+            if (!dynRunPath) 
+                rpath = strTab + rdi(dyn->d_un.d_val);
+        }
+        else if (rdi(dyn->d_tag) == DT_RUNPATH) {
+            dynRunPath = dyn;
             rpath = strTab + rdi(dyn->d_un.d_val);
         }
         else if (rdi(dyn->d_tag) == DT_NEEDED)
@@ -800,6 +817,12 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
     }
 
     debug("new rpath is `%s'\n", newRPath.c_str());
+
+    if (!forceRPath && dynRPath && !dynRunPath) { /* convert DT_RPATH to DT_RUNPATH */
+        dynRPath->d_tag = DT_RUNPATH;
+        dynRunPath = dynRPath;
+        dynRPath = 0;
+    }
     
     if (newRPath.size() <= rpathSize) {
         strcpy(rpath, newRPath.c_str());
@@ -813,12 +836,14 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
         rdi(shdrDynStr.sh_size) + newRPath.size() + 1);
     setSubstr(newDynStr, rdi(shdrDynStr.sh_size), newRPath + '\0');
 
-    /* Update the DT_RPATH entry. */
-    if (dynRPath)
-        dynRPath->d_un.d_val = shdrDynStr.sh_size;
+    /* Update the DT_RUNPATH and DT_RPATH entries. */
+    if (dynRunPath || dynRPath) {
+        if (dynRunPath) dynRunPath->d_un.d_val = shdrDynStr.sh_size;
+        if (dynRPath) dynRPath->d_un.d_val = shdrDynStr.sh_size;
+    }
 
     else {
-        /* There is no DT_RPATH entry in the .dynamic section, so we
+        /* There is no DT_RUNPATH entry in the .dynamic section, so we
            have to grow the .dynamic section. */
         string & newDynamic = replaceSection(".dynamic",
             rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn));
@@ -830,7 +855,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
         debug("DT_NULL index is %d\n", idx);
         
         Elf_Dyn newDyn;
-        wri(newDyn.d_tag, DT_RPATH);
+        wri(newDyn.d_tag, forceRPath ? DT_RPATH : DT_RUNPATH);
         newDyn.d_un.d_val = shdrDynStr.sh_size;
         setSubstr(newDynamic, idx * sizeof(Elf_Dyn),
             string((char *) &newDyn, sizeof(Elf_Dyn)));
@@ -923,6 +948,7 @@ int main(int argc, char * * argv)
   [--set-rpath RPATH]\n\
   [--shrink-rpath]\n\
   [--print-rpath]\n\
+  [--force-rpath]\n\
   [--debug]\n\
   FILENAME\n", argv[0]);
         return 1;
@@ -950,6 +976,20 @@ int main(int argc, char * * argv)
         }
         else if (arg == "--print-rpath") {
             printRPath = true;
+        }
+        else if (arg == "--force-rpath") {
+            /* Generally we prefer to emit DT_RUNPATH instead of
+               DT_RPATH, as the latter is obsolete.  However, there is
+               a slight semantic difference: DT_RUNPATH is "scoped",
+               it only affects the executable or library in question,
+               not its recursive imports.  So maybe you really want to
+               force the use of DT_RPATH.  That's what this option
+               does.  Without it, DT_RPATH (if encountered) is
+               converted to DT_RUNPATH, and if neither is present, a
+               DT_RUNPATH is added.  With it, DT_RPATH isn't converted
+               to DT_RUNPATH, and if neither is present, a DT_RPATH is
+               added. */
+            forceRPath = true;
         }
         else if (arg == "--debug") {
             debugMode = true;
