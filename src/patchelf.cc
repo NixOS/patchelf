@@ -71,6 +71,21 @@ public:
 
 private:
 
+    struct CompPhdr
+    {
+        ElfFile * elfFile;
+        bool operator ()(const Elf_Phdr & x, const Elf_Phdr & y)
+        {
+            if (x.p_type == PT_PHDR) return true;
+            if (y.p_type == PT_PHDR) return false;
+            return elfFile->rdi(x.p_paddr) < elfFile->rdi(y.p_paddr);
+        }
+    };
+
+    friend struct CompPhdr;
+
+    void sortPhdrs();
+
     struct CompShdr 
     {
         ElfFile * elfFile;
@@ -264,6 +279,16 @@ void ElfFile<ElfFileParamNames>::parse()
 
 
 template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::sortPhdrs()
+{
+    /* Sort the segments by offset. */
+    CompPhdr comp;
+    comp.elfFile = this;
+    sort(phdrs.begin(), phdrs.end(), comp);
+}
+
+
+template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::sortShdrs()
 {
     /* Translate sh_link mappings to section names, since sorting the
@@ -297,7 +322,6 @@ void ElfFile<ElfFileParamNames>::sortShdrs()
             (rdi(shdrs[i].sh_type) == SHT_REL || rdi(shdrs[i].sh_type) == SHT_RELA))
             wri(shdrs[i].sh_info,
                 findSection3(info[getSectionName(shdrs[i])]));
-
 }
 
 
@@ -590,6 +614,8 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
         wri(phdrs[0].p_vaddr, wri(phdrs[0].p_paddr, firstPage + rdi(hdr->e_phoff)));
         wri(phdrs[0].p_filesz, wri(phdrs[0].p_memsz, phdrs.size() * sizeof(Elf_Phdr)));
     }
+
+    sortPhdrs();
 
     for (unsigned int i = 0; i < phdrs.size(); ++i)
         * ((Elf_Phdr *) (contents + rdi(hdr->e_phoff)) + i) = phdrs[i];
