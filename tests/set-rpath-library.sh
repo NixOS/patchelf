@@ -11,11 +11,7 @@ cp libbar-scoped.so scratch/libsB/
 
 oldRPath=$(../src/patchelf --print-rpath scratch/main-scoped)
 if test -z "$oldRPath"; then oldRPath="/oops"; fi
-../src/patchelf --force-rpath --set-rpath $oldRPath:$(pwd)/scratch/libsA:$(pwd)/scratch/libsB scratch/main-scoped
-
-#oldRPath=$(../src/patchelf --print-rpath scratch/libsB/libbar.so)
-#if test -z "$oldRPath"; then oldRPath="/oops"; fi
-#../src/patchelf --set-rpath $oldRPath:$(pwd)/scratch/libsC scratch/libsB/libbar.so
+../src/patchelf --set-rpath $oldRPath:$(pwd)/scratch/libsA:$(pwd)/scratch/libsB scratch/main-scoped
 
 # "main" contains libbar in its RUNPATH, but that's ignored when
 # resolving libfoo.  So libfoo won't find libbar and this will fail.
