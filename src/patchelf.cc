@@ -1016,21 +1016,18 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
             rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn));
 
         unsigned int idx = 0;
-        dyn = (Elf_Dyn *) newDynamic.c_str();
-        for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++, idx++) ;
-
+        for ( ; rdi(((Elf_Dyn *) newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
         debug("DT_NULL index is %d\n", idx);
-        
+
+        /* Shift all entries down by one. */
+        setSubstr(newDynamic, sizeof(Elf_Dyn),
+            string(newDynamic, 0, sizeof(Elf_Dyn) * (idx + 1)));
+
+        /* Add the DT_RUNPATH entry at the top. */
         Elf_Dyn newDyn;
         wri(newDyn.d_tag, forceRPath ? DT_RPATH : DT_RUNPATH);
         newDyn.d_un.d_val = shdrDynStr.sh_size;
-        setSubstr(newDynamic, idx * sizeof(Elf_Dyn),
-            string((char *) &newDyn, sizeof(Elf_Dyn)));
-
-        wri(newDyn.d_tag, DT_NULL);
-        wri(newDyn.d_un.d_val, 0);
-        setSubstr(newDynamic, (idx + 1) * sizeof(Elf_Dyn),
-            string((char *) &newDyn, sizeof(Elf_Dyn)));
+        setSubstr(newDynamic, 0, string((char *) &newDyn, sizeof(Elf_Dyn)));
     }
 }
 
