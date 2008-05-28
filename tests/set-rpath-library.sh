@@ -1,5 +1,10 @@
 #! /bin/sh -e
 
+if test "$(uname)" = FreeBSD; then
+    echo "skipping on FreeBSD"
+    exit 0
+fi
+
 rm -rf scratch
 mkdir -p scratch
 mkdir -p scratch/libsA
