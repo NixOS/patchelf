@@ -8,6 +8,7 @@ TESTS_ENVIRONMENT = PATCHELF_DEBUG=1
 
 
 simple_SOURCES = simple.c
+main_scoped_SOURCES =
 
 
 main: main.o libfoo.so
