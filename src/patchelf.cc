@@ -57,11 +57,16 @@ class ElfFile
 
     string sectionNames; /* content of the .shstrtab section */
 
+    /* Align on 4 or 8 bytes boundaries on 32- or 64-bit platforms
+       respectively. */
+    unsigned int sectionAlignment;
+
 public:
 
     ElfFile() 
     {
         changed = false;
+        sectionAlignment = sizeof(Elf_Off);
     }
 
     bool isChanged()
@@ -114,11 +119,18 @@ private:
     string & replaceSection(const SectionName & sectionName,
         unsigned int size);
 
+    void writeReplacedSections(Elf_Off & curOff,
+        Elf_Addr startAddr, Elf_Off startOffset);
+    
+    void rewriteHeaders(Elf_Addr phdrAddress);
+
+    void rewriteSectionsLibrary();
+    
+    void rewriteSectionsExecutable();
+
 public:
 
     void rewriteSections();
-
-    void rewriteHeaders(Elf_Addr phdrAddress);
 
     string getInterpreter();
 
@@ -459,126 +471,115 @@ string & ElfFile<ElfFileParamNames>::replaceSection(const SectionName & sectionN
 
 
 template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::rewriteSections()
+void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
+    Elf_Addr startAddr, Elf_Off startOffset)
 {
-    if (replacedSections.empty()) return;
-
     for (ReplacedSections::iterator i = replacedSections.begin();
          i != replacedSections.end(); ++i)
-        debug("replacing section `%s' with size %d\n",
-            i->first.c_str(), i->second.size());
-
-
-    /* Align on 4 or 8 bytes boundaries on 32- or 64-bit platforms
-       respectively. */
-    unsigned int sectionAlignment = sizeof(Elf_Off);
-
-
-    if (!findSection2(".interp")) {
-        debug("no .interp section; this is a dynamic library\n");
-
+    {
+        string sectionName = i->first;
+        Elf_Shdr & shdr = findSection(sectionName);
+        debug("rewriting section `%s' from offset %d to offset %d\n",
+            sectionName.c_str(), rdi(shdr.sh_offset), curOff);
         
-        /* For dynamic libraries, we just place the replacement
-           sections at the end of the file.  They're mapped into
-           memory by a PT_LOAD segment located directly after the last
-           virtual address page of other segments. */
-        Elf_Addr startPage = 0;
-        for (unsigned int i = 0; i < phdrs.size(); ++i) {
-            Elf_Addr thisPage = roundUp(rdi(phdrs[i].p_vaddr) + rdi(phdrs[i].p_memsz), pageSize);
-            if (thisPage > startPage) startPage = thisPage;
-        }
-        
-        debug("last page is 0x%llx\n", (unsigned long long) startPage);
+        memset(contents + rdi(shdr.sh_offset), 'X', rdi(shdr.sh_size));
+        memcpy(contents + curOff, (unsigned char *) i->second.c_str(),
+            i->second.size());
 
-        
-        /* Compute the total space needed for the replaced sections
-           and the program headers. */
-        off_t neededSpace = (phdrs.size() + 1) * sizeof(Elf_Phdr);
-        for (ReplacedSections::iterator i = replacedSections.begin();
-             i != replacedSections.end(); ++i)
-            neededSpace += roundUp(i->second.size(), sectionAlignment);
-        debug("needed space is %d\n", neededSpace);
+        /* Update the section header for this section. */
+        wri(shdr.sh_offset, curOff);
+        wri(shdr.sh_addr, startAddr + (curOff - startOffset));
+        wri(shdr.sh_size, i->second.size());
+        wri(shdr.sh_addralign, sectionAlignment);
 
-
-        off_t startOffset = roundUp(fileSize, pageSize);
-
-        growFile(startOffset + neededSpace);
-
-
-        /* Add a segment that maps the replaced sections and program
-           headers into memory.. */
-        phdrs.resize(rdi(hdr->e_phnum) + 1);
-        wri(hdr->e_phnum, rdi(hdr->e_phnum) + 1);
-        Elf_Phdr & phdr = phdrs[rdi(hdr->e_phnum) - 1];
-        wri(phdr.p_type, PT_LOAD);
-        wri(phdr.p_offset, startOffset);
-        wri(phdr.p_vaddr, wri(phdr.p_paddr, startPage));
-        wri(phdr.p_filesz, wri(phdr.p_memsz, neededSpace));
-        wri(phdr.p_flags, PF_R | PF_W);
-        wri(phdr.p_align, 4096);
-
-
-        /* Write out the replaced sections. */
-        off_t curOff = startOffset + phdrs.size() * sizeof(Elf_Phdr);
-        for (ReplacedSections::iterator i = replacedSections.begin();
-             i != replacedSections.end(); )
-        {
-            string sectionName = i->first;
-            Elf_Shdr & shdr = findSection(sectionName);
-            debug("rewriting section `%s' from offset %d to offset %d\n",
-                sectionName.c_str(), rdi(shdr.sh_offset), curOff);
-            
-            memset(contents + rdi(shdr.sh_offset), 'X', rdi(shdr.sh_size));
-            memcpy(contents + curOff, (unsigned char *) i->second.c_str(),
-                i->second.size());
-
-            /* Update the section header for this section. */
-            wri(shdr.sh_offset, curOff);
-            wri(shdr.sh_addr, startPage + (curOff - startOffset));
-            wri(shdr.sh_size, i->second.size());
-            wri(shdr.sh_addralign, sectionAlignment);
-
-            /* If this is the .interp section, then the PT_INTERP segment
-               must be sync'ed with it. */
-            if (sectionName == ".interp") {
-                for (unsigned int j = 0; j < phdrs.size(); ++j)
-                    if (rdi(phdrs[j].p_type) == PT_INTERP) {
-                        phdrs[j].p_offset = shdr.sh_offset;
-                        phdrs[j].p_vaddr = phdrs[j].p_paddr = shdr.sh_addr;
-                        phdrs[j].p_filesz = phdrs[j].p_memsz = shdr.sh_size;
-                    }
-            }
-
-            /* If this is the .dynamic section, then the PT_DYNAMIC segment
-               must be sync'ed with it. */
-            if (sectionName == ".dynamic") {
-                for (unsigned int j = 0; j < phdrs.size(); ++j)
-                    if (rdi(phdrs[j].p_type) == PT_DYNAMIC) {
-                        phdrs[j].p_offset = shdr.sh_offset;
-                        phdrs[j].p_vaddr = phdrs[j].p_paddr = shdr.sh_addr;
-                        phdrs[j].p_filesz = phdrs[j].p_memsz = shdr.sh_size;
-                    }
-            }
-
-            curOff += roundUp(i->second.size(), sectionAlignment);
-
-            ++i;
-            replacedSections.erase(sectionName);
+        /* If this is the .interp section, then the PT_INTERP segment
+           must be sync'ed with it. */
+        if (sectionName == ".interp") {
+            for (unsigned int j = 0; j < phdrs.size(); ++j)
+                if (rdi(phdrs[j].p_type) == PT_INTERP) {
+                    phdrs[j].p_offset = shdr.sh_offset;
+                    phdrs[j].p_vaddr = phdrs[j].p_paddr = shdr.sh_addr;
+                    phdrs[j].p_filesz = phdrs[j].p_memsz = shdr.sh_size;
+                }
         }
 
-        assert(replacedSections.empty());
-        assert((off_t) curOff == startOffset + neededSpace);
+        /* If this is the .dynamic section, then the PT_DYNAMIC segment
+           must be sync'ed with it. */
+        if (sectionName == ".dynamic") {
+            for (unsigned int j = 0; j < phdrs.size(); ++j)
+                if (rdi(phdrs[j].p_type) == PT_DYNAMIC) {
+                    phdrs[j].p_offset = shdr.sh_offset;
+                    phdrs[j].p_vaddr = phdrs[j].p_paddr = shdr.sh_addr;
+                    phdrs[j].p_filesz = phdrs[j].p_memsz = shdr.sh_size;
+                }
+        }
 
-
-        /* Move the program header to the start of the new area. */
-        wri(hdr->e_phoff, startOffset);
-        
-        rewriteHeaders(startPage);
-        
-        return;
+        curOff += roundUp(i->second.size(), sectionAlignment);
     }
-    
 
+    replacedSections.clear();
+}
+
+
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
+{
+    /* For dynamic libraries, we just place the replacement sections
+       at the end of the file.  They're mapped into memory by a
+       PT_LOAD segment located directly after the last virtual address
+       page of other segments. */
+    Elf_Addr startPage = 0;
+    for (unsigned int i = 0; i < phdrs.size(); ++i) {
+        Elf_Addr thisPage = roundUp(rdi(phdrs[i].p_vaddr) + rdi(phdrs[i].p_memsz), pageSize);
+        if (thisPage > startPage) startPage = thisPage;
+    }
+
+    debug("last page is 0x%llx\n", (unsigned long long) startPage);
+
+
+    /* Compute the total space needed for the replaced sections and
+       the program headers. */
+    off_t neededSpace = (phdrs.size() + 1) * sizeof(Elf_Phdr);
+    for (ReplacedSections::iterator i = replacedSections.begin();
+         i != replacedSections.end(); ++i)
+        neededSpace += roundUp(i->second.size(), sectionAlignment);
+    debug("needed space is %d\n", neededSpace);
+
+
+    off_t startOffset = roundUp(fileSize, pageSize);
+
+    growFile(startOffset + neededSpace);
+
+
+    /* Add a segment that maps the replaced sections and program
+       headers into memory.. */
+    phdrs.resize(rdi(hdr->e_phnum) + 1);
+    wri(hdr->e_phnum, rdi(hdr->e_phnum) + 1);
+    Elf_Phdr & phdr = phdrs[rdi(hdr->e_phnum) - 1];
+    wri(phdr.p_type, PT_LOAD);
+    wri(phdr.p_offset, startOffset);
+    wri(phdr.p_vaddr, wri(phdr.p_paddr, startPage));
+    wri(phdr.p_filesz, wri(phdr.p_memsz, neededSpace));
+    wri(phdr.p_flags, PF_R | PF_W);
+    wri(phdr.p_align, 4096);
+
+
+    /* Write out the replaced sections. */
+    Elf_Off curOff = startOffset + phdrs.size() * sizeof(Elf_Phdr);
+    writeReplacedSections(curOff, startPage, startOffset);
+    assert((off_t) curOff == startOffset + neededSpace);
+
+
+    /* Move the program header to the start of the new area. */
+    wri(hdr->e_phoff, startOffset);
+
+    rewriteHeaders(startPage);
+}
+
+
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
+{
     /* Sort the sections by offset, otherwise we won't correctly find
        all the sections before the last replaced section. */
     sortShdrs();
@@ -679,55 +680,31 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
     
 
     /* Write out the replaced sections. */
-    for (ReplacedSections::iterator i = replacedSections.begin();
-         i != replacedSections.end(); )
-    {
-        string sectionName = i->first;
-        debug("rewriting section `%s' to offset %d\n",
-            sectionName.c_str(), curOff);
-        memcpy(contents + curOff, (unsigned char *) i->second.c_str(),
-            i->second.size());
-
-        /* Update the section header for this section. */
-        Elf_Shdr & shdr = findSection(sectionName);
-        wri(shdr.sh_offset, curOff);
-        wri(shdr.sh_addr, firstPage + curOff);
-        wri(shdr.sh_size, i->second.size());
-        wri(shdr.sh_addralign, sectionAlignment);
-
-        /* If this is the .interp section, then the PT_INTERP segment
-           must be sync'ed with it. */
-        if (sectionName == ".interp") {
-            for (unsigned int j = 0; j < phdrs.size(); ++j)
-                if (rdi(phdrs[j].p_type) == PT_INTERP) {
-                    phdrs[j].p_offset = shdr.sh_offset;
-                    phdrs[j].p_vaddr = phdrs[j].p_paddr = shdr.sh_addr;
-                    phdrs[j].p_filesz = phdrs[j].p_memsz = shdr.sh_size;
-                }
-        }
-
-        /* If this is the .dynamic section, then the PT_DYNAMIC segment
-           must be sync'ed with it. */
-        if (sectionName == ".dynamic") {
-            for (unsigned int j = 0; j < phdrs.size(); ++j)
-                if (rdi(phdrs[j].p_type) == PT_DYNAMIC) {
-                    phdrs[j].p_offset = shdr.sh_offset;
-                    phdrs[j].p_vaddr = phdrs[j].p_paddr = shdr.sh_addr;
-                    phdrs[j].p_filesz = phdrs[j].p_memsz = shdr.sh_size;
-                }
-        }
-
-        curOff += roundUp(i->second.size(), sectionAlignment);
-
-        ++i;
-        replacedSections.erase(sectionName);
-    }
-
-    assert(replacedSections.empty());
+    writeReplacedSections(curOff, firstPage, 0);
     assert((off_t) curOff == neededSpace);
 
     
     rewriteHeaders(firstPage + rdi(hdr->e_phoff));
+}
+
+    
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::rewriteSections()
+{
+    if (replacedSections.empty()) return;
+
+    for (ReplacedSections::iterator i = replacedSections.begin();
+         i != replacedSections.end(); ++i)
+        debug("replacing section `%s' with size %d\n",
+            i->first.c_str(), i->second.size());
+
+    if (!findSection2(".interp")) {
+        debug("no .interp section; this is a dynamic library\n");
+        rewriteSectionsLibrary();
+    } else {
+        debug("found .interp section; this is an executable\n");
+        rewriteSectionsExecutable();
+    }
 }
 
 
