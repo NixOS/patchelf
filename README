@@ -33,9 +33,6 @@ http://nixos.org/patchelf.html
 
 BUGS
 
-Currently setting the RPATH on libraries ("--set-rpath") will usually
-fail if the new RPATH is longer then the old RPATH.
-
 The `strip' command from binutils generated broken executables when
 applied to the output of patchelf (if `--set-rpath' or
 `--set-interpreter' with a larger path than the original is used).
@@ -57,6 +54,8 @@ RELEASE HISTORY
   converted to DT_RUNPATH unless `--force-rpath' is specified.  If
   neither is present, a DT_RUNPATH is added unless `--force-rpath' is
   specified, in which case a DT_RPATH is added.
+
+* Support for growing the RPATH on dynamic libraries.
 
 0.3 (May 24, 2007):
 
