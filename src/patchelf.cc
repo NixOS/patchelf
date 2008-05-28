@@ -736,39 +736,42 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
 
     
     /* Update all those nasty virtual addresses in the .dynamic
-       section. */
-    Elf_Shdr & shdrDynamic = findSection(".dynamic");
-    Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
-    unsigned int d_tag;
-    for ( ; (d_tag = rdi(dyn->d_tag)) != DT_NULL; dyn++)
-        if (d_tag == DT_STRTAB)
-            dyn->d_un.d_ptr = findSection(".dynstr").sh_addr;
-        else if (d_tag == DT_STRSZ)
-            dyn->d_un.d_val = findSection(".dynstr").sh_size;
-        else if (d_tag == DT_SYMTAB)
-            dyn->d_un.d_ptr = findSection(".dynsym").sh_addr;
-        else if (d_tag == DT_HASH)
-            dyn->d_un.d_ptr = findSection(".hash").sh_addr;
-        else if (d_tag == DT_JMPREL) {
-            Elf_Shdr * shdr = findSection2(".rel.plt");
-            if (!shdr) shdr = findSection2(".rela.plt"); /* 64-bit Linux, x86-64 */
-            if (!shdr) shdr = findSection2(".rela.IA_64.pltoff"); /* 64-bit Linux, IA-64 */
-            if (!shdr) error("cannot find section corresponding to DT_JMPREL");
-            dyn->d_un.d_ptr = shdr->sh_addr;
-        }
-        else if (d_tag == DT_REL) { /* !!! hack! */
-            Elf_Shdr * shdr = findSection2(".rel.dyn");
-            /* no idea if this makes sense, but it was needed for some
-               program */
-            if (!shdr) shdr = findSection2(".rel.got");
-            if (!shdr) error("cannot find .rel.dyn or .rel.got");
-            dyn->d_un.d_ptr = shdr->sh_addr;
-        }
-        /* should probably update DT_RELA */
-        else if (d_tag == DT_VERNEED)
-            dyn->d_un.d_ptr = findSection(".gnu.version_r").sh_addr;
-        else if (d_tag == DT_VERSYM)
-            dyn->d_un.d_ptr = findSection(".gnu.version").sh_addr;
+       section.  Note that not all executables have .dynamic sections
+       (e.g., those produced by klibc's klcc). */
+    Elf_Shdr * shdrDynamic = findSection2(".dynamic");
+    if (shdrDynamic) {
+        Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic->sh_offset));
+        unsigned int d_tag;
+        for ( ; (d_tag = rdi(dyn->d_tag)) != DT_NULL; dyn++)
+            if (d_tag == DT_STRTAB)
+                dyn->d_un.d_ptr = findSection(".dynstr").sh_addr;
+            else if (d_tag == DT_STRSZ)
+                dyn->d_un.d_val = findSection(".dynstr").sh_size;
+            else if (d_tag == DT_SYMTAB)
+                dyn->d_un.d_ptr = findSection(".dynsym").sh_addr;
+            else if (d_tag == DT_HASH)
+                dyn->d_un.d_ptr = findSection(".hash").sh_addr;
+            else if (d_tag == DT_JMPREL) {
+                Elf_Shdr * shdr = findSection2(".rel.plt");
+                if (!shdr) shdr = findSection2(".rela.plt"); /* 64-bit Linux, x86-64 */
+                if (!shdr) shdr = findSection2(".rela.IA_64.pltoff"); /* 64-bit Linux, IA-64 */
+                if (!shdr) error("cannot find section corresponding to DT_JMPREL");
+                dyn->d_un.d_ptr = shdr->sh_addr;
+            }
+            else if (d_tag == DT_REL) { /* !!! hack! */
+                Elf_Shdr * shdr = findSection2(".rel.dyn");
+                /* no idea if this makes sense, but it was needed for some
+                   program */
+                if (!shdr) shdr = findSection2(".rel.got");
+                if (!shdr) error("cannot find .rel.dyn or .rel.got");
+                dyn->d_un.d_ptr = shdr->sh_addr;
+            }
+            /* should probably update DT_RELA */
+            else if (d_tag == DT_VERNEED)
+                dyn->d_un.d_ptr = findSection(".gnu.version_r").sh_addr;
+            else if (d_tag == DT_VERSYM)
+                dyn->d_un.d_ptr = findSection(".gnu.version").sh_addr;
+    }
 }
 
 
