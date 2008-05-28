@@ -13,20 +13,12 @@ oldRPath=$(../src/patchelf --print-rpath scratch/main)
 if test -z "$oldRPath"; then oldRPath="/oops"; fi
 ../src/patchelf --force-rpath --set-rpath $oldRPath:$(pwd)/scratch/libsA:$(pwd)/scratch/libsB scratch/main
 
-#oldRPath=$(../src/patchelf --print-rpath scratch/libsA/libfoo.so)
-#if test -z "$oldRPath"; then oldRPath="/oops"; fi
-#../src/patchelf --set-rpath $oldRPath:$(pwd)/scratch/libsB scratch/libsA/libfoo.so
-
-#oldRPath=$(../src/patchelf --print-rpath scratch/libsB/libbar.so)
-#if test -z "$oldRPath"; then oldRPath="/oops"; fi
-#../src/patchelf --set-rpath $oldRPath:$(pwd)/scratch/libsC scratch/libsB/libbar.so
-
 if test "$(uname)" = FreeBSD; then
     export LD_LIBRARY_PATH=$(pwd)/scratch/libsB
 fi
 
 exitCode=0
-cd scratch && ./main || exitCode=$?
+(cd scratch && ./main) || exitCode=$?
 
 if test "$exitCode" != 46; then
     echo "bad exit code!"
