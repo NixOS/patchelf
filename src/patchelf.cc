@@ -307,6 +307,9 @@ void ElfFile<ElfFileParamNames>::sortShdrs()
             (rdi(shdrs[i].sh_type) == SHT_REL || rdi(shdrs[i].sh_type) == SHT_RELA))
             info[getSectionName(shdrs[i])] = getSectionName(shdrs[rdi(shdrs[i].sh_info)]);
 
+    /* Idem for the index of the .shstrtab section in the ELF header. */
+    SectionName shstrtabName = getSectionName(shdrs[rdi(hdr->e_shstrndx)]);
+    
     /* Sort the sections by offset. */
     CompShdr comp;
     comp.elfFile = this;
@@ -324,6 +327,9 @@ void ElfFile<ElfFileParamNames>::sortShdrs()
             (rdi(shdrs[i].sh_type) == SHT_REL || rdi(shdrs[i].sh_type) == SHT_RELA))
             wri(shdrs[i].sh_info,
                 findSection3(info[getSectionName(shdrs[i])]));
+
+    /* And the .shstrtab index. */
+    wri(hdr->e_shstrndx, findSection3(shstrtabName));
 }
 
 
@@ -579,7 +585,7 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
         /* Rewrite the section header table.  For neatness, keep the
            sections sorted. */
         assert(rdi(hdr->e_shnum) == shdrs.size());
-        //sortShdrs(); !!! breaks the library
+        sortShdrs();
         for (unsigned int i = 1; i < rdi(hdr->e_shnum); ++i)
             * ((Elf_Shdr *) (contents + rdi(hdr->e_shoff)) + i) = shdrs[i];
 
