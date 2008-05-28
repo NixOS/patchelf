@@ -118,6 +118,8 @@ public:
 
     void rewriteSections();
 
+    void rewriteHeaders(Elf_Addr phdrAddress);
+
     string getInterpreter();
 
     void setInterpreter(const string & newInterpreter);
@@ -132,20 +134,7 @@ private:
        specified by the ELF header) to this platform's integer
        representation. */
     template<class I>
-    I rdi(I i) 
-    {
-	I r = 0;
-	if (littleEndian) {
-	    for (unsigned int n = 0; n < sizeof(I); ++n) {
-		r |= ((I) *(((unsigned char *) &i) + n)) << (n * 8);
-	    }
-        } else {
-	    for (unsigned int n = 0; n < sizeof(I); ++n) {
-		r |= ((I) *(((unsigned char *) &i) + n)) << ((sizeof(I) - n - 1) * 8);
-	    }
-	}
-	return r;
-    }
+    I rdi(I i);
 
     /* Convert back to the ELF representation. */
     template<class I>
@@ -155,6 +144,26 @@ private:
         return i;
     }
 };
+
+
+/* !!! G++ creates broken code if this function is inlined, don't know
+   why... */
+template<ElfFileParams>
+template<class I>
+I ElfFile<ElfFileParamNames>::rdi(I i) 
+{
+    I r = 0;
+    if (littleEndian) {
+        for (unsigned int n = 0; n < sizeof(I); ++n) {
+            r |= ((I) *(((unsigned char *) &i) + n)) << (n * 8);
+        }
+    } else {
+        for (unsigned int n = 0; n < sizeof(I); ++n) {
+            r |= ((I) *(((unsigned char *) &i) + n)) << ((sizeof(I) - n - 1) * 8);
+        }
+    }
+    return r;
+}
 
 
 /* Some old versions of elf.h lack some required macros, so define
@@ -211,7 +220,7 @@ static void readFile(string fileName, mode_t * fileMode)
     if (stat(fileName.c_str(), &st) != 0) error("stat");
     fileSize = st.st_size;
     *fileMode = st.st_mode;
-    maxSize = fileSize + 4 * 1024 * 1024;
+    maxSize = fileSize + 8 * 1024 * 1024;
     
     contents = (unsigned char *) malloc(fileSize + maxSize);
     if (!contents) abort();
@@ -473,13 +482,13 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
            sections at the end of the file.  They're mapped into
            memory by a PT_LOAD segment located directly after the last
            virtual address page of other segments. */
-        Elf_Addr lastPage = 0;
+        Elf_Addr startPage = 0;
         for (unsigned int i = 0; i < phdrs.size(); ++i) {
             Elf_Addr thisPage = roundUp(rdi(phdrs[i].p_vaddr) + rdi(phdrs[i].p_memsz), pageSize);
-            if (thisPage > lastPage) lastPage = thisPage;
+            if (thisPage > startPage) startPage = thisPage;
         }
         
-        debug("last page is 0x%llx\n", (unsigned long long) lastPage);
+        debug("last page is 0x%llx\n", (unsigned long long) startPage);
 
         
         /* Compute the total space needed for the replaced sections
@@ -503,7 +512,7 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
         Elf_Phdr & phdr = phdrs[rdi(hdr->e_phnum) - 1];
         wri(phdr.p_type, PT_LOAD);
         wri(phdr.p_offset, startOffset);
-        wri(phdr.p_vaddr, wri(phdr.p_paddr, lastPage));
+        wri(phdr.p_vaddr, wri(phdr.p_paddr, startPage));
         wri(phdr.p_filesz, wri(phdr.p_memsz, neededSpace));
         wri(phdr.p_flags, PF_R | PF_W);
         wri(phdr.p_align, 4096);
@@ -525,7 +534,7 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
 
             /* Update the section header for this section. */
             wri(shdr.sh_offset, curOff);
-            wri(shdr.sh_addr, lastPage + (curOff - startOffset));
+            wri(shdr.sh_addr, startPage + (curOff - startOffset));
             wri(shdr.sh_size, i->second.size());
             wri(shdr.sh_addralign, sectionAlignment);
 
@@ -561,70 +570,10 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
         assert((off_t) curOff == startOffset + neededSpace);
 
 
-        /* !!! cut&paste */
-        
-        /* Rewrite the program header table. */
+        /* Move the program header to the start of the new area. */
         wri(hdr->e_phoff, startOffset);
-
-        /* If there is a segment for the program header table, update
-           it.  (According to the ELF spec, it must be the first
-           entry.) */
-        if (rdi(phdrs[0].p_type) == PT_PHDR) {
-            phdrs[0].p_offset = hdr->e_phoff;
-            abort();
-            // !!! wri(phdrs[0].p_vaddr, wri(phdrs[0].p_paddr, firstPage + rdi(hdr->e_phoff)));
-            wri(phdrs[0].p_filesz, wri(phdrs[0].p_memsz, phdrs.size() * sizeof(Elf_Phdr)));
-        }
-
-        sortPhdrs();
-
-        for (unsigned int i = 0; i < phdrs.size(); ++i)
-            * ((Elf_Phdr *) (contents + rdi(hdr->e_phoff)) + i) = phdrs[i];
-
-
-        /* Rewrite the section header table.  For neatness, keep the
-           sections sorted. */
-        assert(rdi(hdr->e_shnum) == shdrs.size());
-        sortShdrs();
-        for (unsigned int i = 1; i < rdi(hdr->e_shnum); ++i)
-            * ((Elf_Shdr *) (contents + rdi(hdr->e_shoff)) + i) = shdrs[i];
-
-
-        /* Update all those nasty virtual addresses in the .dynamic
-           section. */
-        Elf_Shdr & shdrDynamic = findSection(".dynamic");
-        Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
-        unsigned int d_tag;
-        for ( ; (d_tag = rdi(dyn->d_tag)) != DT_NULL; dyn++)
-            if (d_tag == DT_STRTAB)
-                dyn->d_un.d_ptr = findSection(".dynstr").sh_addr;
-            else if (d_tag == DT_STRSZ)
-                dyn->d_un.d_val = findSection(".dynstr").sh_size;
-            else if (d_tag == DT_SYMTAB)
-                dyn->d_un.d_ptr = findSection(".dynsym").sh_addr;
-            else if (d_tag == DT_HASH)
-                dyn->d_un.d_ptr = findSection(".hash").sh_addr;
-            else if (d_tag == DT_JMPREL) {
-                Elf_Shdr * shdr = findSection2(".rel.plt");
-                if (!shdr) shdr = findSection2(".rela.plt"); /* 64-bit Linux, x86-64 */
-                if (!shdr) shdr = findSection2(".rela.IA_64.pltoff"); /* 64-bit Linux, IA-64 */
-                if (!shdr) error("cannot find section corresponding to DT_JMPREL");
-                dyn->d_un.d_ptr = shdr->sh_addr;
-            }
-            else if (d_tag == DT_REL) { /* !!! hack! */
-                Elf_Shdr * shdr = findSection2(".rel.dyn");
-                /* no idea if this makes sense, but it was needed for some
-                   program */
-                if (!shdr) shdr = findSection2(".rel.got");
-                if (!shdr) error("cannot find .rel.dyn or .rel.got");
-                dyn->d_un.d_ptr = shdr->sh_addr;
-            }
-            /* should probably update DT_RELA */
-            else if (d_tag == DT_VERNEED)
-                dyn->d_un.d_ptr = findSection(".gnu.version_r").sh_addr;
-            else if (d_tag == DT_VERSYM)
-                dyn->d_un.d_ptr = findSection(".gnu.version").sh_addr;
         
+        rewriteHeaders(startPage);
         
         return;
     }
@@ -777,14 +726,21 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
     assert(replacedSections.empty());
     assert((off_t) curOff == neededSpace);
 
+    
+    rewriteHeaders(firstPage + rdi(hdr->e_phoff));
+}
 
+
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
+{
     /* Rewrite the program header table. */
 
     /* If there is a segment for the program header table, update it.
        (According to the ELF spec, it must be the first entry.) */
     if (rdi(phdrs[0].p_type) == PT_PHDR) {
         phdrs[0].p_offset = hdr->e_phoff;
-        wri(phdrs[0].p_vaddr, wri(phdrs[0].p_paddr, firstPage + rdi(hdr->e_phoff)));
+        wri(phdrs[0].p_vaddr, wri(phdrs[0].p_paddr, phdrAddress));
         wri(phdrs[0].p_filesz, wri(phdrs[0].p_memsz, phdrs.size() * sizeof(Elf_Phdr)));
     }
 
@@ -837,6 +793,7 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
         else if (d_tag == DT_VERSYM)
             dyn->d_un.d_ptr = findSection(".gnu.version").sh_addr;
 }
+
 
 
 static void setSubstr(string & s, unsigned int pos, const string & t)
