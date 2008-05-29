@@ -201,6 +201,10 @@ I ElfFile<ElfFileParamNames>::rdi(I i)
 #define DT_RUNPATH      29
 #endif
 
+#ifndef DT_GNU_HASH
+#define DT_GNU_HASH     0x6ffffef5
+#endif
+
 
 static void debug(const char * format, ...)
 {
@@ -485,7 +489,7 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
         Elf_Shdr & shdr = findSection(sectionName);
         debug("rewriting section `%s' from offset %d to offset %d\n",
             sectionName.c_str(), rdi(shdr.sh_offset), curOff);
-        
+
         memset(contents + rdi(shdr.sh_offset), 'X', rdi(shdr.sh_size));
         memcpy(contents + curOff, (unsigned char *) i->second.c_str(),
             i->second.size());
@@ -755,6 +759,8 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                 dyn->d_un.d_ptr = findSection(".dynsym").sh_addr;
             else if (d_tag == DT_HASH)
                 dyn->d_un.d_ptr = findSection(".hash").sh_addr;
+            else if (d_tag == DT_GNU_HASH)
+                dyn->d_un.d_ptr = findSection(".gnu.hash").sh_addr;
             else if (d_tag == DT_JMPREL) {
                 Elf_Shdr * shdr = findSection2(".rel.plt");
                 if (!shdr) shdr = findSection2(".rela.plt"); /* 64-bit Linux, x86-64 */
