@@ -197,6 +197,10 @@ I ElfFile<ElfFileParamNames>::rdi(I i)
 #define DT_VERSYM       0x6ffffff0
 #endif
 
+#ifndef DT_RUNPATH
+#define DT_RUNPATH      29
+#endif
+
 
 static void debug(const char * format, ...)
 {
