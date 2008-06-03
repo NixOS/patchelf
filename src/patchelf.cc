@@ -482,15 +482,25 @@ template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
     Elf_Addr startAddr, Elf_Off startOffset)
 {
+    /* Overwrite the old section contents with 'X's.  Do this
+       *before* writing the new section contents (below) to prevent
+       clobbering previously written new section contents. */
     for (ReplacedSections::iterator i = replacedSections.begin();
          i != replacedSections.end(); ++i)
     {
         string sectionName = i->first;
         Elf_Shdr & shdr = findSection(sectionName);
-        debug("rewriting section `%s' from offset %d to offset %d\n",
-            sectionName.c_str(), rdi(shdr.sh_offset), curOff);
-
         memset(contents + rdi(shdr.sh_offset), 'X', rdi(shdr.sh_size));
+    }
+    
+    for (ReplacedSections::iterator i = replacedSections.begin();
+         i != replacedSections.end(); ++i)
+    {
+        string sectionName = i->first;
+        Elf_Shdr & shdr = findSection(sectionName);
+        debug("rewriting section `%s' from offset %d (size %d) to offset %d (size %d)\n",
+            sectionName.c_str(), rdi(shdr.sh_offset), rdi(shdr.sh_size), curOff, i->second.size());
+
         memcpy(contents + curOff, (unsigned char *) i->second.c_str(),
             i->second.size());
 
