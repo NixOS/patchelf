@@ -42,7 +42,9 @@ This appears to be a bug in binutils
 
 RELEASE HISTORY
 
-0.4 (TBA):
+0.4 (June 4, 2008):
+
+* Support for growing the RPATH on dynamic libraries.
 
 * IA-64 support (not tested) and related 64-bit fixes.
 
@@ -54,8 +56,6 @@ RELEASE HISTORY
   converted to DT_RUNPATH unless `--force-rpath' is specified.  If
   neither is present, a DT_RUNPATH is added unless `--force-rpath' is
   specified, in which case a DT_RPATH is added.
-
-* Support for growing the RPATH on dynamic libraries.
 
 0.3 (May 24, 2007):
 
