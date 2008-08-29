@@ -5,7 +5,7 @@ Version: @version@
 Release: 1
 License: GPL
 Group: Development/Tools
-URL: http://nix.cs.uu.nl/patchelf.html
+URL: http://nixos.org/patchelf.html
 Source0: %{name}-@version@.tar.bz2
 BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
 Prefix: /usr
