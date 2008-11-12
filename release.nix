@@ -13,18 +13,31 @@ let jobs = rec {
       inherit (pkgs) stdenv;
       name = "patchelf-tarball";
       src = patchelfSrc;
-      buildInputs = [pkgs.autoconf pkgs.automake];
+      buildInputs = [pkgs.autoconf pkgs.automake pkgs.pan];
     };
 
-    
+
+  coverage =
+    { tarball ? {path = jobs.tarball {};}
+    , nixpkgs ? {path = ../nixpkgs;}
+    , release ? {path = ../release;}
+    }:
+
+    with import "${release.path}/generic-dist" nixpkgs.path;
+
+    coverageAnalysis {
+      inherit (pkgs) stdenv;
+      name = "patchelf-coverage";
+      src = tarball.path;
+    };
+
+
   build =
     { tarball ? {path = jobs.tarball {};}
     , nixpkgs ? {path = ../nixpkgs;}
     , release ? {path = ../release;}
-    #, system ? "i686-linux"
+    , system ? "i686-linux"
     }:
-
-    let system = "i686-linux"; in
 
     with import "${release.path}/generic-dist" nixpkgs.path;
 
@@ -32,6 +45,9 @@ let jobs = rec {
       inherit (pkgsFun {inherit system;}) stdenv;
       name = "patchelf-build";
       src = tarball.path;
+      postInstall = ''
+        echo "doc readme $out/share/doc/patchelf/README" >> $out/nix-support/hydra-build-products
+      '';
     };
 
 
@@ -39,19 +55,16 @@ let jobs = rec {
     { tarball ? {path = jobs.tarball {};}
     , nixpkgs ? {path = ../nixpkgs;}
     , release ? {path = ../release;}
-    #, system ? "i686-linux"
     }:
-
-    let system = "i686-linux"; in
 
     with import "${release.path}/generic-dist" nixpkgs.path;
 
     rpmBuild {
-      inherit (pkgsFun {inherit system;}) stdenv;
+      inherit (pkgs) stdenv;
       name = "patchelf-rpm";
       src = tarball.path;
       diskImage = diskImages_i686.fedora9i386;
     };
-    
-        
+
+            
 }; in jobs
