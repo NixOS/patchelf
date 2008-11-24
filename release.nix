@@ -4,47 +4,40 @@ let jobs = rec {
   tarball =
     { patchelfSrc ? {path = ./.;}
     , nixpkgs ? {path = ../nixpkgs;}
-    , release ? {path = ../release;}
     }:
     
-    with import "${release.path}/generic-dist" nixpkgs.path;
+    with import nixpkgs.path {};
     
-    makeSourceTarball {
-      inherit (pkgs) stdenv;
+    releaseTools.makeSourceTarball {
       name = "patchelf-tarball";
       src = patchelfSrc;
-      buildInputs = [pkgs.autoconf pkgs.automake pkgs.pan];
     };
 
 
   coverage =
     { tarball ? {path = jobs.tarball {};}
     , nixpkgs ? {path = ../nixpkgs;}
-    , release ? {path = ../release;}
     }:
 
-    with import "${release.path}/generic-dist" nixpkgs.path;
-
-    coverageAnalysis {
-      inherit (pkgs) stdenv;
+    with import nixpkgs.path {};
+    
+    releaseTools.coverageAnalysis {
       name = "patchelf-coverage";
-      src = tarball.path;
+      src = tarball;
     };
 
 
   build =
     { tarball ? {path = jobs.tarball {};}
     , nixpkgs ? {path = ../nixpkgs;}
-    , release ? {path = ../release;}
     , system ? "i686-linux"
     }:
 
-    with import "${release.path}/generic-dist" nixpkgs.path;
+    with import nixpkgs.path {inherit system;};
 
-    nixBuild {
-      inherit (pkgsFun {inherit system;}) stdenv;
+    releaseTools.nixBuild {
       name = "patchelf-build";
-      src = tarball.path;
+      src = tarball;
       postInstall = ''
         echo "doc readme $out/share/doc/patchelf/README" >> $out/nix-support/hydra-build-products
       '';
@@ -54,16 +47,14 @@ let jobs = rec {
   rpm =
     { tarball ? {path = jobs.tarball {};}
     , nixpkgs ? {path = ../nixpkgs;}
-    , release ? {path = ../release;}
     }:
 
-    with import "${release.path}/generic-dist" nixpkgs.path;
+    with import nixpkgs.path {};
 
-    rpmBuild {
-      inherit (pkgs) stdenv;
+    releaseTools.rpmBuild {
       name = "patchelf-rpm";
-      src = tarball.path;
-      diskImage = diskImages_i686.fedora9i386;
+      src = tarball;
+      diskImage = vmTools.diskImages.fedora9i386;
     };
 
             
