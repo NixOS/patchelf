@@ -2,8 +2,9 @@ let jobs = rec {
 
 
   tarball =
-    { patchelfSrc ? {path = ./.;}
+    { patchelfSrc ? {path = ./.; rev = 1234;}
     , nixpkgs ? {path = ../nixpkgs;}
+    , officialRelease ? false
     }:
     
     with import nixpkgs.path {};
@@ -11,6 +12,7 @@ let jobs = rec {
     releaseTools.makeSourceTarball {
       name = "patchelf-tarball";
       src = patchelfSrc;
+      inherit officialRelease;
     };
 
 
