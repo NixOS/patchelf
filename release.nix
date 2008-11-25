@@ -58,4 +58,18 @@ let jobs = rec {
     };
 
             
+  deb =
+    { tarball ? {path = jobs.tarball {};}
+    , nixpkgs ? {path = ../nixpkgs;}
+    }:
+
+    with import nixpkgs.path {};
+
+    releaseTools.debBuild {
+      name = "patchelf-deb";
+      src = tarball;
+      diskImage = vmTools.diskImages.debian40i386;
+    };
+
+            
 }; in jobs
