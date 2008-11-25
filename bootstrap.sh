@@ -2,4 +2,4 @@
 aclocal
 #autoheader
 automake --add-missing --copy --foreign
-autoconf
+autoconf --force
