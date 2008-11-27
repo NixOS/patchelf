@@ -51,6 +51,7 @@ let
 
     rpm_fedora9i386 = makeRPM (diskImages: diskImages.fedora9i386) 50;
     rpm_fedora10i386 = makeRPM (diskImages: diskImages.fedora10i386) 40;
+    rpm_opensuse103i386 = makeRPM (diskImages: diskImages.opensuse103i386) 40;
 
     
     deb_debian40i386 = makeDeb (diskImages: diskImages.debian40i386) 30;
