@@ -5,6 +5,9 @@
 oldInterpreter=$(../src/patchelf --print-interpreter ./simple)
 echo "current interpreter is $oldInterpreter"
 
+echo "running with explicit interpreter..."
+"$oldInterpreter" ./simple
+
 rm -rf scratch
 mkdir -p scratch
 
@@ -21,3 +24,6 @@ fi
 echo "running with new interpreter..."
 ln -s "$oldInterpreter" "$newInterpreter"
 scratch/simple
+
+echo "running with explicit interpreter..."
+"$oldInterpreter" scratch/simple
