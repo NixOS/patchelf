@@ -406,8 +406,14 @@ void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, Elf_Addr sta
         wri(shdrs[i].sh_offset, rdi(shdrs[i].sh_offset) + shift);
     
     /* Update the offsets in the program headers. */
-    for (int i = 0; i < rdi(hdr->e_phnum); ++i)
+    for (int i = 0; i < rdi(hdr->e_phnum); ++i) {
         wri(phdrs[i].p_offset, rdi(phdrs[i].p_offset) + shift);
+        if ((phdrs[i].p_vaddr - phdrs[i].p_offset) % phdrs[i].p_align != 0) {
+            debug("changing alignment of program header %d from %d to %d\n", i,
+                phdrs[i].p_align, pageSize);
+            phdrs[i].p_align = pageSize;
+        }
+    }
 
     /* Add a segment that maps the new program/section headers and
        PT_INTERP segment into memory.  Otherwise glibc will choke. */
