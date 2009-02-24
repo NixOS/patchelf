@@ -105,6 +105,12 @@ let
       src = tarball;
       diskImage = diskImageFun vmTools.diskImages;
       meta = { schedulingPriority = toString prio; };
+
+      # Work around a bug in (apparently) checkinstall, which causes
+      # `make install' to fail on Ubuntu 8.10.
+      preInstall = ''
+        mkdir -p /usr/share/doc/patchelf
+      '';
     };
 
 
