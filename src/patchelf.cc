@@ -1072,9 +1072,8 @@ static void patchElf()
 }
 
 
-int main(int argc, char * * argv)
+void showHelp(const string & progName)
 {
-    if (argc <= 1) {
         fprintf(stderr, "syntax: %s\n\
   [--set-interpreter FILENAME]\n\
   [--print-interpreter]\n\
@@ -1083,7 +1082,15 @@ int main(int argc, char * * argv)
   [--print-rpath]\n\
   [--force-rpath]\n\
   [--debug]\n\
-  FILENAME\n", argv[0]);
+  [--version]\n\
+  FILENAME\n", progName.c_str());
+}
+
+
+int main(int argc, char * * argv)
+{
+    if (argc <= 1) {
+        showHelp(argv[0]);
         return 1;
     }
 
@@ -1126,6 +1133,14 @@ int main(int argc, char * * argv)
         }
         else if (arg == "--debug") {
             debugMode = true;
+        }
+        else if (arg == "--help") {
+            showHelp(argv[0]);
+            return 0;
+        }
+        else if (arg == "--version") {
+            printf(PACKAGE_STRING "\n");
+            return 0;
         }
         else break;
     }
