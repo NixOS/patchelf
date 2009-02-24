@@ -29,6 +29,7 @@ let
       releaseTools.coverageAnalysis {
         name = "patchelf-coverage";
         src = tarball;
+        lcovFilter = ["*/tests/*"];
       };
 
 
