@@ -14,13 +14,14 @@ let
 
       releaseTools.makeSourceTarball {
         name = "patchelf-tarball";
+        version = builtins.readFile ./version;
         src = patchelfSrc;
         inherit officialRelease;
       };
 
 
     coverage =
-      { tarball ? {path = jobs.tarball {};}
+      { tarball ? jobs.tarball {}
       , nixpkgs ? {path = ../nixpkgs;}
       }:
 
@@ -34,7 +35,7 @@ let
 
 
     build =
-      { tarball ? {path = jobs.tarball {};}
+      { tarball ? jobs.tarball {}
       , nixpkgs ? {path = ../nixpkgs;}
       , system ? "i686-linux"
       }:
@@ -56,6 +57,8 @@ let
     rpm_fedora10i386 = makeRPM_i686 (diskImages: diskImages.fedora10i386) 40;
     rpm_fedora10x86_64 = makeRPM_x86_64 (diskImages: diskImages.fedora10x86_64) 40;
     rpm_opensuse103i386 = makeRPM_i686 (diskImages: diskImages.opensuse103i386) 40;
+    rpm_opensuse110i386 = makeRPM_i686 (diskImages: diskImages.opensuse110i386) 40;
+    rpm_opensuse110x86_64 = makeRPM_x86_64 (diskImages: diskImages.opensuse110x86_64) 40;
 
     
     deb_debian40i386 = makeDeb_i686 (diskImages: diskImages.debian40i386) 40;
@@ -76,14 +79,14 @@ let
 
   makeRPM =
     system: diskImageFun: prio:
-    { tarball ? {path = jobs.tarball {};}
+    { tarball ? jobs.tarball {}
     , nixpkgs ? {path = ../nixpkgs;}
     }:
 
     with import nixpkgs.path {inherit system;};
 
     releaseTools.rpmBuild rec {
-      name = "patchelf-rpm-${diskImage.name}";
+      name = "patchelf-rpm";
       src = tarball;
       diskImage = diskImageFun vmTools.diskImages;
       meta = { schedulingPriority = toString prio; };
@@ -95,7 +98,7 @@ let
   
   makeDeb =
     system: diskImageFun: prio:
-    { tarball ? {path = jobs.tarball {};}
+    { tarball ? jobs.tarball {}
     , nixpkgs ? {path = ../nixpkgs;}
     }:
 

@@ -1,4 +1,4 @@
-AC_INIT(patchelf, m4_esyscmd([echo -n 0.5$VERSION_SUFFIX]))
+AC_INIT(patchelf, m4_esyscmd([echo -n $(cat ./version)$VERSION_SUFFIX]))
 AC_CONFIG_SRCDIR(Makefile.am)
 AM_INIT_AUTOMAKE([dist-bzip2 foreign])
 
