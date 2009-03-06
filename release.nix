@@ -43,7 +43,7 @@ let
       with import nixpkgs.path {inherit system;};
 
       releaseTools.nixBuild {
-        name = "patchelf-build";
+        name = "patchelf";
         src = tarball;
         postInstall = ''
           echo "doc readme $out/share/doc/patchelf/README" >> $out/nix-support/hydra-build-products
