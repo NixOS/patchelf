@@ -1,18 +1,19 @@
+{nixpkgs ? ../nixpkgs}:
+
 let
+
+  pkgs = import nixpkgs {};
 
 
   jobs = rec {
 
 
     tarball =
-      { patchelfSrc ? {path = ./.; rev = 1234;}
-      , nixpkgs ? {path = ../nixpkgs;}
+      { patchelfSrc ? {outPath = ./.; rev = 1234;}
       , officialRelease ? false
       }:
 
-      with import nixpkgs.path {};
-
-      releaseTools.makeSourceTarball {
+      pkgs.releaseTools.makeSourceTarball {
         name = "patchelf-tarball";
         version = builtins.readFile ./version;
         src = patchelfSrc;
@@ -22,12 +23,9 @@ let
 
     coverage =
       { tarball ? jobs.tarball {}
-      , nixpkgs ? {path = ../nixpkgs;}
       }:
 
-      with import nixpkgs.path {};
-
-      releaseTools.coverageAnalysis {
+      pkgs.releaseTools.coverageAnalysis {
         name = "patchelf-coverage";
         src = tarball;
         lcovFilter = ["*/tests/*"];
@@ -36,11 +34,10 @@ let
 
     build =
       { tarball ? jobs.tarball {}
-      , nixpkgs ? {path = ../nixpkgs;}
       , system ? "i686-linux"
       }:
 
-      with import nixpkgs.path {inherit system;};
+      with import nixpkgs {inherit system;};
 
       releaseTools.nixBuild {
         name = "patchelf";
@@ -80,10 +77,9 @@ let
   makeRPM =
     system: diskImageFun: prio:
     { tarball ? jobs.tarball {}
-    , nixpkgs ? {path = ../nixpkgs;}
     }:
 
-    with import nixpkgs.path {inherit system;};
+    with import nixpkgs {inherit system;};
 
     releaseTools.rpmBuild rec {
       name = "patchelf-rpm";
@@ -99,10 +95,9 @@ let
   makeDeb =
     system: diskImageFun: prio:
     { tarball ? jobs.tarball {}
-    , nixpkgs ? {path = ../nixpkgs;}
     }:
 
-    with import nixpkgs.path {inherit system;};
+    with import nixpkgs {inherit system;};
 
     releaseTools.debBuild {
       name = "patchelf-deb";
