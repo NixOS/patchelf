@@ -205,6 +205,9 @@ I ElfFile<ElfFileParamNames>::rdi(I i)
 #define DT_GNU_HASH     0x6ffffef5
 #endif
 
+/* Ugly: used to erase DT_RUNPATH when using --force-rpath. */
+#define DT_IGNORE       0x00726e67
+
 
 static void debug(const char * format, ...)
 {
@@ -958,6 +961,10 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
         dynRPath->d_tag = DT_RUNPATH;
         dynRunPath = dynRPath;
         dynRPath = 0;
+    }
+
+    if (forceRPath && dynRPath && dynRunPath) { /* convert DT_RUNPATH to DT_RPATH */
+        dynRunPath->d_tag = DT_IGNORE;
     }
     
     if (newRPath.size() <= rpathSize) {
