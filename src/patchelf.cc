@@ -579,7 +579,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
 
 
     /* Add a segment that maps the replaced sections and program
-       headers into memory.. */
+       headers into memory. */
     phdrs.resize(rdi(hdr->e_phnum) + 1);
     wri(hdr->e_phnum, rdi(hdr->e_phnum) + 1);
     Elf_Phdr & phdr = phdrs[rdi(hdr->e_phnum) - 1];
@@ -725,13 +725,13 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
         debug("replacing section `%s' with size %d\n",
             i->first.c_str(), i->second.size());
 
-    if (!findSection2(".interp")) {
-        debug("no .interp section; this is a dynamic library\n");
+    if (rdi(hdr->e_type) == ET_DYN) {
+        debug("this is a dynamic library\n");
         rewriteSectionsLibrary();
-    } else {
-        debug("found .interp section; this is an executable\n");
+    } else if (rdi(hdr->e_type) == ET_EXEC) {
+        debug("this is an executable\n");
         rewriteSectionsExecutable();
-    }
+    } else error("unknown ELF type");
 }
 
 
