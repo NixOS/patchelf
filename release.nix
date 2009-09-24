@@ -49,27 +49,29 @@ let
 
 
     rpm_fedora5i386 = makeRPM_i686 (diskImages: diskImages.fedora5i386) 20;
-    rpm_fedora9i386 = makeRPM_i686 (diskImages: diskImages.fedora9i386) 50;
-    rpm_fedora9x86_64 = makeRPM_x86_64 (diskImages: diskImages.fedora9x86_64) 50;
+    rpm_fedora9i386 = makeRPM_i686 (diskImages: diskImages.fedora9i386) 30;
+    rpm_fedora9x86_64 = makeRPM_x86_64 (diskImages: diskImages.fedora9x86_64) 30;
     rpm_fedora10i386 = makeRPM_i686 (diskImages: diskImages.fedora10i386) 40;
     rpm_fedora10x86_64 = makeRPM_x86_64 (diskImages: diskImages.fedora10x86_64) 40;
-    rpm_fedora11i386 = makeRPM_i686 (diskImages: diskImages.fedora11i386) 40;
-    rpm_fedora11x86_64 = makeRPM_x86_64 (diskImages: diskImages.fedora11x86_64) 40;
+    rpm_fedora11i386 = makeRPM_i686 (diskImages: diskImages.fedora11i386) 50;
+    rpm_fedora11x86_64 = makeRPM_x86_64 (diskImages: diskImages.fedora11x86_64) 50;
     rpm_opensuse103i386 = makeRPM_i686 (diskImages: diskImages.opensuse103i386) 40;
-    rpm_opensuse110i386 = makeRPM_i686 (diskImages: diskImages.opensuse110i386) 40;
-    rpm_opensuse110x86_64 = makeRPM_x86_64 (diskImages: diskImages.opensuse110x86_64) 40;
+    rpm_opensuse110i386 = makeRPM_i686 (diskImages: diskImages.opensuse110i386) 30;
+    rpm_opensuse110x86_64 = makeRPM_x86_64 (diskImages: diskImages.opensuse110x86_64) 30;
+    rpm_opensuse111i386 = makeRPM_i686 (diskImages: diskImages.opensuse111i386) 40;
+    rpm_opensuse111x86_64 = makeRPM_x86_64 (diskImages: diskImages.opensuse111x86_64) 40;
 
     
     deb_debian40i386 = makeDeb_i686 (diskImages: diskImages.debian40i386) 40;
     deb_debian40x86_64 = makeDeb_x86_64 (diskImages: diskImages.debian40x86_64) 40;
     deb_debian50i386 = makeDeb_i686 (diskImages: diskImages.debian50i386) 30;
     deb_debian50x86_64 = makeDeb_x86_64 (diskImages: diskImages.debian50x86_64) 30;
-    deb_ubuntu804i386 = makeDeb_i686 (diskImages: diskImages.ubuntu804i386) 50;
-    deb_ubuntu804x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu804x86_64) 50;
+    deb_ubuntu804i386 = makeDeb_i686 (diskImages: diskImages.ubuntu804i386) 30;
+    deb_ubuntu804x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu804x86_64) 30;
     deb_ubuntu810i386 = makeDeb_i686 (diskImages: diskImages.ubuntu810i386) 40;
     deb_ubuntu810x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu810x86_64) 40;
-    deb_ubuntu904i386 = makeDeb_i686 (diskImages: diskImages.ubuntu904i386) 30;
-    deb_ubuntu904x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu904x86_64) 30;
+    deb_ubuntu904i386 = makeDeb_i686 (diskImages: diskImages.ubuntu904i386) 50;
+    deb_ubuntu904x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu904x86_64) 50;
 
 
   };
@@ -89,7 +91,7 @@ let
       name = "patchelf-rpm";
       src = tarball;
       diskImage = diskImageFun vmTools.diskImages;
-      meta = { schedulingPriority = toString prio; };
+      meta = { schedulingPriority = prio; };
     };
 
 
@@ -107,7 +109,7 @@ let
       name = "patchelf-deb";
       src = tarball;
       diskImage = diskImageFun vmTools.diskImages;
-      meta = { schedulingPriority = toString prio; };
+      meta = { schedulingPriority = prio; };
     };
 
 
