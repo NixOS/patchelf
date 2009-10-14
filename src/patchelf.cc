@@ -16,7 +16,7 @@
 #include <fcntl.h>
 #include <limits.h>
 
-#include <elf.h>
+#include "elf.h"
 
 using namespace std;
 
