@@ -178,33 +178,6 @@ I ElfFile<ElfFileParamNames>::rdi(I i)
 }
 
 
-/* Some old versions of elf.h lack some required macros, so define
-   them if they're missing. */
-#ifndef ELFMAG
-#define ELFMAG          "\177ELF"
-#define SELFMAG         4
-#endif
-
-#ifndef DT_VERNEED
-#define DT_VERNEED      0x6ffffffe
-#endif
-
-#ifndef DT_VERNEEDNUM
-#define DT_VERNEEDNUM   0x6fffffff
-#endif
-
-#ifndef DT_VERSYM
-#define DT_VERSYM       0x6ffffff0
-#endif
-
-#ifndef DT_RUNPATH
-#define DT_RUNPATH      29
-#endif
-
-#ifndef DT_GNU_HASH
-#define DT_GNU_HASH     0x6ffffef5
-#endif
-
 /* Ugly: used to erase DT_RUNPATH when using --force-rpath. */
 #define DT_IGNORE       0x00726e67
 
