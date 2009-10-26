@@ -18,6 +18,10 @@ let
         version = builtins.readFile ./version;
         src = patchelfSrc;
         inherit officialRelease;
+        postDist = ''
+          cp README $out/
+          echo "doc readme $out/README" >> $out/nix-support/hydra-build-products
+        '';
       };
 
 
@@ -42,9 +46,6 @@ let
       releaseTools.nixBuild {
         name = "patchelf";
         src = tarball;
-        postInstall = ''
-          echo "doc readme $out/share/doc/patchelf/README" >> $out/nix-support/hydra-build-products
-        '';
       };
 
 
