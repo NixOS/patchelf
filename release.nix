@@ -5,7 +5,7 @@ let
   pkgs = import nixpkgs {};
 
 
-  jobs = rec {
+  jobs = {
 
 
     tarball =
@@ -13,7 +13,7 @@ let
       , officialRelease ? false
       }:
 
-      pkgs.releaseTools.makeSourceTarball {
+      pkgs.releaseTools.sourceTarball {
         name = "patchelf-tarball";
         version = builtins.readFile ./version;
         src = patchelfSrc;
@@ -46,6 +46,7 @@ let
       releaseTools.nixBuild {
         name = "patchelf";
         src = tarball;
+        doCheck = system != "i686-darwin" && system != "i686-cygwin";
       };
 
 
