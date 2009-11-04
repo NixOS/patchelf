@@ -57,6 +57,12 @@ This appears to be a bug in binutils
 
 RELEASE HISTORY
 
+0.5 (November 4, 2009):
+
+* Various bugfixes.
+
+* `--force-rpath' now deletes the DT_RUNPATH if it is present.
+
 0.4 (June 4, 2008):
 
 * Support for growing the RPATH on dynamic libraries.
