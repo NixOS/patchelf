@@ -74,6 +74,8 @@ let
     deb_ubuntu810x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu810x86_64) 40;
     deb_ubuntu904i386 = makeDeb_i686 (diskImages: diskImages.ubuntu904i386) 50;
     deb_ubuntu904x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu904x86_64) 50;
+    deb_ubuntu910i386 = makeDeb_i686 (diskImages: diskImages.ubuntu910i386) 50;
+    deb_ubuntu910x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu910x86_64) 50;
 
 
   };
