@@ -1,4 +1,7 @@
-{nixpkgs ? ../nixpkgs}:
+{ nixpkgs ? ../nixpkgs
+, patchelfSrc ? {outPath = ./.; rev = 1234;}
+, officialRelease ? false
+}:
 
 let
 
@@ -9,10 +12,6 @@ let
 
 
     tarball =
-      { patchelfSrc ? {outPath = ./.; rev = 1234;}
-      , officialRelease ? false
-      }:
-
       pkgs.releaseTools.sourceTarball {
         name = "patchelf-tarball";
         version = builtins.readFile ./version;
@@ -26,9 +25,6 @@ let
 
 
     coverage =
-      { tarball ? jobs.tarball {}
-      }:
-
       pkgs.releaseTools.coverageAnalysis {
         name = "patchelf-coverage";
         src = tarball;
@@ -37,9 +33,7 @@ let
 
 
     build =
-      { tarball ? jobs.tarball {}
-      , system ? "i686-linux"
-      }:
+      { system ? "i686-linux" }:
 
       with import nixpkgs {inherit system;};
 
@@ -88,14 +82,12 @@ let
 
   makeRPM =
     system: diskImageFun: prio:
-    { tarball ? jobs.tarball {}
-    }:
 
     with import nixpkgs {inherit system;};
 
     releaseTools.rpmBuild rec {
       name = "patchelf-rpm";
-      src = tarball;
+      src = jobs.tarball;
       diskImage = diskImageFun vmTools.diskImages;
       meta = { schedulingPriority = prio; };
     };
@@ -106,14 +98,12 @@ let
   
   makeDeb =
     system: diskImageFun: prio:
-    { tarball ? jobs.tarball {}
-    }:
 
     with import nixpkgs {inherit system;};
 
     releaseTools.debBuild {
       name = "patchelf-deb";
-      src = tarball;
+      src = jobs.tarball;
       diskImage = diskImageFun vmTools.diskImages;
       meta = { schedulingPriority = prio; };
     };
