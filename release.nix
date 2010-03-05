@@ -27,7 +27,7 @@ let
     coverage =
       pkgs.releaseTools.coverageAnalysis {
         name = "patchelf-coverage";
-        src = tarball;
+        src = jobs.tarball;
         lcovFilter = ["*/tests/*"];
       };
 
@@ -39,7 +39,7 @@ let
 
       releaseTools.nixBuild {
         name = "patchelf";
-        src = tarball;
+        src = jobs.tarball;
         doCheck = system != "i686-darwin" && system != "i686-cygwin";
       };
 
