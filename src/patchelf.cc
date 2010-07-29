@@ -21,7 +21,12 @@
 using namespace std;
 
 
+#ifdef MIPSEL
+/* The lemote fuloong 2f kernel defconfig sets a page size of 16KB */
+const unsigned int pageSize = 4096*4;
+#else
 const unsigned int pageSize = 4096;
+#endif
 
 
 static bool debugMode = false;
