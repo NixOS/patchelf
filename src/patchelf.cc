@@ -407,7 +407,7 @@ void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, Elf_Addr sta
     wri(phdr.p_vaddr, wri(phdr.p_paddr, startPage));
     wri(phdr.p_filesz, wri(phdr.p_memsz, shift)); 
     wri(phdr.p_flags, PF_R | PF_W);
-    wri(phdr.p_align, 4096);
+    wri(phdr.p_align, pageSize);
 }
 
 
@@ -567,7 +567,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
     wri(phdr.p_vaddr, wri(phdr.p_paddr, startPage));
     wri(phdr.p_filesz, wri(phdr.p_memsz, neededSpace));
     wri(phdr.p_flags, PF_R | PF_W);
-    wri(phdr.p_align, 4096);
+    wri(phdr.p_align, pageSize);
 
 
     /* Write out the replaced sections. */
