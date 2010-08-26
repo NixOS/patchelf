@@ -774,7 +774,8 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                 if (!shdr) error("cannot find .rel.dyn or .rel.got");
                 dyn->d_un.d_ptr = shdr->sh_addr;
             }
-            /* should probably update DT_RELA */
+            else if (d_tag == DT_RELA)
+                dyn->d_un.d_ptr = findSection(".rela.dyn").sh_addr; /* PPC Linux */
             else if (d_tag == DT_VERNEED)
                 dyn->d_un.d_ptr = findSection(".gnu.version_r").sh_addr;
             else if (d_tag == DT_VERSYM)
