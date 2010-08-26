@@ -17,8 +17,6 @@ if ! echo "$newRPath" | grep -q '/foo:/bar'; then
     exit 1
 fi
 
-exitCode=0
-
-# !!! disabled running no-rpath for now, since it won't work on 64-bit
-# Linux (the interpreter will be 64 bits).
-#cd scratch && ./no-rpath
+if [ "$(uname -m)" = i686 -a "$(uname -s)" = Linux ]; then
+    cd scratch && ./no-rpath
+fi
