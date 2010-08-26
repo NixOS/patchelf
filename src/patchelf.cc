@@ -157,7 +157,7 @@ private:
     template<class I>
     I wri(I & t, unsigned long long i) 
     {
-	t = rdi(i);
+        t = rdi((I) i);
         return i;
     }
 };
@@ -389,11 +389,11 @@ void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, Elf_Addr sta
     /* Update the offsets in the program headers. */
     for (int i = 0; i < rdi(hdr->e_phnum); ++i) {
         wri(phdrs[i].p_offset, rdi(phdrs[i].p_offset) + shift);
-        if (phdrs[i].p_align != 0 &&
-	    (phdrs[i].p_vaddr - phdrs[i].p_offset) % phdrs[i].p_align != 0) {
+        if (rdi(phdrs[i].p_align) != 0 &&
+            (rdi(phdrs[i].p_vaddr) - rdi(phdrs[i].p_offset)) % rdi(phdrs[i].p_align) != 0) {
             debug("changing alignment of program header %d from %d to %d\n", i,
-                phdrs[i].p_align, pageSize);
-            phdrs[i].p_align = pageSize;
+                rdi(phdrs[i].p_align), pageSize);
+            wri(phdrs[i].p_align, pageSize);
         }
     }
 
