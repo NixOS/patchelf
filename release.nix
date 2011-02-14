@@ -66,6 +66,8 @@ let
     deb_debian40x86_64 = makeDeb_x86_64 (diskImages: diskImages.debian40x86_64) 40;
     deb_debian50i386 = makeDeb_i686 (diskImages: diskImages.debian50i386) 50;
     deb_debian50x86_64 = makeDeb_x86_64 (diskImages: diskImages.debian50x86_64) 50;
+    deb_debian60i386 = makeDeb_i686 (diskImages: diskImages.debian60i386) 60;
+    deb_debian60x86_64 = makeDeb_x86_64 (diskImages: diskImages.debian60x86_64) 60;
     deb_ubuntu804i386 = makeDeb_i686 (diskImages: diskImages.ubuntu804i386) 20;
     deb_ubuntu804x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu804x86_64) 20;
     deb_ubuntu810i386 = makeDeb_i686 (diskImages: diskImages.ubuntu810i386) 30;
@@ -76,6 +78,8 @@ let
     deb_ubuntu910x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu910x86_64) 40;
     deb_ubuntu1004i386 = makeDeb_i686 (diskImages: diskImages.ubuntu1004i386) 50;
     deb_ubuntu1004x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu1004x86_64) 50;
+    deb_ubuntu1010i386 = makeDeb_i686 (diskImages: diskImages.ubuntu1010i386) 60;
+    deb_ubuntu1010x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu1010x86_64) 60;
 
 
   };
