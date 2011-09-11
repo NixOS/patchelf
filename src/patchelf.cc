@@ -55,6 +55,8 @@ class ElfFile
 
     bool changed;
 
+    bool isExecutable;
+
     typedef string SectionName;
     typedef map<SectionName, string> ReplacedSections;
 
@@ -245,6 +247,8 @@ static void checkPointer(void * p, unsigned int size)
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::parse()
 {
+    isExecutable = false;
+    
     /* Check the ELF header for basic validity. */
     if (fileSize < (off_t) sizeof(Elf_Ehdr)) error("missing ELF header");
 
@@ -268,8 +272,10 @@ void ElfFile<ElfFileParamNames>::parse()
         error("program headers have wrong size");
 
     /* Copy the program and section headers. */
-    for (int i = 0; i < rdi(hdr->e_phnum); ++i)
+    for (int i = 0; i < rdi(hdr->e_phnum); ++i) {
         phdrs.push_back(* ((Elf_Phdr *) (contents + rdi(hdr->e_phoff)) + i));
+        if (rdi(phdrs[i].p_type) == PT_INTERP) isExecutable = true;
+    }
     
     for (int i = 0; i < rdi(hdr->e_shnum); ++i)
         shdrs.push_back(* ((Elf_Shdr *) (contents + rdi(hdr->e_shoff)) + i));
@@ -486,7 +492,7 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
     {
         string sectionName = i->first;
         Elf_Shdr & shdr = findSection(sectionName);
-        debug("rewriting section `%s' from offset %d (size %d) to offset %d (size %d)\n",
+        debug("rewriting section `%s' from offset 0x%x (size %d) to offset 0x%x (size %d)\n",
             sectionName.c_str(), rdi(shdr.sh_offset), rdi(shdr.sh_size), curOff, i->second.size());
 
         memcpy(contents + curOff, (unsigned char *) i->second.c_str(),
@@ -552,11 +558,40 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
     debug("needed space is %d\n", neededSpace);
 
 
-    off_t startOffset = roundUp(fileSize, pageSize);
+    size_t startOffset = roundUp(fileSize, pageSize);
 
     growFile(startOffset + neededSpace);
 
 
+    /* Even though this file is of type ET_DYN, it could actually be
+       an executable.  For instance, Gold produces executables marked
+       ET_DYN.  In that case we can still hit the kernel bug that
+       necessitated rewriteSectionsExecutable().  However, such
+       executables also tend to start at virtual address 0, so
+       rewriteSectionsExecutable() won't work because it doesn't have
+       any virtual address space to grow downwards into.  As a
+       workaround, make sure that the virtual address of our new
+       PT_LOAD segment relative to the first PT_LOAD segment is equal
+       to its offset; otherwise we hit the kernel bug.  This may
+       require creating a hole in the executable.  The bigger the size
+       of the uninitialised data segment, the bigger the hole. */
+    if (isExecutable) {
+        if (startOffset >= startPage) {
+            debug("shifting new PT_LOAD segment by %d bytes to work around a Linux kernel bug\n", startOffset - startPage);
+        } else {
+            size_t hole = startPage - startOffset;
+            /* Print a warning, because the hole could be very big. */
+            fprintf(stderr, "warning: working around a Linux kernel bug by creating a hole of %zu bytes in ‘%s’\n", hole, fileName.c_str());
+            assert(hole % pageSize == 0);
+            /* !!! We could create an actual hole in the file here,
+               but it's probably not worth the effort. */
+            growFile(fileSize + hole);
+            startOffset += hole;
+        }
+        startPage = startOffset;
+    }
+
+    
     /* Add a segment that maps the replaced sections and program
        headers into memory. */
     phdrs.resize(rdi(hdr->e_phnum) + 1);
@@ -610,7 +645,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
        SHT_PROGBITS).  These cannot be moved in virtual address space
        since that would invalidate absolute references to them. */
     assert(lastReplaced + 1 < shdrs.size()); /* !!! I'm lazy. */
-    off_t startOffset = rdi(shdrs[lastReplaced + 1].sh_offset);
+    size_t startOffset = rdi(shdrs[lastReplaced + 1].sh_offset);
     Elf_Addr startAddr = rdi(shdrs[lastReplaced + 1].sh_addr);
     string prevSection;
     for (unsigned int i = 1; i <= lastReplaced; ++i) {
@@ -651,7 +686,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
     
     /* Compute the total space needed for the replaced sections, the
        ELF header, and the program headers. */
-    off_t neededSpace = sizeof(Elf_Ehdr) + phdrs.size() * sizeof(Elf_Phdr);
+    size_t neededSpace = sizeof(Elf_Ehdr) + phdrs.size() * sizeof(Elf_Phdr);
     for (ReplacedSections::iterator i = replacedSections.begin();
          i != replacedSections.end(); ++i)
         neededSpace += roundUp(i->second.size(), sectionAlignment);
