@@ -57,7 +57,9 @@ This appears to be a bug in binutils
 
 RELEASE HISTORY
 
-0.6 (TBA):
+0.6 (November 7, 2011):
+
+* Hacky support for executables created by the Gold linker.
 
 * Support segments with an alignment of 0 (contributed by Zack
   Weinberg).
