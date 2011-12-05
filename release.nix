@@ -1,11 +1,10 @@
-{ nixpkgs ? ../nixpkgs
-, patchelfSrc ? {outPath = ./.; rev = 1234;}
+{ patchelfSrc ? {outPath = ./.; rev = 1234;}
 , officialRelease ? false
 }:
 
 let
 
-  pkgs = import nixpkgs {};
+  pkgs = import <nixpkgs> {};
 
 
   jobs = {
@@ -35,7 +34,7 @@ let
     build =
       { system ? "i686-linux" }:
 
-      with import nixpkgs {inherit system;};
+      with import <nixpkgs> {inherit system;};
 
       releaseTools.nixBuild {
         name = "patchelf";
@@ -91,7 +90,7 @@ let
   makeRPM =
     system: diskImageFun: prio:
 
-    with import nixpkgs {inherit system;};
+    with import <nixpkgs> {inherit system;};
 
     releaseTools.rpmBuild rec {
       name = "patchelf-rpm";
@@ -107,7 +106,7 @@ let
   makeDeb =
     system: diskImageFun: prio:
 
-    with import nixpkgs {inherit system;};
+    with import <nixpkgs> {inherit system;};
 
     releaseTools.debBuild {
       name = "patchelf-deb";
