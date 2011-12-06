@@ -1,4 +1,4 @@
-{ patchelfSrc ? { outPath = ./.; revCount = 1234; gitTag = "abcdef"; }
+{ patchelfSrc ? { outPath = ./.; revCount = 1234; shortRev = "abcdef"; }
 , officialRelease ? false
 }:
 
@@ -14,7 +14,7 @@ let
       pkgs.releaseTools.sourceTarball {
         name = "patchelf-tarball";
         version = builtins.readFile ./version;
-        versionSuffix = if officialRelease then "" else "pre${toString patchelfSrc.revCount}-${patchelfSrc.gitTag}";
+        versionSuffix = if officialRelease then "" else "pre${toString patchelfSrc.revCount}-${patchelfSrc.shortRev}";
         src = patchelfSrc;
         inherit officialRelease;
         postDist = ''
