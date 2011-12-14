@@ -1,13 +1,13 @@
 Summary: A utility for patching ELF binaries
 
 Name: patchelf
-Version: @version@
+Version: @PACKAGE_VERSION@
 Release: 1
 License: GPL
 Group: Development/Tools
 URL: http://nixos.org/patchelf.html
-Source0: %{name}-@version@.tar.bz2
-BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
+Source0: %{name}-@PACKAGE_VERSION@.tar.bz2
+BuildRoot: %{_tmppath}/%{name}-%{PACKAGE_VERSION}-buildroot
 Prefix: /usr
 
 %description

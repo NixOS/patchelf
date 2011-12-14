@@ -1,9 +1,6 @@
 SUBDIRS = src tests
 
-EXTRA_DIST = COPYING README patchelf.spec patchelf.spec.in version $(man1_MANS)
-
-patchelf.spec: patchelf.spec.in
-	sed -e "s^@version\@^$(VERSION)^g" < patchelf.spec.in > patchelf.spec
+EXTRA_DIST = COPYING README patchelf.spec version $(man1_MANS)
 
 man1_MANS = patchelf.1
 

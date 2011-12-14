@@ -14,7 +14,7 @@ let
       pkgs.releaseTools.sourceTarball {
         name = "patchelf-tarball";
         version = builtins.readFile ./version;
-        versionSuffix = if officialRelease then "" else "pre${toString patchelfSrc.revCount}-${patchelfSrc.shortRev}";
+        versionSuffix = if officialRelease then "" else "pre${toString patchelfSrc.revCount}_${patchelfSrc.shortRev}";
         src = patchelfSrc;
         inherit officialRelease;
         postDist = ''
