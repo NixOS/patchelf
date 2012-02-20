@@ -6,4 +6,4 @@ man1_MANS = patchelf.1
 
 install-data-local:
 	$(INSTALL) -d $(DESTDIR)$(docdir)
-	$(INSTALL_DATA) README $(DESTDIR)$(docdir)/
+	$(INSTALL_DATA) $(top_srcdir)/README $(DESTDIR)$(docdir)/
