@@ -1,5 +1,2 @@
 #! /bin/sh -e
-aclocal
-#autoheader
-automake --add-missing --copy --foreign
-autoconf --force
+autoreconf --verbose --install --force --warnings=all
