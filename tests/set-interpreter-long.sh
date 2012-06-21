@@ -1,4 +1,5 @@
 #! /bin/sh -e
+SCRATCH=scratch/$(basename $0 .sh)
 
 ./simple
 
@@ -10,24 +11,24 @@ if test "$(uname)" = Linux; then
     "$oldInterpreter" ./simple
 fi
 
-rm -rf scratch
-mkdir -p scratch
+rm -rf ${SCRATCH}
+mkdir -p ${SCRATCH}
 
-newInterpreter=$(pwd)/scratch/iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
-cp simple scratch/
-../src/patchelf --set-interpreter "$newInterpreter" scratch/simple
+newInterpreter=$(pwd)/${SCRATCH}/iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
+cp simple ${SCRATCH}/
+../src/patchelf --set-interpreter "$newInterpreter" ${SCRATCH}/simple
 
 echo "running with missing interpreter..."
-if scratch/simple; then
+if ${SCRATCH}/simple; then
     echo "simple works, but it shouldn't"
     exit 1
 fi
 
 echo "running with new interpreter..."
 ln -s "$oldInterpreter" "$newInterpreter"
-scratch/simple
+${SCRATCH}/simple
 
 if test "$(uname)" = Linux; then
     echo "running with explicit interpreter..."
-    "$oldInterpreter" scratch/simple
+    "$oldInterpreter" ${SCRATCH}/simple
 fi
