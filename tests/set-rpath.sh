@@ -1,24 +1,25 @@
 #! /bin/sh -e
+SCRATCH=scratch/$(basename $0 .sh)
 
-rm -rf scratch
-mkdir -p scratch
-mkdir -p scratch/libsA
-mkdir -p scratch/libsB
+rm -rf ${SCRATCH}
+mkdir -p ${SCRATCH}
+mkdir -p ${SCRATCH}/libsA
+mkdir -p ${SCRATCH}/libsB
 
-cp main scratch/
-cp libfoo.so scratch/libsA/
-cp libbar.so scratch/libsB/
+cp main ${SCRATCH}/
+cp libfoo.so ${SCRATCH}/libsA/
+cp libbar.so ${SCRATCH}/libsB/
 
-oldRPath=$(../src/patchelf --print-rpath scratch/main)
+oldRPath=$(../src/patchelf --print-rpath ${SCRATCH}/main)
 if test -z "$oldRPath"; then oldRPath="/oops"; fi
-../src/patchelf --force-rpath --set-rpath $oldRPath:$(pwd)/scratch/libsA:$(pwd)/scratch/libsB scratch/main
+../src/patchelf --force-rpath --set-rpath $oldRPath:$(pwd)/${SCRATCH}/libsA:$(pwd)/${SCRATCH}/libsB ${SCRATCH}/main
 
 if test "$(uname)" = FreeBSD; then
-    export LD_LIBRARY_PATH=$(pwd)/scratch/libsB
+    export LD_LIBRARY_PATH=$(pwd)/${SCRATCH}/libsB
 fi
 
 exitCode=0
-(cd scratch && ./main) || exitCode=$?
+(cd ${SCRATCH} && ./main) || exitCode=$?
 
 if test "$exitCode" != 46; then
     echo "bad exit code!"
