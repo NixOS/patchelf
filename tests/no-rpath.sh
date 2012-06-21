@@ -3,7 +3,7 @@
 rm -rf scratch
 mkdir -p scratch
 
-cp no-rpath scratch/
+cp ${srcdir}/no-rpath scratch/
 
 oldRPath=$(../src/patchelf --print-rpath scratch/no-rpath)
 if test -n "$oldRPath"; then exit 1; fi
