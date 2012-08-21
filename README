@@ -57,6 +57,11 @@ This appears to be a bug in binutils
 
 RELEASE HISTORY
 
+0.7 (TBA):
+
+* Rewrite section indices in symbol tables. This for instance allows
+  gdb to show proper backtraces.
+
 0.6 (November 7, 2011):
 
 * Hacky support for executables created by the Gold linker.
