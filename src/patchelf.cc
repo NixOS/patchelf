@@ -836,7 +836,7 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                 string section = sectionsByOldIndex[rdi(sym->st_shndx)];
                 assert(!section.empty());
                 unsigned int newIndex = findSection3(section); // inefficient
-                debug("rewriting symbol %d: index = %d (%s) -> %d\n", entry, rdi(sym->st_shndx), section.c_str(), newIndex);
+                //debug("rewriting symbol %d: index = %d (%s) -> %d\n", entry, rdi(sym->st_shndx), section.c_str(), newIndex);
                 wri(sym->st_shndx, newIndex);
             }
         }
