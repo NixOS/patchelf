@@ -40,8 +40,8 @@ off_t fileSize, maxSize;
 unsigned char * contents = 0;
 
 
-#define ElfFileParams class Elf_Ehdr, class Elf_Phdr, class Elf_Shdr, class Elf_Addr, class Elf_Off, class Elf_Dyn
-#define ElfFileParamNames Elf_Ehdr, Elf_Phdr, Elf_Shdr, Elf_Addr, Elf_Off, Elf_Dyn
+#define ElfFileParams class Elf_Ehdr, class Elf_Phdr, class Elf_Shdr, class Elf_Addr, class Elf_Off, class Elf_Dyn, class Elf_Sym
+#define ElfFileParamNames Elf_Ehdr, Elf_Phdr, Elf_Shdr, Elf_Addr, Elf_Off, Elf_Dyn, Elf_Sym
 
 
 template<ElfFileParams>
@@ -67,6 +67,8 @@ class ElfFile
     /* Align on 4 or 8 bytes boundaries on 32- or 64-bit platforms
        respectively. */
     unsigned int sectionAlignment;
+
+    vector<SectionName> sectionsByOldIndex;
 
 public:
 
@@ -293,6 +295,10 @@ void ElfFile<ElfFileParamNames>::parse()
     assert(shstrtab[shstrtabSize - 1] == 0);
 
     sectionNames = string(shstrtab, shstrtabSize);
+
+    sectionsByOldIndex.resize(hdr->e_shnum);
+    for (unsigned int i = 1; i < rdi(hdr->e_shnum); ++i)
+        sectionsByOldIndex[i] = getSectionName(shdrs[i]);
 }
 
 
@@ -816,6 +822,25 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
             else if (d_tag == DT_VERSYM)
                 dyn->d_un.d_ptr = findSection(".gnu.version").sh_addr;
     }
+
+
+    /* Rewrite the .dynsym section.  It contains the indices of the
+       sections in which symbols appear, so these need to be
+       remapped. */
+    for (unsigned int i = 1; i < rdi(hdr->e_shnum); ++i) {
+        if (rdi(shdrs[i].sh_type) != SHT_SYMTAB && rdi(shdrs[i].sh_type) != SHT_DYNSYM) continue;
+        debug("rewriting symbol table section %d\n", i);
+        for (size_t entry = 0; (entry + 1) * sizeof(Elf_Sym) <= rdi(shdrs[i].sh_size); entry++) {
+            Elf_Sym * sym = (Elf_Sym *) (contents + rdi(shdrs[i].sh_offset) + entry * sizeof(Elf_Sym));
+            if (sym->st_shndx != SHN_UNDEF && sym->st_shndx < SHN_LORESERVE) {
+                string section = sectionsByOldIndex[rdi(sym->st_shndx)];
+                assert(!section.empty());
+                unsigned int newIndex = findSection3(section); // inefficient
+                debug("rewriting symbol %d: index = %d (%s) -> %d\n", entry, rdi(sym->st_shndx), section.c_str(), newIndex);
+                wri(sym->st_shndx, newIndex);
+            }
+        }
+    }
 }
 
 
@@ -1079,13 +1104,13 @@ static void patchElf()
     if (contents[EI_CLASS] == ELFCLASS32 &&
         contents[EI_VERSION] == EV_CURRENT)
     {
-        ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn> elfFile;
+        ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym> elfFile;
         patchElf2(elfFile, fileMode);
     }
     else if (contents[EI_CLASS] == ELFCLASS64 &&
         contents[EI_VERSION] == EV_CURRENT)
     {
-        ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn> elfFile;
+        ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym> elfFile;
         patchElf2(elfFile, fileMode);
     }
     else {
