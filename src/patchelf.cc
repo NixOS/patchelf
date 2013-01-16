@@ -1077,8 +1077,6 @@ void ElfFile<ElfFileParamNames>::removeNeeded(set<string> libs)
     }
 
     memset(last, 0, sizeof(Elf_Dyn) * (dyn - last));
-
-    debug("%d", dyn - last);
 }
 
 
