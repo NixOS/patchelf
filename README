@@ -19,10 +19,17 @@ libraries.  In particular, it can do the following:
   an RPATH "/lib:/usr/lib:/foo/lib", and libfoo.so can only be found
   in /foo/lib, then the new RPATH will be "/foo/lib".
 
+* Remove declared dependencies on dynamic libraries (DT_NEEDED
+  entries):
+
+  $ patchelf --remove-needed libfoo.so.1 my-program
+
+  This option can be given multiple times.
+
 
 AUTHOR
 
-Copyright 2004-2009 Eelco Dolstra <e.dolstra@tudelft.nl>.
+Copyright 2004-2013 Eelco Dolstra <eelco.dolstra@logicblox.com>.
 
 
 LICENSE
@@ -61,6 +68,8 @@ RELEASE HISTORY
 
 * Rewrite section indices in symbol tables. This for instance allows
   gdb to show proper backtraces.
+
+* Added `--remove-needed' option.
 
 0.6 (November 7, 2011):
 

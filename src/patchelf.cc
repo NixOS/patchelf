@@ -1,5 +1,6 @@
 #include <string>
 #include <vector>
+#include <set>
 #include <map>
 #include <algorithm>
 
@@ -148,6 +149,8 @@ public:
     typedef enum { rpPrint, rpShrink, rpSet } RPathOp;
 
     void modifyRPath(RPathOp op, string newRPath);
+
+    void removeNeeded(set<string> libs);
 
 private:
 
@@ -924,7 +927,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
             rpath = strTab + rdi(dyn->d_un.d_val);
         }
         else if (rdi(dyn->d_tag) == DT_NEEDED)
-	  neededLibs.push_back(string(strTab + rdi(dyn->d_un.d_val)));
+            neededLibs.push_back(string(strTab + rdi(dyn->d_un.d_val)));
     }
 
     if (op == rpPrint) {
@@ -1048,6 +1051,37 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
 }
 
 
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::removeNeeded(set<string> libs)
+{
+    if (libs.empty()) return;
+
+    Elf_Shdr & shdrDynamic = findSection(".dynamic");
+    Elf_Shdr & shdrDynStr = findSection(".dynstr");
+    char * strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
+
+    Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+    Elf_Dyn * last = dyn;
+    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+        if (rdi(dyn->d_tag) == DT_NEEDED) {
+            char * name = strTab + rdi(dyn->d_un.d_val);
+            if (libs.find(name) != libs.end()) {
+                debug("removing DT_NEEDED entry `%s'\n", name);
+                changed = true;
+            } else {
+                debug("keeping DT_NEEDED entry `%s'\n", name);
+                *last++ = *dyn;
+            }
+        } else
+            *last++ = *dyn;
+    }
+
+    memset(last, 0, sizeof(Elf_Dyn) * (dyn - last));
+
+    debug("%d", dyn - last);
+}
+
+
 static bool printInterpreter = false;
 static string newInterpreter;
 
@@ -1055,13 +1089,13 @@ static bool shrinkRPath = false;
 static bool setRPath = false;
 static bool printRPath = false;
 static string newRPath;
+static set<string> neededLibsToRemove;
 
 
 template<class ElfFile>
 static void patchElf2(ElfFile & elfFile, mode_t fileMode)
 {
     elfFile.parse();
-
 
     if (printInterpreter)
         printf("%s\n", elfFile.getInterpreter().c_str());
@@ -1077,6 +1111,7 @@ static void patchElf2(ElfFile & elfFile, mode_t fileMode)
     else if (setRPath)
         elfFile.modifyRPath(elfFile.rpSet, newRPath);
 
+    elfFile.removeNeeded(neededLibsToRemove);
 
     if (elfFile.isChanged()){
         elfFile.rewriteSections();
@@ -1128,6 +1163,7 @@ void showHelp(const string & progName)
   [--shrink-rpath]\n\
   [--print-rpath]\n\
   [--force-rpath]\n\
+  [--remove-needed LIBRARY]\n\
   [--debug]\n\
   [--version]\n\
   FILENAME\n", progName.c_str());
@@ -1177,6 +1213,10 @@ int main(int argc, char * * argv)
                to DT_RUNPATH, and if neither is present, a DT_RPATH is
                added. */
             forceRPath = true;
+        }
+        else if (arg == "--remove-needed") {
+            if (++i == argc) error("missing argument");
+            neededLibsToRemove.insert(argv[i]);
         }
         else if (arg == "--debug") {
             debugMode = true;
