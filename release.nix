@@ -4,10 +4,10 @@
 
 let
 
-  pkgs = import <nixpkgs> {};
+  pkgs = import <nixpkgs> { };
 
 
-  jobs = {
+  jobs = rec {
 
 
     tarball =
@@ -27,21 +27,20 @@ let
     coverage =
       pkgs.releaseTools.coverageAnalysis {
         name = "patchelf-coverage";
-        src = jobs.tarball;
+        src = tarball;
         lcovFilter = ["*/tests/*"];
       };
 
 
-    build =
-      { system ? "i686-linux" }:
+    build = pkgs.lib.genAttrs [ "x86_64-linux" "i686-linux" "x86_64-freebsd" "i686-freebsd" "x86_64-darwin" "i686-solaris" "i686-cygwin" ] (system:
 
-      with import <nixpkgs> {inherit system;};
+      with import <nixpkgs> { inherit system; };
 
       releaseTools.nixBuild {
         name = "patchelf";
-        src = jobs.tarball;
-        doCheck = system != "i686-darwin" && system != "i686-cygwin" && system != "i686-solaris";
-      };
+        src = tarball;
+        doCheck = system != "i686-cygwin" && system != "i686-solaris";
+      });
 
 
     rpm_fedora5i386 = makeRPM_i686 (diskImages: diskImages.fedora5i386) 10;
@@ -101,7 +100,7 @@ let
   makeRPM =
     system: diskImageFun: prio:
 
-    with import <nixpkgs> {inherit system;};
+    with import <nixpkgs> { inherit system; };
 
     releaseTools.rpmBuild rec {
       name = "patchelf-rpm";
@@ -117,7 +116,7 @@ let
   makeDeb =
     system: diskImageFun: prio:
 
-    with import <nixpkgs> {inherit system;};
+    with import <nixpkgs> { inherit system; };
 
     releaseTools.debBuild {
       name = "patchelf-deb";
