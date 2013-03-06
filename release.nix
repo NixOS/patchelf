@@ -11,12 +11,12 @@ let
 
 
     tarball =
-      pkgs.releaseTools.sourceTarball {
+      pkgs.releaseTools.sourceTarball rec {
         name = "patchelf-tarball";
-        version = builtins.readFile ./version;
-        versionSuffix = if officialRelease then "" else "pre${toString patchelfSrc.revCount}_${patchelfSrc.shortRev}";
+        version = builtins.readFile ./version + (if officialRelease then "" else "pre${toString patchelfSrc.revCount}_${patchelfSrc.shortRev}");
+        versionSuffix = ""; # obsolete
         src = patchelfSrc;
-        inherit officialRelease;
+        preAutoconf = "echo ${version} > version";
         postDist = ''
           cp README $out/
           echo "doc readme $out/README" >> $out/nix-support/hydra-build-products
