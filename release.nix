@@ -39,7 +39,7 @@ let
       releaseTools.nixBuild {
         name = "patchelf";
         src = tarball;
-        doCheck = system != "i686-cygwin" && system != "i686-solaris";
+        doCheck = !stdenv.isDarwin && system != "i686-cygwin" && system != "i686-solaris";
       });
 
 
