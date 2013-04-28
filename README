@@ -26,6 +26,16 @@ libraries.  In particular, it can do the following:
 
   This option can be given multiple times.
 
+* Add a declared dependency on a dynamic library (DT_NEEDED):
+  $ patchelf --add-needed libfoo.so.1 my-program
+  
+  This option can be give multiple times.
+
+* Replace a declared dependency on a dynamic library with another one (DT_NEEDED):
+  $ patchelf --replace-needed liboriginal.so.1 libreplacement.so.1 my-program
+  
+  This option can be give multiple times.
+
 
 AUTHOR
 

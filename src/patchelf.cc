@@ -150,7 +150,11 @@ public:
 
     void modifyRPath(RPathOp op, string newRPath);
 
+    void addNeeded(set<string> libs);
+
     void removeNeeded(set<string> libs);
+    
+    void replaceNeeded(map<string, string>& libs);
 
 private:
 
@@ -1079,6 +1083,98 @@ void ElfFile<ElfFileParamNames>::removeNeeded(set<string> libs)
     memset(last, 0, sizeof(Elf_Dyn) * (dyn - last));
 }
 
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::replaceNeeded(map<string, string>& libs)
+{
+    if (libs.empty()) return;
+    
+    Elf_Shdr & shdrDynamic = findSection(".dynamic");
+    Elf_Shdr & shdrDynStr = findSection(".dynstr");
+    char * strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
+
+    Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+    
+    unsigned int dynStrAddedBytes = 0;
+    
+    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+        if (rdi(dyn->d_tag) == DT_NEEDED) {
+            char * name = strTab + rdi(dyn->d_un.d_val);
+            if (libs.find(name) != libs.end()) {
+                const string & replacement = libs[name];
+                
+                debug("replacing DT_NEEDED entry `%s' with `%s'\n", name, replacement.c_str());
+                
+                // technically, the string referred by d_val could be used otherwise, too (although unlikely)
+                // we'll therefore add a new string
+                debug("resizing .dynstr ...");
+                
+                string & newDynStr = replaceSection(".dynstr",
+                    rdi(shdrDynStr.sh_size) + replacement.size() + 1 + dynStrAddedBytes);
+                setSubstr(newDynStr, rdi(shdrDynStr.sh_size) + dynStrAddedBytes, replacement + '\0');
+                
+                dyn->d_un.d_val = shdrDynStr.sh_size + dynStrAddedBytes;
+                
+                dynStrAddedBytes += replacement.size() + 1;
+                
+                changed = true;
+            } else {
+                debug("keeping DT_NEEDED entry `%s'\n", name);
+            }
+        }
+    }
+}
+
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::addNeeded(set<string> libs)
+{
+    if (libs.empty()) return;
+
+    Elf_Shdr & shdrDynamic = findSection(".dynamic");
+    Elf_Shdr & shdrDynStr = findSection(".dynstr");
+    char * strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
+
+    Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+    
+    /* add all new libs to the dynstr string table */
+    unsigned int length = 0;
+    for (set<string>::iterator it = libs.begin(); it != libs.end(); it++) {
+        length += it->size() + 1;
+    }
+    
+    string & newDynStr = replaceSection(".dynstr",
+        rdi(shdrDynStr.sh_size) + length + 1);
+    set<Elf64_Xword> libStrings;
+    unsigned int pos = 0;
+    for (set<string>::iterator it = libs.begin(); it != libs.end(); it++) {
+        setSubstr(newDynStr, rdi(shdrDynStr.sh_size) + pos, *it + '\0');
+        libStrings.insert(rdi(shdrDynStr.sh_size) + pos);
+        pos += it->size() + 1;
+    }
+    
+    /* add all new needed entries to the dynamic section */
+    string & newDynamic = replaceSection(".dynamic",
+        rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn) * libs.size());
+
+    unsigned int idx = 0;
+    for ( ; rdi(((Elf_Dyn *) newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
+    debug("DT_NULL index is %d\n", idx);
+
+    /* Shift all entries down by the number of new entries. */
+    setSubstr(newDynamic, sizeof(Elf_Dyn) * libs.size(),
+        string(newDynamic, 0, sizeof(Elf_Dyn) * (idx + 1)));
+
+    /* Add the DT_NEEDED entries at the top. */
+    unsigned int i = 0;
+    for (set<Elf64_Xword>::iterator it = libStrings.begin(); it != libStrings.end(); it++, i++) {
+        Elf_Dyn newDyn;
+        wri(newDyn.d_tag, DT_NEEDED);
+        wri(newDyn.d_un.d_val, *it);
+        setSubstr(newDynamic, i * sizeof(Elf_Dyn), string((char *) &newDyn, sizeof(Elf_Dyn)));
+    }
+    
+    changed = true;
+}
+
 
 static bool printInterpreter = false;
 static string newInterpreter;
@@ -1088,7 +1184,8 @@ static bool setRPath = false;
 static bool printRPath = false;
 static string newRPath;
 static set<string> neededLibsToRemove;
-
+static map<string, string> neededLibsToReplace;
+static set<string> neededLibsToAdd;
 
 template<class ElfFile>
 static void patchElf2(ElfFile & elfFile, mode_t fileMode)
@@ -1110,6 +1207,8 @@ static void patchElf2(ElfFile & elfFile, mode_t fileMode)
         elfFile.modifyRPath(elfFile.rpSet, newRPath);
 
     elfFile.removeNeeded(neededLibsToRemove);
+    elfFile.replaceNeeded(neededLibsToReplace);
+    elfFile.addNeeded(neededLibsToAdd);
 
     if (elfFile.isChanged()){
         elfFile.rewriteSections();
@@ -1161,7 +1260,9 @@ void showHelp(const string & progName)
   [--shrink-rpath]\n\
   [--print-rpath]\n\
   [--force-rpath]\n\
+  [--add-needed LIBRARY]\n\
   [--remove-needed LIBRARY]\n\
+  [--replace-needed LIBRARY NEW_LIBRARY]\n\
   [--debug]\n\
   [--version]\n\
   FILENAME\n", progName.c_str());
@@ -1212,9 +1313,18 @@ int main(int argc, char * * argv)
                added. */
             forceRPath = true;
         }
+        else if (arg == "--add-needed") {
+            if (++i == argc) error("missing argument");
+            neededLibsToAdd.insert(argv[i]);
+        }
         else if (arg == "--remove-needed") {
             if (++i == argc) error("missing argument");
             neededLibsToRemove.insert(argv[i]);
+        }
+        else if (arg == "--replace-needed") {
+            if (i+2 >= argc) error("missing argument(s)");
+            neededLibsToReplace[ argv[i+1] ] = argv[i+2];
+            i += 2;
         }
         else if (arg == "--debug") {
             debugMode = true;
