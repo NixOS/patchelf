@@ -70,6 +70,8 @@ let
     deb_debian50x86_64 = makeDeb_x86_64 (diskImages: diskImages.debian50x86_64) 50;
     deb_debian60i386 = makeDeb_i686 (diskImages: diskImages.debian60i386) 60;
     deb_debian60x86_64 = makeDeb_x86_64 (diskImages: diskImages.debian60x86_64) 60;
+    deb_debian70i386 = makeDeb_i686 (diskImages: diskImages.debian70i386) 70;
+    deb_debian70x86_64 = makeDeb_x86_64 (diskImages: diskImages.debian70x86_64) 70;
 
     deb_ubuntu804i386 = makeDeb_i686 (diskImages: diskImages.ubuntu804i386) 20;
     deb_ubuntu804x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu804x86_64) 20;
