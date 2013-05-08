@@ -33,4 +33,6 @@ strip $RPM_BUILD_ROOT/%{_prefix}/bin/* || true
 rm -rf $RPM_BUILD_ROOT
 
 %files
-/
+/usr/bin/patchelf
+/usr/share/doc/patchelf/README
+/usr/share/man/man1/patchelf.1.gz

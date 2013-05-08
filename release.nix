@@ -56,6 +56,8 @@ let
     rpm_fedora13x86_64 = makeRPM_x86_64 (diskImages: diskImages.fedora13x86_64) 50;
     rpm_fedora16i386 = makeRPM_i686 (diskImages: diskImages.fedora16i386) 60;
     rpm_fedora16x86_64 = makeRPM_x86_64 (diskImages: diskImages.fedora16x86_64) 60;
+    rpm_fedora18i386 = makeRPM_i686 (diskImages: diskImages.fedora18i386) 70;
+    rpm_fedora18x86_64 = makeRPM_x86_64 (diskImages: diskImages.fedora18x86_64) 70;
 
     rpm_opensuse103i386 = makeRPM_i686 (diskImages: diskImages.opensuse103i386) 40;
     rpm_opensuse110i386 = makeRPM_i686 (diskImages: diskImages.opensuse110i386) 30;
