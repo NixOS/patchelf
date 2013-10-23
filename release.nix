@@ -58,6 +58,8 @@ let
     rpm_fedora16x86_64 = makeRPM_x86_64 (diskImages: diskImages.fedora16x86_64) 60;
     rpm_fedora18i386 = makeRPM_i686 (diskImages: diskImages.fedora18i386) 70;
     rpm_fedora18x86_64 = makeRPM_x86_64 (diskImages: diskImages.fedora18x86_64) 70;
+    rpm_fedora19i386 = makeRPM_i686 (diskImages: diskImages.fedora19i386) 80;
+    rpm_fedora19x86_64 = makeRPM_x86_64 (diskImages: diskImages.fedora19x86_64) 80;
 
     rpm_opensuse103i386 = makeRPM_i686 (diskImages: diskImages.opensuse103i386) 40;
     rpm_opensuse110i386 = makeRPM_i686 (diskImages: diskImages.opensuse110i386) 30;
@@ -72,8 +74,8 @@ let
     deb_debian50x86_64 = makeDeb_x86_64 (diskImages: diskImages.debian50x86_64) 50;
     deb_debian60i386 = makeDeb_i686 (diskImages: diskImages.debian60i386) 60;
     deb_debian60x86_64 = makeDeb_x86_64 (diskImages: diskImages.debian60x86_64) 60;
-    deb_debian70i386 = makeDeb_i686 (diskImages: diskImages.debian70i386) 70;
-    deb_debian70x86_64 = makeDeb_x86_64 (diskImages: diskImages.debian70x86_64) 70;
+    deb_debian7i386 = makeDeb_i686 (diskImages: diskImages.debian7i386) 70;
+    deb_debian7x86_64 = makeDeb_x86_64 (diskImages: diskImages.debian7x86_64) 70;
 
     deb_ubuntu804i386 = makeDeb_i686 (diskImages: diskImages.ubuntu804i386) 20;
     deb_ubuntu804x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu804x86_64) 20;
@@ -95,6 +97,8 @@ let
     deb_ubuntu1210x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu1210x86_64) 80;
     deb_ubuntu1304i386 = makeDeb_i686 (diskImages: diskImages.ubuntu1304i386) 85;
     deb_ubuntu1304x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu1304x86_64) 85;
+    deb_ubuntu1310i386 = makeDeb_i686 (diskImages: diskImages.ubuntu1310i386) 90;
+    deb_ubuntu1310x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu1310x86_64) 90;
 
 
   };
