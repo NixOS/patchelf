@@ -32,7 +32,7 @@ let
       };
 
 
-    build = pkgs.lib.genAttrs [ "x86_64-linux" "i686-linux" "x86_64-freebsd" "i686-freebsd" "x86_64-darwin" "i686-solaris" "i686-cygwin" ] (system:
+    build = pkgs.lib.genAttrs [ "x86_64-linux" "i686-linux" "x86_64-freebsd" "i686-freebsd" "x86_64-darwin" /* "i686-solaris" "i686-cygwin" */ ] (system:
 
       with import <nixpkgs> { inherit system; };
 
@@ -100,6 +100,25 @@ let
     deb_ubuntu1310i386 = makeDeb_i686 (diskImages: diskImages.ubuntu1310i386) 90;
     deb_ubuntu1310x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu1310x86_64) 90;
 
+
+    release = pkgs.releaseTools.aggregate
+      { name = "patchelf-${tarball.version}";
+        constituents =
+          [ tarball
+            build.x86_64-linux
+            build.i686-linux
+            build.x86_64-freebsd
+            build.i686-freebsd
+            build.x86_64-darwin
+            rpm_fedora19i386
+            rpm_fedora19x86_64
+            deb_debian7i386
+            deb_debian7x86_64
+            deb_ubuntu1310i386
+            deb_ubuntu1310x86_64
+          ];
+        meta.description = "Release-critical builds";
+      };
 
   };
 
