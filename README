@@ -64,7 +64,7 @@ This appears to be a bug in binutils
 
 RELEASE HISTORY
 
-0.7 (TBA):
+0.7 (January 7, 2014):
 
 * Rewrite section indices in symbol tables. This for instance allows
   gdb to show proper backtraces.

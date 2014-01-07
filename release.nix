@@ -107,8 +107,8 @@ let
           [ tarball
             build.x86_64-linux
             build.i686-linux
-            build.x86_64-freebsd
-            build.i686-freebsd
+            #build.x86_64-freebsd
+            #build.i686-freebsd
             build.x86_64-darwin
             rpm_fedora19i386
             rpm_fedora19x86_64
