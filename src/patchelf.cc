@@ -835,11 +835,16 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
         debug("rewriting symbol table section %d\n", i);
         for (size_t entry = 0; (entry + 1) * sizeof(Elf_Sym) <= rdi(shdrs[i].sh_size); entry++) {
             Elf_Sym * sym = (Elf_Sym *) (contents + rdi(shdrs[i].sh_offset) + entry * sizeof(Elf_Sym));
-            if (sym->st_shndx != SHN_UNDEF && sym->st_shndx < SHN_LORESERVE) {
-                string section = sectionsByOldIndex[rdi(sym->st_shndx)];
+            unsigned int shndx = rdi(sym->st_shndx);
+            if (shndx != SHN_UNDEF && shndx < SHN_LORESERVE) {
+                if (shndx >= sectionsByOldIndex.size()) {
+                    fprintf(stderr, "warning: entry %d in symbol table refers to a non-existent section, skipping\n", shndx);
+                    continue;
+                }
+                string section = sectionsByOldIndex.at(shndx);
                 assert(!section.empty());
                 unsigned int newIndex = findSection3(section); // inefficient
-                //debug("rewriting symbol %d: index = %d (%s) -> %d\n", entry, rdi(sym->st_shndx), section.c_str(), newIndex);
+                //debug("rewriting symbol %d: index = %d (%s) -> %d\n", entry, shndx, section.c_str(), newIndex);
                 wri(sym->st_shndx, newIndex);
             }
         }
