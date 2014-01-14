@@ -64,6 +64,10 @@ This appears to be a bug in binutils
 
 RELEASE HISTORY
 
+0.8 (January 15, 2014):
+
+* Fix a segfault caused by certain illegal entries in symbol tables.
+
 0.7 (January 7, 2014):
 
 * Rewrite section indices in symbol tables. This for instance allows
