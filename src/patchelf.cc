@@ -1228,7 +1228,7 @@ int main(int argc, char * * argv)
         else if (arg == "--debug") {
             debugMode = true;
         }
-        else if (arg == "--help") {
+        else if (arg == "--help" || arg == "-h" ) {
             showHelp(argv[0]);
             return 0;
         }
