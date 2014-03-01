@@ -1163,24 +1163,33 @@ static void patchElf()
 
 void showHelp(const string & progName)
 {
-        fprintf(stderr, "syntax: %s\n\
-  [--set-interpreter FILENAME]\n\
-  [--print-interpreter]\n\
-  [--set-rpath RPATH]\n\
-  [--shrink-rpath]\n\
-  [--print-rpath]\n\
-  [--force-rpath]\n\
-  [--remove-needed LIBRARY]\n\
-  [--debug]\n\
-  [--version]\n\
-  FILENAME\n", progName.c_str());
+    fprintf(stderr, "syntax: %s OPTION FILENAME\n\
+options:\n\
+  --interpreter FILENAME / --set-interpreter FILENAME\n\
+  --print-interpreter\n\
+  --set-rpath RPATH\n\
+  --shrink-rpath\n\
+  --print-rpath\n\
+  --force-rpath\n\
+  --remove-needed LIBRARY\n\
+  --debug\n\
+  -h / --help\n\
+  -v / --version\n\
+Run 'man patchelf' for full documentation.\n", progName.c_str());
+}
+
+
+void showInfo(const string & progName)
+{
+    fprintf(stderr, "syntax: %s OPTION FILENAME\n\
+Run 'patchelf --help' for a list of options or 'man patchelf' for the manual.\n", progName.c_str());
 }
 
 
 int main(int argc, char * * argv)
 {
     if (argc <= 1) {
-        showHelp(argv[0]);
+        showInfo(argv[0]);
         return 1;
     }
 
@@ -1228,11 +1237,11 @@ int main(int argc, char * * argv)
         else if (arg == "--debug") {
             debugMode = true;
         }
-        else if (arg == "--help") {
+        else if (arg == "--help" || arg == "-h") {
             showHelp(argv[0]);
             return 0;
         }
-        else if (arg == "--version") {
+        else if (arg == "--version" || arg == "-v") {
             printf(PACKAGE_STRING "\n");
             return 0;
         }
