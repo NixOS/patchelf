@@ -4,4 +4,4 @@
 	dh $@ --with autoreconf
 
 override_dh_autoreconf:
-	autoreconf --verbose --install --force --warnings=all
+	autoreconf --verbose --install --force --warnings=all  # copy command from bootstrap.sh
