@@ -1,9 +1,9 @@
-patchelf (0.8-1~ubuntu13.10.2~ppa1) saucy; urgency=low
+patchelf (0.8-2~ubuntu13.10.1~ppa1) saucy; urgency=low
 
   * patchelf: added '-h' and '-v' to as commands, changed help display
   * manpage: better layout, added description of '--interpreter'
 
- -- Marshall Banana <djcj@gmx.de>  Sat, 01 Mar 2014 03:45:00 +0100
+ -- Marshall Banana <djcj@gmx.de>  Sat, 01 Mar 2014 12:00:00 +0100
 
 patchelf (0.8-1~ubuntu13.10.1~ppa1) saucy; urgency=low
 
