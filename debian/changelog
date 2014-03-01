@@ -1,0 +1,19 @@
+patchelf (0.8-1~ubuntu13.10.2~ppa1) saucy; urgency=low
+
+  * patchelf: added '-h' and '-v' to as commands, changed help display
+  * manpage: better layout, added description of '--interpreter'
+
+ -- Marshall Banana <djcj@gmx.de>  Sat, 01 Mar 2014 03:45:00 +0100
+
+patchelf (0.8-1~ubuntu13.10.1~ppa1) saucy; urgency=low
+
+  * Brought to Ubuntu
+  * Added description of '--remove-needed' feature to manpage
+
+ -- Marshall Banana <djcj@gmx.de>  Mon, 17 Feb 2014 14:40:00 +0100
+
+patchelf (0.8) saucy; urgency=low
+
+  * See /usr/share/doc/README for full changelog information
+
+ -- Marshall Banana <djcj@gmx.de>  Mon, 17 Feb 2014 12:00:00 +0100
