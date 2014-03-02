@@ -27,9 +27,11 @@ libraries.  In particular, it can do the following:
   This option can be given multiple times.
 
 
-AUTHOR
+AUTHORS
 
-Copyright 2004-2013 Eelco Dolstra <eelco.dolstra@logicblox.com>.
+Copyright 2004-2013 Eelco Dolstra <eelco.dolstra@logicblox.com>
+Copyright      2012 vdanjean
+Copyright      2014 djcj <djcj@gmx.de>
 
 
 LICENSE
