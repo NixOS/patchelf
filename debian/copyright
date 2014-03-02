@@ -11,6 +11,7 @@ License: GPL-3+
 Files: patchelf.1
 Copyright:
   2010-2014 Eelco Dolstra <eelco.dolstra@logicblox.com>
+  2012 vdanjean
   2014 djcj <djcj@gmx.de>
 License: GPL-3+
 
