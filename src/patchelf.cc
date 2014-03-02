@@ -1179,17 +1179,10 @@ Run 'man patchelf' for full documentation.\n", progName.c_str());
 }
 
 
-void showInfo(const string & progName)
-{
-    fprintf(stderr, "syntax: %s OPTION FILENAME\n\
-Run 'patchelf --help' for a list of options or 'man patchelf' for the manual.\n", progName.c_str());
-}
-
-
 int main(int argc, char * * argv)
 {
     if (argc <= 1) {
-        showInfo(argv[0]);
+        showHelp(argv[0]);
         return 1;
     }
 
