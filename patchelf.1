@@ -47,6 +47,10 @@ Prints the RPATH for an executable or library.
 Forces the use of the obsolete DT_RPATH in the file instead of
 DT_RUNPATH. By default DT_RPATH is converted to DT_RUNPATH.
 
+.IP "--remove-needed LIBRARY"
+Removes a declared depency on LIBRARY (DT_NEEDED entry). This
+option can be given multiple times.
+
 .IP --debug
 Prints details of the changes made to the input file.
 
