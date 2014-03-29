@@ -1275,7 +1275,7 @@ options:\n\
   --replace-needed LIBRARY NEW_LIBRARY\n\
   --debug\n\
   -h / --help\n\
-  -v / --version\n\
+  -V / --version\n\
 Run 'man patchelf' for full documentation.\n", progName.c_str());
 }
 
@@ -1344,7 +1344,7 @@ int main(int argc, char * * argv)
             showHelp(argv[0]);
             return 0;
         }
-        else if (arg == "--version" || arg == "-v") {
+        else if (arg == "--version" || arg == "-V") {
             printf(PACKAGE_STRING "\n");
             return 0;
         }
