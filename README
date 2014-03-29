@@ -19,17 +19,27 @@ libraries.  In particular, it can do the following:
   an RPATH "/lib:/usr/lib:/foo/lib", and libfoo.so can only be found
   in /foo/lib, then the new RPATH will be "/foo/lib".
 
-* Remove declared dependencies on dynamic libraries (DT_NEEDED
+* Remove a declared dependency on dynamic libraries (DT_NEEDED
   entries):
 
   $ patchelf --remove-needed libfoo.so.1 my-program
 
   This option can be given multiple times.
 
+* Add a declared dependency on a dynamic library (DT_NEEDED entries):
 
-AUTHOR
+  $ patchelf --add-needed libfoo.so.1 my-program
 
-Copyright 2004-2013 Eelco Dolstra <eelco.dolstra@logicblox.com>.
+  This option can be give multiple times.
+
+* Replace a declared dependency on a dynamic library with another
+  one (DT_NEEDED entries):
+
+  $ patchelf --replace-needed liboriginal.so.1 \
+               libreplacement.so.1 my-program
+
+  This option can be give multiple times.
+
 
 
 LICENSE
@@ -55,14 +65,24 @@ http://nixos.org/patchelf.html
 
 BUGS
 
-The `strip' command from binutils generated broken executables when
-applied to the output of patchelf (if `--set-rpath' or
-`--set-interpreter' with a larger path than the original is used).
-This appears to be a bug in binutils
-(http://bugs.strategoxt.org/browse/NIXPKGS-85).
+See BUGS file.
 
 
 RELEASE HISTORY
+
+0.8-1 (March 29, 2014):
+
+* Added `--add-needed' and `--replace-needed' options
+  (contributed by rgcjonas)
+
+* Changes in the no-rpath test (contributed by vdanjean),
+  but without multi-arch tests
+
+* Add Debian folder
+
+* Update manpage
+
+* Mentioning of ALL known authors
 
 0.8 (January 15, 2014):
 

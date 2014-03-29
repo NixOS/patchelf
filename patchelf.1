@@ -1,16 +1,12 @@
 .\" Process this file with
 .\" groff -man -Tascii foo.1
 .\"
-.TH PATCHELF 1 "JUNE 2010" PATCHELF "User Manuals"
+.TH PATCHELF "1" "MARCH 2014" "0.8" "User Manuals"
 .SH NAME
 patchelf - Modify ELF files
 
 .SH SYNOPSIS
-.B patchelf
-.I OPTION
-.B
-.I FILE
-.B
+.B patchelf \fIOPTION FILE
 
 .SH DESCRIPTION
 
@@ -22,17 +18,17 @@ of executables and change the RPATH of executables and libraries.
 
 The single option given operates on a given FILE, editing in place.
 
-.IP "--set-interpreter INTERPRETER"
+.IP "\fB--interpreter \fIINTERPRETER\fR or \fB--set-interpreter \fIINTERPRETER"
 Change the dynamic loader ("ELF interpreter") of executable given to
 INTERPRETER.
 
-.IP --print-intepreter
+.IP "\fB--print-interpreter"
 Prints the ELF interpreter of the executable.
 
-.IP "--set-rpath RPATH"
+.IP "\fB--set-rpath \fIRPATH"
 Change the RPATH of the executable or library to RPATH.
 
-.IP --shrink-rpath
+.IP "\fB--shrink-rpath"
 Remove from the RPATH all directories that do not contain a
 library referenced by DT_NEEDED fields of the executable or library.
 
@@ -40,24 +36,44 @@ For instance, if an executable references one library libfoo.so, has
 an RPATH "/lib:/usr/lib:/foo/lib", and libfoo.so can only be found
 in /foo/lib, then the new RPATH will be "/foo/lib".
 
-.IP --print-rpath
+.IP "\fB--print-rpath"
 Prints the RPATH for an executable or library.
 
-.IP --force-rpath
+.IP "\fB--force-rpath"
 Forces the use of the obsolete DT_RPATH in the file instead of
 DT_RUNPATH. By default DT_RPATH is converted to DT_RUNPATH.
 
-.IP --debug
+.IP "\fB--remove-needed \fILIBRARY"
+Remove a declared dependency on dynamic libraries. This option can
+be given multiple times.
+
+.IP "\fB--add-needed \fILIBRARY"
+Add a declared dependency on dynamic libraries. This option can
+be given multiple times.
+
+.IP "\fB--replace-needed \fILIBRARY NEW_LIBRARY"
+Replace a declared dependency on dynamic libraries. This option can
+be given multiple times.
+
+.IP "\fB--debug"
 Prints details of the changes made to the input file.
 
-.IP --version
+.IP "\fB\-h \fRor\fB \--help"
+Prints help information.
+
+.IP "\fB\-v \fRor\fB \--version"
 Shows the version of patchelf.
 
-.SH AUTHOR
-Eelco Dolstra <e.dolstra@tudelft.nl>
+.SH AUTHORS
+Eelco Dolstra <\fIeelco.dolstra@logicblox.com\fR>
+.br
+vdanjean
+.br
+djcj <\fIdjcj@gmx.de\fR>
+.PP
+This manpage was written by Eelco Dolstra <\fIeelco.dolstra@logicblox.com\fR>
+and modified by djcj <\fIdjcj@gmx.de\fR>.
 
 .SH "SEE ALSO"
 .BR elf (5),
 .BR ld.so (8)
-
-

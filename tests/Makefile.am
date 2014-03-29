@@ -1,15 +1,20 @@
-check_PROGRAMS = simple main main-scoped big-dynstr
+check_PROGRAMS = simple main main-scoped big-dynstr no-rpath
 
-TESTS = plain-fail.sh plain-run.sh shrink-rpath.sh set-interpreter-short.sh \
+src_TESTS = \
+  plain-fail.sh plain-run.sh shrink-rpath.sh set-interpreter-short.sh \
   set-interpreter-long.sh set-rpath.sh no-rpath.sh big-dynstr.sh \
   set-rpath-library.sh
-EXTRA_DIST = no-rpath $(TESTS)
+
+build_TESTS = \
+  $(no_rpath_arch_TESTS)
+
+TESTS= $(src_TESTS) $(build_TESTS)
 
 TESTS_ENVIRONMENT = PATCHELF_DEBUG=1
 
 CLEANFILES = big-dynstr.c
 clean-local:
-	$(RM) -r scratch
+	$(RM) -r scratch $(no_rpath_arch_TESTS)
 
 # by default, use -fpic to compile
 AM_CFLAGS = -fpic
@@ -61,4 +66,8 @@ libbar_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-rpath,`pwd`/no-such-path
 
 libbar_scoped_so_SOURCES = bar.c
 libbar_scoped_so_LDFLAGS = $(LDFLAGS_sharedlib)
+
+no_rpath_SOURCES = no-rpath.c
+# no -fpic for no-rpath.o
+no_rpath_CFLAGS =
 
