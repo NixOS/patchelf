@@ -75,10 +75,14 @@ RELEASE HISTORY
 * Added `--add-needed' and `--replace-needed' options
   (contributed by rgcjonas)
 
+* Added the following options:
+  --add-list/--add-needed-list  <library1>,<library2>,...
+  --remove-list/--remove-needed-list  <library1>,<library2>,...
+
 * Changes in the no-rpath test (contributed by vdanjean),
   but without multi-arch tests
 
-* Add Debian folder
+* Added Debian folder
 
 * Update manpage
 

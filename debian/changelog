@@ -3,6 +3,9 @@ patchelf (0.8-1) unstable; urgency=low
   * Add many changes:
     * Added `--add-needed' and `--replace-needed' options
       (contributed by rgcjonas)
+    * Added the following options:
+      --add-list/--add-needed-list  <library1>,<library2>,...
+      --remove-list/--remove-needed-list  <library1>,<library2>,...
     * Changes in the no-rpath test (contributed by vdanjean),
       but without multi-arch tests
     * Add Debian folder
@@ -10,7 +13,7 @@ patchelf (0.8-1) unstable; urgency=low
     * Mentioning of ALL known authors
   * Other minor changes
 
- -- Marshall Banana <djcj@gmx.de>  Sat, 29 Mar 2014 12:00:00 +0100
+ -- Marshall Banana <djcj@gmx.de>  Sat, 29 Mar 2014 21:30:00 +0100
 
 patchelf (0.8) unstable; urgency=low
 

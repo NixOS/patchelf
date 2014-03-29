@@ -17,6 +17,9 @@
 #include <fcntl.h>
 #include <limits.h>
 
+#include <functional>
+#include <iostream>
+
 #include "elf.h"
 
 using namespace std;
@@ -1260,22 +1263,50 @@ static void patchElf()
 }
 
 
+/* http://stackoverflow.com/a/8965145
+   used for "--*-list" arguments */
+void split(const string& s, char c,
+           vector<string>& v) {
+   string::size_type i = 0;
+   string::size_type j = s.find(c);
+
+   while (j != string::npos) {
+      v.push_back(s.substr(i, j-i));
+      i = ++j;
+      j = s.find(c, j);
+
+      if (j == string::npos)
+         v.push_back(s.substr(i, s.length( )));
+   }
+}
+
+
 void showHelp(const string & progName)
 {
-    fprintf(stderr, "syntax: %s OPTION FILENAME\n\
-options:\n\
-  --interpreter FILENAME / --set-interpreter FILENAME\n\
+    fprintf(stderr, "Syntax: %s [option] elf-file\n\
+\n\
+Options:\n\
+  --interpreter/--set-interpreter  <interpreter>\n\
   --print-interpreter\n\
-  --set-rpath RPATH\n\
+\n\
+  --set-rpath  <rpath>\n\
   --shrink-rpath\n\
   --print-rpath\n\
   --force-rpath\n\
-  --add-needed LIBRARY\n\
-  --remove-needed LIBRARY\n\
-  --replace-needed LIBRARY NEW_LIBRARY\n\
+\n\
+  --add-needed  <library>\n\
+  --remove-needed  <library>\n\
+\n\
+  --add-list/--add-needed-list  <library1>,<library2>,...\n\
+  --remove-list/--remove-needed-list  <library1>,<library2>,...\n\
+\n\
+  --replace-needed  <library>  <new library>\n\
+\n\
   --debug\n\
-  -h / --help\n\
-  -V / --version\n\
+\n\
+  -h/--help\n\
+  -V/--version\n\
+\n\
 Run 'man patchelf' for full documentation.\n", progName.c_str());
 }
 
@@ -1331,6 +1362,23 @@ int main(int argc, char * * argv)
         else if (arg == "--remove-needed") {
             if (++i == argc) error("missing argument");
             neededLibsToRemove.insert(argv[i]);
+        }
+        else if (arg == "--add-needed-list" || arg == "--add-list") {
+            /* Bug: a trailing comma creates an empty NEEDED entry */
+            if (++i == argc) error("missing argument");
+            vector<string> v;
+            split(argv[i], ',', v);
+            for (int i = 0; i < v.size( ); ++i) {
+                neededLibsToAdd.insert(v[i]);
+            }
+        }
+        else if (arg == "--remove-needed-list" || arg == "--remove-list") {
+            if (++i == argc) error("missing argument");
+            vector<string> v;
+            split(argv[i], ',', v);
+            for (int i = 0; i < v.size( ); ++i) {
+                neededLibsToRemove.insert(v[i]);
+            }
         }
         else if (arg == "--replace-needed") {
             if (i+2 >= argc) error("missing argument(s)");
