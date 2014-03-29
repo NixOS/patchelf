@@ -4,6 +4,9 @@
 #include <map>
 #include <algorithm>
 
+#include <functional>
+#include <iostream>
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -17,10 +20,7 @@
 #include <fcntl.h>
 #include <limits.h>
 
-#include <functional>
-#include <iostream>
-
-#include "elf.h"
+#include <elf.h>
 
 using namespace std;
 
