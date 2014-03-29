@@ -8,7 +8,6 @@ patchelf (0.8-1) unstable; urgency=low
     * Add Debian folder
     * Update manpage
     * Mentioning of ALL known authors
-  * See /usr/share/doc/README for full changelog information.
 
  -- Marshall Banana <djcj@gmx.de>  Sat, 29 Mar 2014 12:00:00 +0100
 
