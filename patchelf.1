@@ -18,61 +18,68 @@ of executables and change the RPATH of executables and libraries.
 
 The single option given operates on a given FILE, editing in place.
 
-.IP "\fB--interpreter \fIINTERPRETER\fR or \fB--set-interpreter \fIINTERPRETER"
-Change the dynamic loader ("ELF interpreter") of executable given to
-INTERPRETER.
+.IP "\fB--interpreter \fIINTERPRETER\fR | \fB--set-interpreter \fIINTERPRETER"
+Changes the dynamic loader ("ELF interpreter") of an executable given
+to INTERPRETER.
 
 .IP "\fB--print-interpreter"
-Prints the ELF interpreter of the executable.
+Prints the ELF interpreter of an executable.
 
 .IP "\fB--set-rpath \fIRPATH"
-Change the RPATH of the executable or library to RPATH.
+Changes the RPATH of an executable or library to RPATH.
 
 .IP "\fB--shrink-rpath"
-Remove from the RPATH all directories that do not contain a
+Removes all directories from RPATH that do not contain a
 library referenced by DT_NEEDED fields of the executable or library.
 
-For instance, if an executable references one library libfoo.so, has
-an RPATH "/lib:/usr/lib:/foo/lib", and libfoo.so can only be found
+For instance, if an executable references one library libfoo.so, and
+has an RPATH "/lib:/usr/lib:/foo/lib", and libfoo.so can only be found
 in /foo/lib, then the new RPATH will be "/foo/lib".
 
 .IP "\fB--print-rpath"
-Prints the RPATH for an executable or library.
+Prints the RPATH of an executable or library.
 
 .IP "\fB--force-rpath"
 Forces the use of the obsolete DT_RPATH in the file instead of
 DT_RUNPATH. By default DT_RPATH is converted to DT_RUNPATH.
 
 .IP "\fB--remove-needed \fILIBRARY"
-Remove a declared dependency on a dynamic library. This option can
+Removes a declared dependency on a dynamic library. This option can
 be given multiple times.
 
 .IP "\fB--add-needed \fILIBRARY"
-Add a declared dependency on a dynamic library. This option can
+Adds a declared dependency on a dynamic library. This option can
 be given multiple times.
 
 .IP "\fB--replace-needed \fILIBRARY NEW_LIBRARY"
-Replace a declared dependency on a dynamic library. This option can
+Replaces a declared dependency on a dynamic library. This option can
 be given multiple times.
 
 .IP "\fB--debug"
 Prints details of the changes made to the input file.
 
-.IP "\fB\-h \fRor\fB \--help"
+.IP "\fB\-h \fR|\fB \--help"
 Prints help information.
 
-.IP "\fB\-v \fRor\fB \--version"
+.IP "\fB\-V \fR|\fB \--version"
 Shows the version of patchelf.
 
 .SH AUTHORS
-Eelco Dolstra <\fIeelco.dolstra@logicblox.com\fR>
+2004-2014, Eelco Dolstra <\fIeelco.dolstra@logicblox.com\fR>
 .br
-vdanjean
+     2011, Zack Weinberg
 .br
-djcj <\fIdjcj@gmx.de\fR>
+     2011, Jeremy Sanders <\fIjeremy@jeremysanders.net\fR>
+.br
+     2012, vdanjean
+.br
+     2013, rgcjonas
+.br
+     2014, djcj <\fIdjcj@gmx.de\fR>
 .PP
-This manpage was written by Eelco Dolstra <\fIeelco.dolstra@logicblox.com\fR>
-and modified by djcj <\fIdjcj@gmx.de\fR>.
+This manpage was written by Jeremy Sanders <\fIjeremy@jeremysanders.net\fR>
+and modified by Eelco Dolstra <\fIeelco.dolstra@logicblox.com\fR>
+and djcj <\fIdjcj@gmx.de\fR>.
 
 .SH "SEE ALSO"
 .BR elf (5),
