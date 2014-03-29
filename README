@@ -19,7 +19,7 @@ libraries.  In particular, it can do the following:
   an RPATH "/lib:/usr/lib:/foo/lib", and libfoo.so can only be found
   in /foo/lib, then the new RPATH will be "/foo/lib".
 
-* Remove a declared dependency on dynamic libraries (DT_NEEDED
+* Remove a declared dependency on a dynamic library (DT_NEEDED
   entries):
 
   $ patchelf --remove-needed libfoo.so.1 my-program
