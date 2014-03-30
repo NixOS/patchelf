@@ -9,7 +9,6 @@ patchelf (0.8-1) unstable; urgency=low
     * Add tests for new options.
     * Changes in the no-rpath test (contributed by vdanjean),
       but without multi-arch tests.
-    * Add Debian folder.
     * Update manpage.
     * Mentioning of ALL known authors.
   * Some minor changes
@@ -26,7 +25,6 @@ patchelf (0.7) unstable; urgency=low
 
   * Rewrite section indices in symbol tables. This for instance allows
     gdb to show proper backtraces.
-
   * Added `--remove-needed' option.
 
  -- Eelco Dolstra <eelco.dolstra@logicblox.com>  Sat, 07 Jan 2014 12:00:00 +0000
@@ -34,9 +32,7 @@ patchelf (0.7) unstable; urgency=low
 patchelf (0.6) unstable; urgency=low
 
   * Hacky support for executables created by the Gold linker.
-
   * Support segments with an alignment of 0 (contributed by Zack Weinberg).
-
   * Added a manual page (contributed by Jeremy Sanders
     <jeremy@jeremysanders.net>).
 
@@ -45,7 +41,6 @@ patchelf (0.6) unstable; urgency=low
 patchelf (0.5) unstable; urgency=low
 
   * Various bugfixes.
-
   * `--force-rpath' now deletes the DT_RUNPATH if it is present.
 
  -- Eelco Dolstra <eelco.dolstra@logicblox.com>  Sat, 04 Nov 2009 12:00:00 +0000
@@ -53,11 +48,8 @@ patchelf (0.5) unstable; urgency=low
 patchelf (0.4) unstable; urgency=low
 
   * Support for growing the RPATH on dynamic libraries.
-
   * IA-64 support (not tested) and related 64-bit fixes.
-
   * FreeBSD support.
-
   * `--set-rpath', `--shrink-rpath' and `--print-rpath' now prefer
     DT_RUNPATH over DT_RPATH, which is obsolete.  When updating, if both
     are present, both are updated.  If only DT_RPATH is present, it is
@@ -70,9 +62,7 @@ patchelf (0.4) unstable; urgency=low
 patchelf (0.3) unstable; urgency=low
 
   * Support for 64-bit ELF binaries (such as on x86_64-linux).
-
   * Support for big-endian ELF binaries (such as on powerpc-linux).
-
   * Various bugfixes.
 
  -- Eelco Dolstra <eelco.dolstra@logicblox.com>  Sat, 24 May 2007 12:00:00 +0000
@@ -89,4 +79,3 @@ patchelf (0.1) unstable; urgency=low
   * Initial release.
 
  -- Eelco Dolstra <eelco.dolstra@logicblox.com>  Sat, 11 Oct 2005 12:00:00 +0000
-
