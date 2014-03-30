@@ -1400,7 +1400,7 @@ int main(int argc, char * * argv)
             neededLibsToRemove.insert(argv[i]);
         }
         else if (arg == "--add-needed-list" || arg == "--add-list") {
-            /* Bug: a trailing comma creates an empty NEEDED entry */
+            /* Bug: a trailing comma creates an empty DT_NEEDED entry */
             if (++i == argc) error("missing argument");
             vector<string> v;
             split(argv[i], ',', v);
