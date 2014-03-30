@@ -7,7 +7,6 @@ Source: https://github.com/darealshinji/patchelf
 Files: *
 Copyright:
   2004-2014, Eelco Dolstra <eelco.dolstra@logicblox.com>
-       2011, Zack Weinberg
        2012, vdanjean
        2013, rgcjonas
        2014, djcj <djcj@gmx.de>
@@ -18,7 +17,7 @@ Copyright:
        2014 djcj, <djcj@gmx.de>
 License: GPL-3+
 
-Files: src/patchelf.cc
+Files: src/patchelf.cpp
 Copyright:
   2004-2014, Eelco Dolstra <eelco.dolstra@logicblox.com>
        2011, Zack Weinberg
@@ -30,6 +29,7 @@ Files: tests/*
 Copyright:
   2004-2014, Eelco Dolstra <eelco.dolstra@logicblox.com>
        2012, vdanjean
+       2014, djcj <djcj@gmx.de>
 License: GPL-3+
 
 Files: patchelf.1
