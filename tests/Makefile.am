@@ -3,7 +3,8 @@ check_PROGRAMS = simple main main-scoped big-dynstr no-rpath
 src_TESTS = \
   plain-fail.sh plain-run.sh shrink-rpath.sh set-interpreter-short.sh \
   set-interpreter-long.sh set-rpath.sh no-rpath.sh big-dynstr.sh \
-  set-rpath-library.sh
+  set-rpath-library.sh add-dt-needed.sh add-dt-needed-list.sh \
+  remove-dt-needed.sh remove-dt-needed-list.sh replace-dt-needed.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)

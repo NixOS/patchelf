@@ -55,7 +55,7 @@ be given multiple times.
 The same as '--add-needed', but with several dynamic library declared
 at once through a comma seperated list.
 
-Note that a trailing comma will create an empty NEEDED entry, which
+Note that a trailing comma will create an empty DT_NEEDED entry, which
 can be removed with the following command:
  patchelf --remove-needed ""
 
