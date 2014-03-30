@@ -1,3 +1,26 @@
+/*
+ *  PatchELF is a simple utility for modifing existing ELF executables
+ *  and libraries.
+ *
+ *  Copyright (c) 2004-2014  Eelco Dolstra <eelco.dolstra@logicblox.com>
+ *                     2011  Zack Weinberg
+ *                     2013  rgcjonas
+ *                     2014  djcj <djcj@gmx.de>
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or (at
+ *  your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful, but
+ *  WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *  General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <string>
 #include <vector>
 #include <set>
@@ -20,7 +43,20 @@
 #include <fcntl.h>
 #include <limits.h>
 
+/*
+ * You can find the latest elf.h here if you need it:
+ *  http://www.gnu.org/software/libc/index.html
+ *  https://sourceware.org/git/?p=glibc.git;a=blob;f=elf/elf.h;hb=HEAD
+ *
+ * Download it and place it in the directory of patchelf.cc and
+ * replace the line    #include <elf.h>    with    #include "elf.h"
+ *
+ * That should do it.
+ */
+
 #include <elf.h>
+/* #include "elf.h" */
+
 
 using namespace std;
 
