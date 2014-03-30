@@ -1,9 +1,9 @@
 .\" Process this file with
-.\" groff -man -Tascii foo.1
+.\" groff -man -Tascii patchelf.1
 .\"
-.TH PATCHELF "1" "MARCH 2014" "0.8" "User Manuals"
+.TH PATCHELF "1" "MARCH 2014" "0.8-1"
 .SH NAME
-patchelf - Modify ELF files
+PatchELF - Modify ELF files
 
 .SH SYNOPSIS
 .B patchelf \fIOPTION FILE
@@ -11,7 +11,7 @@ patchelf - Modify ELF files
 .SH DESCRIPTION
 
 PatchELF is a simple utility for modifying existing ELF executables
-and libraries.  It can change the dynamic loader ("ELF interpreter")
+and libraries. It can change the dynamic loader ("ELF interpreter")
 of executables and change the RPATH of executables and libraries.
 
 .SH OPTIONS
@@ -43,13 +43,25 @@ Prints the RPATH of an executable or library.
 Forces the use of the obsolete DT_RPATH in the file instead of
 DT_RUNPATH. By default DT_RPATH is converted to DT_RUNPATH.
 
+.IP "\fB--add-needed \fILIBRARY"
+Adds a declared dependency on a dynamic library. This option can
+be given multiple times.
+
 .IP "\fB--remove-needed \fILIBRARY"
 Removes a declared dependency on a dynamic library. This option can
 be given multiple times.
 
-.IP "\fB--add-needed \fILIBRARY"
-Adds a declared dependency on a dynamic library. This option can
-be given multiple times.
+.IP "\fB--add-list \fR|\fB --add-needed-list \fILIBRARY1\fR,\fILIBRARY2\fR,..."
+The same as '--add-needed', but with several dynamic library declared
+at once through a comma seperated list.
+
+Note that a trailing comma will create an empty NEEDED entry, which
+can be removed with the following command:
+ patchelf --remove-needed ""
+
+.IP "\fB--remove-list \fR|\fB --remove-needed-list \fILIBRARY1\fR,\fILIBRARY2\fR,..."
+The same as '--add-needed-list', but it removes the libraries.
+Trailing commas will be ignored.
 
 .IP "\fB--replace-needed \fILIBRARY NEW_LIBRARY"
 Replaces a declared dependency on a dynamic library. This option can
@@ -65,6 +77,8 @@ Prints help information.
 Shows the version of patchelf.
 
 .SH AUTHORS
+\fIhttp://nixos.org/patchelf.html
+.PP
 2004-2014, Eelco Dolstra <\fIeelco.dolstra@logicblox.com\fR>
 .br
      2011, Zack Weinberg
