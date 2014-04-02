@@ -9,8 +9,8 @@ Build-Depends:
 Standards-Version: 3.9.4
 Section: utils
 Homepage: http://nixos.org/patchelf.html
-Vcs-Git: https://github.com/NixOS/patchelf.git
-Vcs-Browser: https://github.com/NixOS/patchelf
+Vcs-Git: https://github.com/darealshinji/patchelf.git
+Vcs-Browser: https://github.com/darealshinji/patchelf
 
 Package: patchelf
 Section: utils
