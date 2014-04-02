@@ -41,10 +41,14 @@ For known bugs see BUGS file.
 
 
 **Installation:**<br>
-`./bootstrap.sh`<br>
-`./configure && make && make check`<br>
-`strip src/patchelfmod`<br>
-`make install`<br>
+```
+./bootstrap.sh
+./configure
+make
+make check
+strip src/patchelfmod
+make install
+```
 
 
 **Homepage:** https://github.com/darealshinji/patchelfmod<br>
@@ -81,7 +85,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 * Add Debian folder.
 * Update manpage and documentation.
 * Mentioning of ALL known authors.
-* Some minor changes.
+* Other changes.
 
 0.8 (January 15, 2014):
 * Fix a segfault caused by certain illegal entries in symbol tables.
