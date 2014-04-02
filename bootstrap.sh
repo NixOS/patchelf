@@ -1,2 +1,7 @@
 #! /bin/sh -e
-autoreconf --verbose --install --force --warnings=all
+
+echo "Running autoreconf..."
+autoreconf -ivf --warnings=all "$@"
+
+echo "Now run './configure' and then 'make' to build PatchELFmod"
+

@@ -1,4 +1,4 @@
-patchelf (0.8-1) unstable; urgency=low
+patchelfmod (0.8m) unstable; urgency=low
 
   * Add many changes:
     * Add `--add-needed' and `--replace-needed' options.

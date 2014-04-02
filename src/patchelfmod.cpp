@@ -1,5 +1,5 @@
 /*
- *  PatchELF is a simple utility for modifing existing ELF executables
+ *  PatchELFmod is a simple utility for modifing existing ELF executables
  *  and libraries.
  *
  *  Copyright (c) 2004-2014  Eelco Dolstra <eelco.dolstra@logicblox.com>
@@ -48,7 +48,7 @@
  *  http://www.gnu.org/software/libc/index.html
  *  https://sourceware.org/git/?p=glibc.git;a=blob;f=elf/elf.h;hb=HEAD
  *
- * Download it and place it in the directory of patchelf.cc and
+ * Download it and place it in the directory of patchelfmod.cpp and
  * replace the line    #include <elf.h>    with    #include "elf.h"
  *
  * That should do it.
@@ -194,6 +194,8 @@ public:
     void removeNeeded(set<string> libs);
 
     void replaceNeeded(map<string, string>& libs);
+
+    void replaceSoname(map<string, string>& libs);
 
 private:
 
@@ -403,7 +405,7 @@ void ElfFile<ElfFileParamNames>::sortShdrs()
 
 static void writeFile(string fileName, mode_t fileMode)
 {
-    string fileName2 = fileName + "_patchelf_tmp";
+    string fileName2 = fileName + "_patchelfmod_tmp";
 
     int fd = open(fileName2.c_str(),
         O_CREAT | O_TRUNC | O_WRONLY, 0700);
@@ -1224,6 +1226,48 @@ void ElfFile<ElfFileParamNames>::addNeeded(set<string> libs)
 }
 
 
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::replaceSoname(map<string, string>& libs)
+{
+    if (libs.empty()) return;
+    
+    Elf_Shdr & shdrDynamic = findSection(".dynamic");
+    Elf_Shdr & shdrDynStr = findSection(".dynstr");
+    char * strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
+
+    Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+    
+    unsigned int dynStrAddedBytes = 0;
+    
+    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+        if (rdi(dyn->d_tag) == DT_SONAME) {
+            char * name = strTab + rdi(dyn->d_un.d_val);
+            if (libs.find(name) != libs.end()) {
+                const string & replacement = libs[name];
+                
+                debug("replacing DT_SONAME entry `%s' with `%s'\n", name, replacement.c_str());
+                
+                // technically, the string referred by d_val could be used otherwise, too (although unlikely)
+                // we'll therefore add a new string
+                debug("resizing .dynstr ...");
+                
+                string & newDynStr = replaceSection(".dynstr",
+                    rdi(shdrDynStr.sh_size) + replacement.size() + 1 + dynStrAddedBytes);
+                setSubstr(newDynStr, rdi(shdrDynStr.sh_size) + dynStrAddedBytes, replacement + '\0');
+                
+                dyn->d_un.d_val = shdrDynStr.sh_size + dynStrAddedBytes;
+               
+                dynStrAddedBytes += replacement.size() + 1;
+                
+                changed = true;
+            } else {
+                debug("keeping DT_SONAME entry `%s'\n", name);
+            }
+        }
+    }
+}
+
+
 static bool printInterpreter = false;
 static string newInterpreter;
 
@@ -1233,10 +1277,11 @@ static bool printRPath = false;
 static string newRPath;
 static set<string> neededLibsToRemove;
 static map<string, string> neededLibsToReplace;
+static map<string, string> sonameToReplace;
 static set<string> neededLibsToAdd;
 
 template<class ElfFile>
-static void patchElf2(ElfFile & elfFile, mode_t fileMode)
+static void patchElfmod2(ElfFile & elfFile, mode_t fileMode)
 {
     elfFile.parse();
 
@@ -1257,6 +1302,7 @@ static void patchElf2(ElfFile & elfFile, mode_t fileMode)
     elfFile.removeNeeded(neededLibsToRemove);
     elfFile.replaceNeeded(neededLibsToReplace);
     elfFile.addNeeded(neededLibsToAdd);
+    elfFile.replaceSoname(sonameToReplace);
 
     if (elfFile.isChanged()){
         elfFile.rewriteSections();
@@ -1265,7 +1311,7 @@ static void patchElf2(ElfFile & elfFile, mode_t fileMode)
 }
 
 
-static void patchElf()
+static void patchElfmod()
 {
     if (!printInterpreter && !printRPath)
         debug("patching ELF file `%s'\n", fileName.c_str());
@@ -1285,13 +1331,13 @@ static void patchElf()
         contents[EI_VERSION] == EV_CURRENT)
     {
         ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym> elfFile;
-        patchElf2(elfFile, fileMode);
+        patchElfmod2(elfFile, fileMode);
     }
     else if (contents[EI_CLASS] == ELFCLASS64 &&
         contents[EI_VERSION] == EV_CURRENT)
     {
         ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym> elfFile;
-        patchElf2(elfFile, fileMode);
+        patchElfmod2(elfFile, fileMode);
     }
     else {
         error("ELF executable is not 32/64-bit, little/big-endian, version 1");
@@ -1317,44 +1363,107 @@ void split(const string& s, char c,
 }
 
 
-void showHelp(const string & progName)
+void showInfo(const string & progName)
 {
-    fprintf(stderr, "Syntax: %s [option] elf-file\n\
+    fprintf(stderr, "Syntax: %s [option] <elf-file>\n\
 \n\
 Options:\n\
-  --interpreter/--set-interpreter  <interpreter>\n\
+  --interpreter/--set-interpreter <interpreter>\n\
   --print-interpreter\n\
 \n\
-  --set-rpath  <rpath>\n\
+  --set-rpath <rpath>\n\
   --shrink-rpath\n\
   --print-rpath\n\
   --force-rpath\n\
 \n\
-  --add-needed  <library>\n\
-  --remove-needed  <library>\n\
+  --add-needed <library>\n\
+  --remove-needed <library>\n\
 \n\
-  --add-list/--add-needed-list  <library1>,<library2>,...\n\
-  --remove-list/--remove-needed-list  <library1>,<library2>,...\n\
+  --add-list/--add-needed-list <library1>,<library2>,...\n\
+  --remove-list/--remove-needed-list <library1>,<library2>,...\n\
 \n\
-  --replace-needed  <library>  <new library>\n\
-\n\
-  --debug\n\
+  --replace-needed <library> <new library>\n\
 \n\
   -h/--help\n\
   -V/--version\n\
+  --debug\n\
 \n\
-Run 'man patchelf' for full documentation.\n", progName.c_str());
+Run '%s --help' or 'man patchelfmod' for more information.\n", progName.c_str(), progName.c_str());
+}
+
+
+void showHelp(const string & progName)
+{
+    fprintf(stderr, "Syntax: %s [option] <elf-file>\n\
+\n\
+Options:\n\
+\n\
+  -h, --help              Print help information\n\
+  -V, --version           Show version\n\
+      --debug             Prints details of the changes made\n\
+                          to the input file\n\
+\n\
+\n\
+Dynamic loader options:\n\
+\n\
+  --interpreter,\n\
+  --set-interpreter <interpreter>  Changes the dynamic loader (\"ELF interpreter\")\n\
+                                   of an executable given to INTERPRETER.\n\
+  --print-interpreter     Print the ELF interpreter of an executable.\n\
+\n\
+\n\
+RPATH options:\n\
+\n\
+  --set-rpath <rpath>     Change the RPATH of an executable or library.\n\
+\n\
+  --shrink-rpath          Remove all directories from RPATH that do not contain\n\
+                          a library referenced by DT_NEEDED fields of the executable\n\
+                          or library.\n\
+\n\
+  For instance, if an executable references one library libfoo.so,\n\
+  and has an RPATH \"/lib:/usr/lib:/foo/lib\", and libfoo.so can only\n\
+  be found in /foo/lib, then the new RPATH will be \"/foo/lib\".\n\
+\n\
+  --print-rpath           Print the RPATH of an executable or library.\n\
+\n\
+  --force-rpath           Force the use of the obsolete DT_RPATH instead of DT_RUNPATH.\n\
+                          By default DT_RPATH is converted to DT_RUNPATH.\n\
+\n\
+\n\
+DT_NEEDED options:\n\
+\n\
+  --add-needed <library>  Adds a declared dependency on a dynamic library. This\n\
+                          option can be given multiple times.\n\
+  --remove-needed <library>  Removes a declared dependency on a dynamic library. This\n\
+                             option can be given multiple times.\n\
+\n\
+  --add-list <library1>,<library2>,...\n\
+  --add-needed-list <library1>,<library2>,...  The same as '--add-needed', but with\n\
+                                               several dynamic library declared at once\n\
+                                               through a comma seperated list.\n\
+\n\
+  Note that a trailing comma will create an empty DT_NEEDED entry,\n\
+  which can be removed with the following command:\n\
+  patchelfmod --remove-needed \"\"\n\
+\n\
+  --remove-list <library1>,<library2>,...\n\
+  --remove-needed-list <library1>,<library2>,...  The same as '--add-needed-list',\n\
+                                                  but it removes the libraries.\n\
+                                                  Trailing commas will be ignored.\n\
+\n\
+  --replace-needed <library> <new library>  Replace a declared dependency on a dynamic\n\
+                                            library. This option can be given multiple times.\n", progName.c_str());
 }
 
 
 int main(int argc, char * * argv)
 {
     if (argc <= 1) {
-        showHelp(argv[0]);
+        showInfo(argv[0]);
         return 1;
     }
 
-    if (getenv("PATCHELF_DEBUG") != 0) debugMode = true;
+    if (getenv("PATCHELFMOD_DEBUG") != 0) debugMode = true;
 
     int i;
     for (i = 1; i < argc; ++i) {
@@ -1421,6 +1530,11 @@ int main(int argc, char * * argv)
             neededLibsToReplace[ argv[i+1] ] = argv[i+2];
             i += 2;
         }
+        else if (arg == "--replace-soname") {
+            if (i+2 >= argc) error("missing argument(s)");
+            sonameToReplace[ argv[i+1] ] = argv[i+2];
+            i += 2;
+        }
         else if (arg == "--debug") {
             debugMode = true;
         }
@@ -1438,7 +1552,7 @@ int main(int argc, char * * argv)
     if (i == argc) error("missing filename");
     fileName = argv[i];
 
-    patchElf();
+    patchElfmod();
 
     return 0;
 }

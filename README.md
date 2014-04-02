@@ -1,52 +1,53 @@
-PatchELF
+PatchELFmod
 ===============
-**PatchELF** is a simple utility for modifing existing ELF executables
+**PatchELFmod** is a simple utility for modifing existing ELF executables
 and libraries.<br>
 In particular, it can do the following:
 
 Change the ELF interpreter of an executable:<br>
-  `patchelf --interpreter  <interpreter>  <elf-file>`<br>
-  `patchelf --set-interpreter  <interpreter>  <elf-file>`<br>
+  `patchelfmod --interpreter  <interpreter>  <elf-file>`<br>
 
 Print the ELF interpreter of an executable:<br>
-  `patchelf --print-interpreter  <elf-file>`<br>
+  `patchelfmod --print-interpreter  <elf-file>`<br>
 
 Change the RPATH of an executable or library:<br>
-  `patchelf --set-rpath  <rpath>  <elf-file>`<br>
+  `patchelfmod --set-rpath  <rpath>  <elf-file>`<br>
 
 Remove all directories from RPATH that do not contain<br>
 a library referenced by DT_NEEDED fields:<br>
-  `patchelf --shrink-rpath  <elf-file>`<br>
+  `patchelfmod --shrink-rpath  <elf-file>`<br>
 
 Print the RPATH of an executable or library:<br>
-  `patchelf --print-rpath  <elf-file>`<br>
+  `patchelfmod --print-rpath  <elf-file>`<br>
 
 Force the use of the obsolete DT_RPATH instead of DT_RUNPATH:<br>
-  `patchelf --force-rpath  <elf-file>`<br>
+  `patchelfmod --force-rpath  <elf-file>`<br>
 
-Add or remove one or more declared dependencies on a dynamic library:<br>
-  `patchelf --add-needed  <library>  <elf-file>`<br>
-  `patchelf --remove-needed  <library>  <elf-file>`<br>
-  `patchelf --add-list  <library1>,<library2>,...  <elf-file>`<br>
-  `patchelf --add-needed-list  <library1>,<library2>,...  <elf-file>`<br>
-  `patchelf --remove-list  <library1>,<library2>,...  <elf-file>`<br>
-  `patchelf --remove-needed-list  <library1>,<library2>,...  <elf-file>`<br>
+Add or remove a declared dependencies on a dynamic library:<br>
+  `patchelfmod --add-needed  <library>  <elf-file>`<br>
+  `patchelfmod --remove-needed  <library>  <elf-file>`<br>
+This option can be given multiple times.<br>
+
+Add or remove several declared dependencies on a dynamic library at once:<br>
+  `patchelfmod --add-list  <library1>,<library2>,...  <elf-file>`<br>
+  `patchelfmod --remove-list  <library1>,<library2>,...  <elf-file>`<br>
 
 Replace a declared dependency on a dynamic library:<br>
-  `patchelf --replace-needed  <library>  <new library>  <elf-file>`<br>
+  `patchelfmod --replace-needed  <library>  <new library>  <elf-file>`<br>
+This option can be given multiple times.<br>
 
-See the manpage (`man patchelf`) for more information.
+Run `patchelfmod --help` or see the manpage (`man patchelfmod`) for more information.
 For known bugs see BUGS file.
 
 
 **Installation:**<br>
 `./bootstrap.sh`<br>
 `./configure && make && make check`<br>
-`strip src/patchelf`<br>
+`strip src/patchelfmod`<br>
 `make install`<br>
 
 
-**Homepage:** http://nixos.org/patchelf.html<br>
+**Homepage:** https://github.com/darealshinji/patchelfmod<br>
 
 
 **License:**<br>
@@ -68,7 +69,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 **Release history:**
 
-0.8-1 (March 30, 2014):
+0.8m (April 02, 2014):
 * Add '--add-needed' and '--replace-needed' options
   (contributed by rgcjonas).
 * Add the following options:

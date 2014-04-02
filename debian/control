@@ -1,4 +1,4 @@
-Source: patchelf
+Source: patchelfmod
 Priority: extra
 Maintainer: Marshall Banana <djcj@gmx.de>
 Build-Depends:
@@ -8,11 +8,11 @@ Build-Depends:
   automake
 Standards-Version: 3.9.4
 Section: utils
-Homepage: http://nixos.org/patchelf.html
-Vcs-Git: https://github.com/darealshinji/patchelf.git
-Vcs-Browser: https://github.com/darealshinji/patchelf
+Homepage: https://github.com/darealshinji/patchelfmod
+Vcs-Git: https://github.com/darealshinji/patchelfmod.git
+Vcs-Browser: https://github.com/darealshinji/patchelfmod
 
-Package: patchelf
+Package: patchelfmod
 Section: utils
 Architecture: any
 Depends:
@@ -20,5 +20,5 @@ Depends:
   ${misc:Depends}
 Description: utility for patching ELF binaries
  Simple utility for modifing existing ELF executables and libraries.
- It can change the dynamic loader ("ELF interpreter") of
- executables and change the RPATH of executables and libraries.
+ It can change the dynamic loader ("ELF interpreter") of executables,
+ change the RPATH of executables and libraries and their DT_NEEDED entries.

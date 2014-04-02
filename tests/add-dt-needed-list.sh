@@ -17,8 +17,8 @@ cp libbar.so ${SCRATCH}/libs/libbar2.so
 cp libfoo.so ${SCRATCH}/libs/libfoo3.so
 cp libbar.so ${SCRATCH}/libs/libbar3.so
 
-../src/patchelf --add-needed-list libfoo0.so,libfoo1.so,libfoo2.so,libfoo3.so ${SCRATCH}/simple
-../src/patchelf --add-list libbar0.so,libbar1.so,libbar2.so,libbar3.so ${SCRATCH}/simple
+../src/patchelfmod --add-needed-list libfoo0.so,libfoo1.so,libfoo2.so,libfoo3.so ${SCRATCH}/simple
+../src/patchelfmod --add-list libbar0.so,libbar1.so,libbar2.so,libbar3.so ${SCRATCH}/simple
 
 export LD_LIBRARY_PATH=$(pwd)/${SCRATCH}/libs
 

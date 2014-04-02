@@ -8,7 +8,7 @@ mkdir -p ${SCRATCH}/libs
 cp simple ${SCRATCH}/
 cp libbar.so ${SCRATCH}/libs/
 
-../src/patchelf --add-needed libfoo.so ${SCRATCH}/simple
+../src/patchelfmod --add-needed libfoo.so ${SCRATCH}/simple
 
 export LD_LIBRARY_PATH=$(pwd)/${SCRATCH}/libs
 
@@ -21,7 +21,7 @@ if test "$exitCode" != 127; then
 fi
 
 cd ../..
-../src/patchelf --replace-needed libfoo.so libbar.so ${SCRATCH}/simple
+../src/patchelfmod --replace-needed libfoo.so libbar.so ${SCRATCH}/simple
 
 export LD_LIBRARY_PATH=$(pwd)/${SCRATCH}/libs
 

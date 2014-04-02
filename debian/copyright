@@ -1,7 +1,7 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: patchelf
+Upstream-Name: patchelfmod
 Upstream-Contact: djcj <djcj@gmx.de>
-Source: https://github.com/darealshinji/patchelf
+Source: https://github.com/darealshinji/patchelfmod
 
 
 Files: *
@@ -17,7 +17,7 @@ Copyright:
        2014 djcj, <djcj@gmx.de>
 License: GPL-3+
 
-Files: src/patchelf.cpp
+Files: src/patchelfmod.cpp
 Copyright:
   2004-2014, Eelco Dolstra <eelco.dolstra@logicblox.com>
        2011, Zack Weinberg
@@ -32,7 +32,7 @@ Copyright:
        2014, djcj <djcj@gmx.de>
 License: GPL-3+
 
-Files: patchelf.1
+Files: patchelfmod.1
 Copyright:
        2011, Jeremy Sanders <jeremy@jeremysanders.net>
   2011-2014, Eelco Dolstra <eelco.dolstra@logicblox.com>

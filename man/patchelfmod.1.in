@@ -1,18 +1,19 @@
 .\" Process this file with
 .\" groff -man -Tascii patchelf.1
 .\"
-.TH PATCHELF "1" "MARCH 2014" "0.8-1"
+.TH PATCHELFMOD "1" "APRIL 2014" "@PACKAGE_VERSION@"
 .SH NAME
-PatchELF - Modify ELF files
+PatchELFmod - Modify ELF files
 
 .SH SYNOPSIS
-.B patchelf \fIOPTION FILE
+.B patchelfmod \fIOPTION FILE
 
 .SH DESCRIPTION
 
-PatchELF is a simple utility for modifying existing ELF executables
+PatchELFmod is a simple utility for modifying existing ELF executables
 and libraries. It can change the dynamic loader ("ELF interpreter")
-of executables and change the RPATH of executables and libraries.
+of executables, change the RPATH of executables and libraries and
+their DT_NEEDED entries.
 
 .SH OPTIONS
 
@@ -57,7 +58,7 @@ at once through a comma seperated list.
 
 Note that a trailing comma will create an empty DT_NEEDED entry, which
 can be removed with the following command:
- patchelf --remove-needed ""
+ patchelfmod --remove-needed ""
 
 .IP "\fB--remove-list \fR|\fB --remove-needed-list \fILIBRARY1\fR,\fILIBRARY2\fR,..."
 The same as '--add-needed-list', but it removes the libraries.
@@ -74,11 +75,9 @@ Prints details of the changes made to the input file.
 Prints help information.
 
 .IP "\fB\-V \fR|\fB \--version"
-Shows the version of patchelf.
+Shows the version of PatchElfmod.
 
 .SH AUTHORS
-.I http://nixos.org/patchelf.html
-.PP
 2004-2014, Eelco Dolstra <\fIeelco.dolstra@logicblox.com\fR>
 .br
      2011, Zack Weinberg
