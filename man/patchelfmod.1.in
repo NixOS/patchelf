@@ -1,5 +1,5 @@
 .\" Process this file with
-.\" groff -man -Tascii patchelf.1
+.\" groff -man -Tascii patchelfmod.1
 .\"
 .TH PATCHELFMOD "1" "APRIL 2014" "@PACKAGE_VERSION@"
 .SH NAME
