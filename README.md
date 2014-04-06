@@ -13,8 +13,7 @@ For known bugs see BUGS file.
 ```
 ./bootstrap.sh
 ./configure
-make
-make check
+make && make check
 make install-strip
 ```
 
@@ -97,3 +96,4 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 0.1 (October 11, 2005):
 * Initial release.
+

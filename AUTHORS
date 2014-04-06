@@ -1,5 +1,11 @@
-2004-2014, Eelco Dolstra <eelco.dolstra@logicblox.com>
-     2011, Zack Weinberg
-     2012, vdanjean
-     2013, rgcjonas
-     2014, djcj <djcj@gmx.de>
+This program was originally written by:
+  Eelco Dolstra <eelco.dolstra@logicblox.com>, 2004-2014
+
+The current maintainer is:
+  djcj <djcj@gmx.de>, 2014
+
+The following people have contributed code:
+  rgcjonas, 2013
+  vdanjean, 2012
+  Zack Weinberg, 2011
+
