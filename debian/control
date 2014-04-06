@@ -18,7 +18,9 @@ Architecture: any
 Depends:
   ${shlibs:Depends},
   ${misc:Depends}
+Suggests: chrpath, binutils
 Description: utility for patching ELF binaries
- Simple utility for modifing existing ELF executables and libraries.
+ Simple utility to modify header data of ELF executables and libraries.
  It can change the dynamic loader ("ELF interpreter") of executables,
- change the RPATH of executables and libraries and their DT_NEEDED entries.
+ change existing DT_SONAME entries of shared libraries and manipulate
+ the RPATH and DT_NEEDED entries of executables and libraries.

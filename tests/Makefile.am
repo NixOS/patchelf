@@ -3,8 +3,8 @@ check_PROGRAMS = simple main main-scoped big-dynstr no-rpath
 src_TESTS = \
   plain-fail.sh plain-run.sh shrink-rpath.sh set-interpreter-short.sh \
   set-interpreter-long.sh set-rpath.sh no-rpath.sh big-dynstr.sh \
-  set-rpath-library.sh add-dt-needed.sh add-dt-needed-list.sh \
-  remove-dt-needed.sh remove-dt-needed-list.sh replace-dt-needed.sh
+  set-rpath-library.sh add-needed.sh add-needed-list.sh remove-needed.sh \
+  remove-needed-list.sh replace-needed.sh set-soname.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)
@@ -50,7 +50,7 @@ big_dynstr_LDFLAGS = $(LDFLAGS_local)
 # - without libtool, only archives (static libraries) can be built by automake
 # - with libtool, it is difficult to control options
 # - with libtool, it is not possible to compile convenience *dynamic* libraries :-(
-check_PROGRAMS += libfoo.so libfoo-scoped.so libbar.so libbar-scoped.so
+check_PROGRAMS += libfoo.so libfoo-scoped.so libbar.so libbar-scoped.so libbar-withsoname.so
 
 libfoo_so_SOURCES = foo.c
 libfoo_so_LDADD = -lbar $(AM_LDADD)
@@ -67,6 +67,9 @@ libbar_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-rpath,`pwd`/no-such-path
 
 libbar_scoped_so_SOURCES = bar.c
 libbar_scoped_so_LDFLAGS = $(LDFLAGS_sharedlib)
+
+libbar_withsoname_so_SOURCES = bar.c
+libbar_withsoname_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-soname,libbar.so.0
 
 no_rpath_SOURCES = no-rpath.c
 # no -fpic for no-rpath.o

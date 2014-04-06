@@ -194,7 +194,9 @@ public:
 
     void replaceNeeded(map<string, string>& libs);
 
-    void replaceSoname(map<string, string>& libs);
+    void replaceSoname(const string & sonameToReplace);
+
+    void printSoname();
 
 private:
 
@@ -900,7 +902,6 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
 }
 
 
-
 static void setSubstr(string & s, unsigned int pos, const string & t)
 {
     assert(pos + t.size() <= s.size());
@@ -984,7 +985,8 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
     }
 
     if (op == rpPrint) {
-        printf("%s\n", rpath ? rpath : "");
+        printf("%s", rpath ? rpath : "");
+        if (rpath != 0) printf("\n");
         return;
     }
 
@@ -1226,44 +1228,65 @@ void ElfFile<ElfFileParamNames>::addNeeded(set<string> libs)
 
 
 template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::replaceSoname(map<string, string>& libs)
+void ElfFile<ElfFileParamNames>::replaceSoname(const string & sonameToReplace)
 {
-    if (libs.empty()) return;
-    
     Elf_Shdr & shdrDynamic = findSection(".dynamic");
     Elf_Shdr & shdrDynStr = findSection(".dynstr");
     char * strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
 
     Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
-    
+
     unsigned int dynStrAddedBytes = 0;
-    
+
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_SONAME) {
             char * name = strTab + rdi(dyn->d_un.d_val);
-            if (libs.find(name) != libs.end()) {
-                const string & replacement = libs[name];
-                
-                debug("replacing DT_SONAME entry `%s' with `%s'\n", name, replacement.c_str());
-                
+            if (name != sonameToReplace) {
+                debug("replacing DT_SONAME entry `%s' with `%s'\n", name, sonameToReplace.c_str());
+
                 // technically, the string referred by d_val could be used otherwise, too (although unlikely)
                 // we'll therefore add a new string
                 debug("resizing .dynstr ...");
-                
+
                 string & newDynStr = replaceSection(".dynstr",
-                    rdi(shdrDynStr.sh_size) + replacement.size() + 1 + dynStrAddedBytes);
-                setSubstr(newDynStr, rdi(shdrDynStr.sh_size) + dynStrAddedBytes, replacement + '\0');
-                
+                    rdi(shdrDynStr.sh_size) + sonameToReplace.size() + 1 + dynStrAddedBytes);
+                setSubstr(newDynStr, rdi(shdrDynStr.sh_size) + dynStrAddedBytes, sonameToReplace + '\0');
+
                 dyn->d_un.d_val = shdrDynStr.sh_size + dynStrAddedBytes;
-               
-                dynStrAddedBytes += replacement.size() + 1;
-                
+
+                dynStrAddedBytes += sonameToReplace.size() + 1;
+
                 changed = true;
             } else {
                 debug("keeping DT_SONAME entry `%s'\n", name);
             }
         }
     }
+}
+
+
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::printSoname()
+{
+    Elf_Shdr & shdrDynamic = findSection(".dynamic");
+    Elf_Shdr & shdrDynStr = findSection(".dynstr");
+    char * strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
+
+    Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+
+    unsigned int dynStrAddedBytes = 0;
+
+    char * name;
+    bool foundSoname = false;
+
+    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+        if (rdi(dyn->d_tag) == DT_SONAME) {
+            name = strTab + rdi(dyn->d_un.d_val);
+            foundSoname = true;
+        }
+    }
+
+    if (foundSoname) printf("%s\n", name);
 }
 
 
@@ -1274,10 +1297,14 @@ static bool shrinkRPath = false;
 static bool setRPath = false;
 static bool printRPath = false;
 static string newRPath;
+
 static set<string> neededLibsToRemove;
 static map<string, string> neededLibsToReplace;
-static map<string, string> sonameToReplace;
 static set<string> neededLibsToAdd;
+
+static string sonameToReplace;
+static bool printSoname = false;
+
 
 template<class ElfFile>
 static void patchElfmod2(ElfFile & elfFile, mode_t fileMode)
@@ -1301,7 +1328,12 @@ static void patchElfmod2(ElfFile & elfFile, mode_t fileMode)
     elfFile.removeNeeded(neededLibsToRemove);
     elfFile.replaceNeeded(neededLibsToReplace);
     elfFile.addNeeded(neededLibsToAdd);
-    elfFile.replaceSoname(sonameToReplace);
+
+    if (sonameToReplace != "")
+        elfFile.replaceSoname(sonameToReplace);
+
+    if (printSoname)
+        elfFile.printSoname();
 
     if (elfFile.isChanged()){
         elfFile.rewriteSections();
@@ -1312,7 +1344,7 @@ static void patchElfmod2(ElfFile & elfFile, mode_t fileMode)
 
 static void patchElfmod()
 {
-    if (!printInterpreter && !printRPath)
+    if (!printInterpreter && !printRPath && !printSoname)
         debug("patching ELF file `%s'\n", fileName.c_str());
 
     mode_t fileMode;
@@ -1344,8 +1376,6 @@ static void patchElfmod()
 }
 
 
-/* http://stackoverflow.com/a/8965145
-   used for "--*-list" arguments */
 void split(const string& s, char c,
            vector<string>& v) {
    string::size_type i = 0;
@@ -1364,94 +1394,103 @@ void split(const string& s, char c,
 
 void showInfo(const string & progName)
 {
-    fprintf(stderr, "Syntax: %s [option] <elf-file>\n\
+    fprintf(stderr, "Syntax: %s [option] <elffile>\n\
 \n\
 Options:\n\
-  --interpreter/--set-interpreter <interpreter>\n\
-  --print-interpreter\n\
+  -i --set-interpreter <interpreter>\n\
+     --interpreter <interpreter>\n\
+  -I --print-interpreter\n\
+  -R --set-rpath <rpath>\n\
+     --rpath <rpath>\n\
+  -s --shrink-rpath\n\
+  -p --print-rpath\n\
+  -f --force-rpath\n\
+  -a --add-needed <library>\n\
+  -r --remove-needed <library>\n\
+  -l --add-needed-list <library1>,<library2>,...\n\
+     --add-list <library1>,<library2>,...\n\
+  -L --remove-needed-list <library1>,<library2>,...\n\
+     --remove-list <library1>,<library2>,...\n\
+  -n --replace-needed <library> <new-library>\n\
+  -S --set-soname <soname>\n\
+     --soname <soname>\n\
+  -P --print-soname\n\
+  -h --help\n\
+  -V --version\n\
+  -d --debug\n\
 \n\
-  --set-rpath <rpath>\n\
-  --shrink-rpath\n\
-  --print-rpath\n\
-  --force-rpath\n\
-\n\
-  --add-needed <library>\n\
-  --remove-needed <library>\n\
-\n\
-  --add-list/--add-needed-list <library1>,<library2>,...\n\
-  --remove-list/--remove-needed-list <library1>,<library2>,...\n\
-\n\
-  --replace-needed <library> <new library>\n\
-\n\
-  -h/--help\n\
-  -V/--version\n\
-  --debug\n\
-\n\
-Run '%s --help' or 'man patchelfmod' for more information.\n", progName.c_str(), progName.c_str());
+Run '%s --help' for more information.\n", progName.c_str(), progName.c_str());
 }
 
 
 void showHelp(const string & progName)
 {
-    fprintf(stderr, "Syntax: %s [option] <elf-file>\n\
+    printf("Syntax: %s [option] <elffile>\n\
 \n\
 Options:\n\
 \n\
-  -h, --help              Print help information\n\
-  -V, --version           Show version\n\
-      --debug             Prints details of the changes made\n\
-                          to the input file\n\
+  -h, --help                 Prints this help.\n\
+  -V, --version              Prints version information.\n\
+  -d, --debug                Prints details of the changes made to the input file.\n\
 \n\
 \n\
 Dynamic loader options:\n\
 \n\
-  --interpreter,\n\
-  --set-interpreter <interpreter>  Changes the dynamic loader (\"ELF interpreter\")\n\
-                                   of an executable given to INTERPRETER.\n\
-  --print-interpreter     Print the ELF interpreter of an executable.\n\
+  -i, --set-interpreter <interpreter>\n\
+                             Changes the dynamic loader (\"ELF interpreter\")\n\
+                             of an executable to <interpreter>.\n\
+      --interpreter          An alias for '--set-interpreter'.\n\
+  -I, --print-interpreter    Prints the ELF interpreter of an executable.\n\
 \n\
 \n\
 RPATH options:\n\
 \n\
-  --set-rpath <rpath>     Change the RPATH of an executable or library.\n\
+  -R, --set-rpath <rpath>    Changes the RPATH of an executable or library to <rpath>.\n\
+      --rpath <rpath>        An alias for '--set-rpath'.\n\
+  -s, --shrink-rpath         Removes all directories from RPATH that do not contain\n\
+                             a library referenced by DT_NEEDED fields of the executable\n\
+                             or library.\n\
+                             For instance, if an executable references one library libfoo.so,\n\
+                             and has an RPATH \"/lib:/usr/lib:/foo/lib\", and libfoo.so\n\
+                             can only be found in /foo/lib, then the new RPATH will\n\
+                             be \"/foo/lib\".\n\
 \n\
-  --shrink-rpath          Remove all directories from RPATH that do not contain\n\
-                          a library referenced by DT_NEEDED fields of the executable\n\
-                          or library.\n\
+  -p, --print-rpath          Prints the RPATH of an executable or library.\n\
 \n\
-  For instance, if an executable references one library libfoo.so,\n\
-  and has an RPATH \"/lib:/usr/lib:/foo/lib\", and libfoo.so can only\n\
-  be found in /foo/lib, then the new RPATH will be \"/foo/lib\".\n\
-\n\
-  --print-rpath           Print the RPATH of an executable or library.\n\
-\n\
-  --force-rpath           Force the use of the obsolete DT_RPATH instead of DT_RUNPATH.\n\
-                          By default DT_RPATH is converted to DT_RUNPATH.\n\
+  -f, --force-rpath          Forces the use of the obsolete DT_RPATH instead of DT_RUNPATH.\n\
+                             By default DT_RPATH is converted to DT_RUNPATH.\n\
 \n\
 \n\
 DT_NEEDED options:\n\
 \n\
-  --add-needed <library>  Adds a declared dependency on a dynamic library. This\n\
-                          option can be given multiple times.\n\
-  --remove-needed <library>  Removes a declared dependency on a dynamic library. This\n\
-                             option can be given multiple times.\n\
+  -a, --add-needed <library>\n\
+                             Adds a dependency <library> on a dynamic library.\n\
+  -r, --remove-needed <library>\n\
+                             Removes a dependency <library> from a dynamic library.\n\
 \n\
-  --add-list <library1>,<library2>,...\n\
-  --add-needed-list <library1>,<library2>,...  The same as '--add-needed', but with\n\
-                                               several dynamic library declared at once\n\
-                                               through a comma seperated list.\n\
+  -l, --add-needed-list <library1>,<library2>,...\n\
+                             The same as '--add-needed', but with several dynamic\n\
+                             libraries declared at once through a comma seperated list.\n\
+      --add-list <library1>,<library2>,...\n\
+                             An alias for '--add-needed-list'.\n\
 \n\
-  Note that a trailing comma will create an empty DT_NEEDED entry,\n\
-  which can be removed with the following command:\n\
-  patchelfmod --remove-needed \"\"\n\
+  -L, --remove-needed-list <library1>,<library2>,...\n\
+                             The same as '--remove-needed', but with several dynamic\n\
+                             libraries declared at once through a comma seperated list.\n\
+      --remove-list <library1>,<library2>,...\n\
+                             An alias for '--remove-needed-list'.\n\
 \n\
-  --remove-list <library1>,<library2>,...\n\
-  --remove-needed-list <library1>,<library2>,...  The same as '--add-needed-list',\n\
-                                                  but it removes the libraries.\n\
-                                                  Trailing commas will be ignored.\n\
+  -n, --replace-needed <library> <new-library>\n\
+                             Replaces a dependency <library> on a dynamic library with\n\
+                             a new dependency <new-library>.\n\
+                             This option can be given multiple times.\n\
 \n\
-  --replace-needed <library> <new library>  Replace a declared dependency on a dynamic\n\
-                                            library. This option can be given multiple times.\n", progName.c_str());
+\n\
+DT_SONAME options:\n\
+\n\
+  -S, --set-soname <soname>  Changes the DT_SONAME entry of a library to <soname>.\n\
+      --soname <soname>      An alias for '--replace-soname'.\n\
+  -P, --print-soname         Prints the soname of a library.\n\n", progName.c_str());
 }
 
 
@@ -1467,25 +1506,25 @@ int main(int argc, char * * argv)
     int i;
     for (i = 1; i < argc; ++i) {
         string arg(argv[i]);
-        if (arg == "--set-interpreter" || arg == "--interpreter") {
+        if (arg == "--set-interpreter" || arg == "--interpreter" || arg == "-i") {
             if (++i == argc) error("missing argument");
             newInterpreter = argv[i];
         }
-        else if (arg == "--print-interpreter") {
+        else if (arg == "--print-interpreter" || arg == "-I") {
             printInterpreter = true;
         }
-        else if (arg == "--shrink-rpath") {
+        else if (arg == "--shrink-rpath" || arg == "-s") {
             shrinkRPath = true;
         }
-        else if (arg == "--set-rpath") {
+        else if (arg == "--set-rpath" || arg == "--rpath" || arg == "-R") {
             if (++i == argc) error("missing argument");
             setRPath = true;
             newRPath = argv[i];
         }
-        else if (arg == "--print-rpath") {
+        else if (arg == "--print-rpath" || arg == "-p") {
             printRPath = true;
         }
-        else if (arg == "--force-rpath") {
+        else if (arg == "--force-rpath" || arg == "-f") {
             /* Generally we prefer to emit DT_RUNPATH instead of
                DT_RPATH, as the latter is obsolete.  However, there is
                a slight semantic difference: DT_RUNPATH is "scoped",
@@ -1499,24 +1538,23 @@ int main(int argc, char * * argv)
                added. */
             forceRPath = true;
         }
-        else if (arg == "--add-needed") {
+        else if (arg == "--add-needed" || arg == "-a") {
             if (++i == argc) error("missing argument");
             neededLibsToAdd.insert(argv[i]);
         }
-        else if (arg == "--remove-needed") {
+        else if (arg == "--remove-needed" || arg == "-r") {
             if (++i == argc) error("missing argument");
             neededLibsToRemove.insert(argv[i]);
         }
-        else if (arg == "--add-needed-list" || arg == "--add-list") {
-            /* Bug: a trailing comma creates an empty DT_NEEDED entry */
+        else if (arg == "--add-needed-list" || arg == "--add-list" || arg == "-l") {
             if (++i == argc) error("missing argument");
             vector<string> v;
             split(argv[i], ',', v);
             for (int i = 0; i < v.size( ); ++i) {
-                neededLibsToAdd.insert(v[i]);
+                if (v[i] != "") neededLibsToAdd.insert(v[i]);
             }
         }
-        else if (arg == "--remove-needed-list" || arg == "--remove-list") {
+        else if (arg == "--remove-needed-list" || arg == "--remove-list" || arg == "-L") {
             if (++i == argc) error("missing argument");
             vector<string> v;
             split(argv[i], ',', v);
@@ -1524,25 +1562,29 @@ int main(int argc, char * * argv)
                 neededLibsToRemove.insert(v[i]);
             }
         }
-        else if (arg == "--replace-needed") {
+        else if (arg == "--replace-needed" || arg == "-n") {
             if (i+2 >= argc) error("missing argument(s)");
             neededLibsToReplace[ argv[i+1] ] = argv[i+2];
             i += 2;
         }
-        else if (arg == "--replace-soname") {
-            if (i+2 >= argc) error("missing argument(s)");
-            sonameToReplace[ argv[i+1] ] = argv[i+2];
-            i += 2;
+        else if (arg == "--set-soname" || arg == "--soname" || arg == "-S") {
+            if (++i == argc) error("missing argument");
+            sonameToReplace = argv[i];
         }
-        else if (arg == "--debug") {
+        else if (arg == "--print-soname" || arg == "-P") {
+            printSoname = true;
+        }
+        else if (arg == "--debug" || arg == "-d") {
             debugMode = true;
         }
         else if (arg == "--help" || arg == "-h") {
             showHelp(argv[0]);
             return 0;
         }
-        else if (arg == "--version" || arg == "-V") {
-            printf(PACKAGE_STRING "\n");
+        else if (arg == "--version" || arg == "-V" || arg == "-v") {
+            /* '-v' is a "hidden alias" for '-V'.
+               It's not listed in showInfo() or showHelp(). */
+            printf(PACKAGE_STRING "\nlicense: GPL version 3 or later\n");
             return 0;
         }
         else break;

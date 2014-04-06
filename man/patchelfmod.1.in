@@ -1,3 +1,6 @@
+.\" The 'options' section of this manpage was
+.\" generated with help2man 1.43.3.
+.\"
 .\" Process this file with
 .\" groff -man -Tascii patchelfmod.1
 .\"
@@ -6,93 +9,121 @@
 PatchELFmod - Modify ELF files
 
 .SH SYNOPSIS
-.B patchelfmod \fIOPTION FILE
+.B patchelfmod \fR[option] <elffile>
 
 .SH DESCRIPTION
 
-PatchELFmod is a simple utility for modifying existing ELF executables
+PatchELFmod is a simple utility to modify header data of ELF executables
 and libraries. It can change the dynamic loader ("ELF interpreter")
-of executables, change the RPATH of executables and libraries and
-their DT_NEEDED entries.
+of executables, change existing DT_SONAME entries of shared libraries
+and manipulate the RPATH and DT_NEEDED entries of executables and libraries.
 
 .SH OPTIONS
-
-The single option given operates on a given FILE, editing in place.
-
-.IP "\fB--interpreter \fIINTERPRETER\fR | \fB--set-interpreter \fIINTERPRETER"
-Changes the dynamic loader ("ELF interpreter") of an executable given
-to INTERPRETER.
-
-.IP "\fB--print-interpreter"
-Prints the ELF interpreter of an executable.
-
-.IP "\fB--set-rpath \fIRPATH"
-Changes the RPATH of an executable or library to RPATH.
-
-.IP "\fB--shrink-rpath"
-Removes all directories from RPATH that do not contain a
-library referenced by DT_NEEDED fields of the executable or library.
-
-For instance, if an executable references one library libfoo.so, and
-has an RPATH "/lib:/usr/lib:/foo/lib", and libfoo.so can only be found
-in /foo/lib, then the new RPATH will be "/foo/lib".
-
-.IP "\fB--print-rpath"
-Prints the RPATH of an executable or library.
-
-.IP "\fB--force-rpath"
-Forces the use of the obsolete DT_RPATH in the file instead of
-DT_RUNPATH. By default DT_RPATH is converted to DT_RUNPATH.
-
-.IP "\fB--add-needed \fILIBRARY"
-Adds a declared dependency on a dynamic library. This option can
-be given multiple times.
-
-.IP "\fB--remove-needed \fILIBRARY"
-Removes a declared dependency on a dynamic library. This option can
-be given multiple times.
-
-.IP "\fB--add-list \fR|\fB --add-needed-list \fILIBRARY1\fR,\fILIBRARY2\fR,..."
-The same as '--add-needed', but with several dynamic library declared
-at once through a comma seperated list.
-
-Note that a trailing comma will create an empty DT_NEEDED entry, which
-can be removed with the following command:
- patchelfmod --remove-needed ""
-
-.IP "\fB--remove-list \fR|\fB --remove-needed-list \fILIBRARY1\fR,\fILIBRARY2\fR,..."
-The same as '--add-needed-list', but it removes the libraries.
-Trailing commas will be ignored.
-
-.IP "\fB--replace-needed \fILIBRARY NEW_LIBRARY"
-Replaces a declared dependency on a dynamic library. This option can
-be given multiple times.
-
-.IP "\fB--debug"
-Prints details of the changes made to the input file.
-
-.IP "\fB\-h \fR|\fB \--help"
+.TP
+\fB\-h\fR, \fB\-\-help\fR
 Prints help information.
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+Prints version information.
+.TP
+\fB\-d\fR, \fB\-\-debug\fR
+Prints details of the changes made to the input file.
+.PP
+Dynamic loader options:
+.TP
+\fB\-i\fR, \fB\-\-set\-interpreter\fR <interpreter>
+Changes the dynamic loader ("ELF interpreter")
+of an executable to <interpreter>.
+.TP
+\fB    \-\-interpreter\fR
+An alias for '\-\-set\-interpreter'.
+.TP
+\fB\-I\fR, \fB\-\-print\-interpreter\fR
+Prints the ELF interpreter of an executable.
+.PP
+RPATH options:
+.TP
+\fB\-R\fR, \fB\-\-set\-rpath\fR <rpath>
+Changes the RPATH of an executable or library to <rpath>.
+.TP
+\fB    \-\-rpath\fR <rpath>
+An alias for '\-\-set\-rpath'.
+.TP
+\fB\-s\fR, \fB\-\-shrink\-rpath\fR
+Removes all directories from RPATH that do not contain
+a library referenced by DT_NEEDED fields of the executable
+or library.
+For instance, if an executable references one library libfoo.so,
+and has an RPATH "/lib:/usr/lib:/foo/lib", and libfoo.so
+can only be found in /foo/lib, then the new RPATH will
+be "/foo/lib".
+.TP
+\fB\-p\fR, \fB\-\-print\-rpath\fR
+Prints the RPATH of an executable or library.
+.TP
+\fB\-f\fR, \fB\-\-force\-rpath\fR
+Forces the use of the obsolete DT_RPATH instead of DT_RUNPATH.
+By default DT_RPATH is converted to DT_RUNPATH.
+.PP
+DT_NEEDED options:
+.TP
+\fB\-a\fR, \fB\-\-add\-needed\fR <library>
+Adds a dependency <library> on a dynamic library.
+.TP
+\fB\-r\fR, \fB\-\-remove\-needed\fR <library>
+Removes a dependency <library> from a dynamic library.
+.TP
+\fB\-l\fR, \fB\-\-add\-needed\-list\fR <library1>,<library2>,...
+The same as '\-\-add\-needed', but with several dynamic
+libraries declared at once through a comma seperated list.
+.TP
+\fB    \-\-add\-list\fR <library1>,<library2>,...
+An alias for '\-\-add\-needed\-list'.
+.TP
+\fB\-L\fR, \fB\-\-remove\-needed\-list\fR <library1>,<library2>,...
+The same as '\-\-remove\-needed', but with several dynamic
+libraries declared at once through a comma seperated list.
+.TP
+\fB    \-\-remove\-list\fR <library1>,<library2>,...
+An alias for '\-\-remove\-needed\-list'.
+.TP
+\fB\-n\fR, \fB\-\-replace\-needed\fR <library> <new\-library>
+Replaces a dependency <library> on a dynamic library with
+a new dependency <new\-library>.
+This option can be given multiple times.
+.PP
+DT_SONAME options:
+.TP
+\fB\-S\fR, \fB\-\-set\-soname\fR <soname>
+Changes the DT_SONAME entry of a library to <soname>.
+.TP
+\fB    \-\-soname\fR <soname>
+An alias for '\-\-replace\-soname'.
+.TP
+\fB\-P\fR, \fB\-\-print\-soname\fR
+Prints the soname of a library.
 
-.IP "\fB\-V \fR|\fB \--version"
-Shows the version of PatchElfmod.
+.SH LIMITATIONS
+Currently PatchELFmod can't add new RPATHS or remove existing ones.
+Use \fBchrpath\fR(1) to delete RPATHs.
+
+.SH BUGS
+The \fBstrip\fR(1) command from binutils generated broken executables when
+applied to the output of patchelf (if '\-\-set-rpath' or '\-\-set-interpreter'
+with a larger path than the original is used).
+This appears to be a bug in binutils.
 
 .SH AUTHORS
 2004-2014, Eelco Dolstra <\fIeelco.dolstra@logicblox.com\fR>
 .br
      2011, Zack Weinberg
 .br
-     2011, Jeremy Sanders <\fIjeremy@jeremysanders.net\fR>
-.br
-     2012, vdanjean
-.br
      2013, rgcjonas
 .br
      2014, djcj <\fIdjcj@gmx.de\fR>
 .PP
-This manpage was written by Jeremy Sanders <\fIjeremy@jeremysanders.net\fR>
-and modified by Eelco Dolstra <\fIeelco.dolstra@logicblox.com\fR>
-and djcj <\fIdjcj@gmx.de\fR>.
+
+This manpage was written by djcj <\fIdjcj@gmx.de\fR>.
 
 .SH "SEE ALSO"
 .BR elf (5),

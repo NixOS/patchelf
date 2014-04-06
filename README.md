@@ -1,40 +1,9 @@
 PatchELFmod
 ===============
-**PatchELFmod** is a simple utility for modifing existing ELF executables
-and libraries.<br>
-In particular, it can do the following:
-
-Change the ELF interpreter of an executable:<br>
-  `patchelfmod --interpreter  <interpreter>  <elf-file>`<br>
-
-Print the ELF interpreter of an executable:<br>
-  `patchelfmod --print-interpreter  <elf-file>`<br>
-
-Change the RPATH of an executable or library:<br>
-  `patchelfmod --set-rpath  <rpath>  <elf-file>`<br>
-
-Remove all directories from RPATH that do not contain<br>
-a library referenced by DT_NEEDED fields:<br>
-  `patchelfmod --shrink-rpath  <elf-file>`<br>
-
-Print the RPATH of an executable or library:<br>
-  `patchelfmod --print-rpath  <elf-file>`<br>
-
-Force the use of the obsolete DT_RPATH instead of DT_RUNPATH:<br>
-  `patchelfmod --force-rpath  <elf-file>`<br>
-
-Add or remove a declared dependencies on a dynamic library:<br>
-  `patchelfmod --add-needed  <library>  <elf-file>`<br>
-  `patchelfmod --remove-needed  <library>  <elf-file>`<br>
-This option can be given multiple times.<br>
-
-Add or remove several declared dependencies on a dynamic library at once:<br>
-  `patchelfmod --add-list  <library1>,<library2>,...  <elf-file>`<br>
-  `patchelfmod --remove-list  <library1>,<library2>,...  <elf-file>`<br>
-
-Replace a declared dependency on a dynamic library:<br>
-  `patchelfmod --replace-needed  <library>  <new library>  <elf-file>`<br>
-This option can be given multiple times.<br>
+**PatchELFmod** is a simple utility to modify header data of ELF executables
+and libraries. It can change the dynamic loader ("ELF interpreter")
+of executables, change existing DT_SONAME entries of shared libraries
+and manipulate the RPATH and DT_NEEDED entries of executables and libraries.
 
 Run `patchelfmod --help` or see the manpage (`man patchelfmod`) for more information.
 For known bugs see BUGS file.
@@ -46,8 +15,7 @@ For known bugs see BUGS file.
 ./configure
 make
 make check
-strip src/patchelfmod
-make install
+make install-strip
 ```
 
 
@@ -73,17 +41,18 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 **Release history:**
 
-0.8m (April 02, 2014):
-* Add '--add-needed' and '--replace-needed' options
-  (contributed by rgcjonas).
-* Add the following options:
-  --add-list/--add-needed-list,
-  --remove-list/--remove-needed-list
+0.9 (April 06, 2014):
+* Fork "PatchELF" and rename project to "PatchELFmod".
+* Add the following new options:
+  --add-needed & --replace-needed (contributed by rgcjonas),
+  --add-needed-list, --remove-needed-list,
+  --set-soname, --print-soname
+* Add short aliases for each option (-h, -I, -a, -S, ...)
 * Add tests for new options.
 * Changes in the no-rpath test (contributed by vdanjean),
   but without multi-arch tests.
 * Add Debian folder.
-* Update manpage and documentation.
+* Rewrite manpage from scratch.
 * Mentioning of ALL known authors.
 * Other changes.
 

@@ -13,9 +13,3 @@ applied to the output of patchelf (if `--set-rpath' or
 This appears to be a bug in binutils
 (http://bugs.strategoxt.org/browse/NIXPKGS-85).
 
-
-
-Option "--add-needed-list" / "--add-list":
-A trailing comma in the libraries list creates an empty NEEDED entry.
-
-

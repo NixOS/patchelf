@@ -1,19 +1,20 @@
-patchelfmod (0.8m) unstable; urgency=low
+patchelfmod (0.9) unstable; urgency=low
 
+  * Fork "PatchELF" and rename project to "PatchELFmod".
   * Add many changes:
-    * Add `--add-needed' and `--replace-needed' options.
-      (contributed by rgcjonas)
-    * Add the following options:
-      --add-list/--add-needed-list
-      --remove-list/--remove-needed-list
+    * Add the following new options:
+      --add-needed & --replace-needed (contributed by rgcjonas),
+      --add-needed-list, --remove-needed-list
+      --set-soname, --print-soname
+    * Add short aliases for each option (-h, -I, -a, -S, ...)
     * Add tests for new options.
     * Changes in the no-rpath test (contributed by vdanjean),
       but without multi-arch tests.
-    * Update manpage.
+    * Rewrite manpage from scratch.
     * Mentioning of ALL known authors.
   * Some minor changes
 
- -- Marshall Banana <djcj@gmx.de>  Sun, 30 Mar 2014 20:50:00 +0100
+ -- Marshall Banana <djcj@gmx.de>  Sun, 06 Apr 2014 15:00:00 +0100
 
 patchelf (0.8) unstable; urgency=low
 
