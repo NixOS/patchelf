@@ -1,0 +1,14 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@ --with autoreconf
+
+override_dh_autoreconf:
+	./bootstrap.sh
+
+override_dh_strip:
+	dh_strip --dbg-package=patchelfmod-dbg
+
+override_dh_installdocs:
+	dh_installdocs --link-doc=patchelfmod
+

@@ -12,7 +12,6 @@ PatchELFmod - Modify ELF files
 .B patchelfmod \fR[option] <elffile>
 
 .SH DESCRIPTION
-
 PatchELFmod is a simple utility to modify header data of ELF executables
 and libraries. It can change the dynamic loader ("ELF interpreter")
 of executables, change existing DT_SONAME entries of shared libraries
@@ -28,6 +27,8 @@ Prints version information.
 .TP
 \fB\-d\fR, \fB\-\-debug\fR
 Prints details of the changes made to the input file.
+Alternatively you can use the environment
+variable PATCHELFMOD_DEBUG.
 .PP
 Dynamic loader options:
 .TP
@@ -53,16 +54,18 @@ An alias for '\-\-set\-rpath'.
 Removes all directories from RPATH that do not contain
 a library referenced by DT_NEEDED fields of the executable
 or library.
-For instance, if an executable references one library libfoo.so,
-and has an RPATH "/lib:/usr/lib:/foo/lib", and libfoo.so
-can only be found in /foo/lib, then the new RPATH will
-be "/foo/lib".
+.br
+For instance, if an executable references one library
+libfoo.so, and has an RPATH "/lib:/usr/lib:/foo/lib",
+and libfoo.so can only be found in /foo/lib, then the
+new RPATH will be "/foo/lib".
 .TP
 \fB\-p\fR, \fB\-\-print\-rpath\fR
 Prints the RPATH of an executable or library.
 .TP
 \fB\-f\fR, \fB\-\-force\-rpath\fR
-Forces the use of the obsolete DT_RPATH instead of DT_RUNPATH.
+Forces the use of the obsolete DT_RPATH instead of
+DT_RUNPATH.
 By default DT_RPATH is converted to DT_RUNPATH.
 .PP
 DT_NEEDED options:
@@ -90,6 +93,7 @@ An alias for '\-\-remove\-needed\-list'.
 \fB\-n\fR, \fB\-\-replace\-needed\fR <library> <new\-library>
 Replaces a dependency <library> on a dynamic library with
 a new dependency <new\-library>.
+.br
 This option can be given multiple times.
 .PP
 DT_SONAME options:
@@ -122,7 +126,6 @@ This appears to be a bug in binutils.
 .br
      2014, djcj <\fIdjcj@gmx.de\fR>
 .PP
-
 This manpage was written by djcj <\fIdjcj@gmx.de\fR>.
 
 .SH "SEE ALSO"
