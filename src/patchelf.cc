@@ -144,6 +144,8 @@ public:
 
     string getInterpreter();
 
+    string getSoname();
+
     void setInterpreter(const string & newInterpreter);
 
     typedef enum { rpPrint, rpShrink, rpSet } RPathOp;
@@ -871,6 +873,28 @@ string ElfFile<ElfFileParamNames>::getInterpreter()
     return string((char *) contents + rdi(shdr.sh_offset), rdi(shdr.sh_size));
 }
 
+template<ElfFileParams>
+string ElfFile<ElfFileParamNames>::getSoname()
+{
+    /* Simply searching for .dynamic section and getting its DT_SONAME entry content (if any)
+       TODO: add check of .dynstr <-> DT_STRTAB correspondance, as it's done in modifyRPath
+       TODO: for what is this check?? */
+    Elf_Shdr & shdrDynamic = findSection(".dynamic");
+
+    Elf_Shdr & shdrDynStr = findSection(".dynstr");
+    char * strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
+
+    Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+    dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+    char * soname = 0;
+    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+        if (rdi(dyn->d_tag) == DT_SONAME) {
+            soname = strTab + rdi(dyn->d_un.d_val);
+            break;
+        }
+    }
+    return soname;
+}
 
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::setInterpreter(const string & newInterpreter)
@@ -1090,6 +1114,7 @@ void ElfFile<ElfFileParamNames>::removeNeeded(set<string> libs)
 
 
 static bool printInterpreter = false;
+static bool printSoname = false;
 static string newInterpreter;
 
 static bool shrinkRPath = false;
@@ -1106,6 +1131,9 @@ static void patchElf2(ElfFile & elfFile, mode_t fileMode)
 
     if (printInterpreter)
         printf("%s\n", elfFile.getInterpreter().c_str());
+
+    if (printSoname)
+        printf("%s\n", elfFile.getSoname().c_str());
 
     if (newInterpreter != "")
         elfFile.setInterpreter(newInterpreter);
@@ -1129,7 +1157,7 @@ static void patchElf2(ElfFile & elfFile, mode_t fileMode)
 
 static void patchElf()
 {
-    if (!printInterpreter && !printRPath)
+    if (!printInterpreter && !printRPath && !printSoname)
         debug("patching ELF file `%s'\n", fileName.c_str());
 
     mode_t fileMode;
@@ -1166,6 +1194,7 @@ void showHelp(const string & progName)
         fprintf(stderr, "syntax: %s\n\
   [--set-interpreter FILENAME]\n\
   [--print-interpreter]\n\
+  [--print-soname]\n\
   [--set-rpath RPATH]\n\
   [--shrink-rpath]\n\
   [--print-rpath]\n\
@@ -1195,6 +1224,9 @@ int main(int argc, char * * argv)
         }
         else if (arg == "--print-interpreter") {
             printInterpreter = true;
+        }
+        else if (arg == "--print-soname") {
+            printSoname = true;
         }
         else if (arg == "--shrink-rpath") {
             shrinkRPath = true;
