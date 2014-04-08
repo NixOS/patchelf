@@ -13,7 +13,7 @@ For known bugs see BUGS file.
 ```
 ./bootstrap.sh
 ./configure
-make && make check
+make check
 make install-strip
 ```
 

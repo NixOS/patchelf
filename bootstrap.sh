@@ -1,7 +1,7 @@
 #! /bin/sh -e
 
 echo "Running autoreconf..."
-autoreconf -ivf --warnings=all "$@"
+autoreconf -ivf "$@"
 
 echo "Now run './configure' and then 'make' to build PatchELFmod"
 

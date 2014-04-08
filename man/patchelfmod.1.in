@@ -19,16 +19,19 @@ and manipulate the RPATH and DT_NEEDED entries of executables and libraries.
 
 .SH OPTIONS
 .TP
-\fB\-h\fR, \fB\-\-help\fR
-Prints help information.
-.TP
-\fB\-V\fR, \fB\-\-version\fR
-Prints version information.
+\fB\-b\fR, \fB\-\-backup\fR
+Saves a backup of the unmodified file with the suffix '~orig'.
 .TP
 \fB\-d\fR, \fB\-\-debug\fR
 Prints details of the changes made to the input file.
 Alternatively you can use the environment
 variable PATCHELFMOD_DEBUG.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Prints help information.
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+Prints version information.
 .PP
 Dynamic loader options:
 .TP

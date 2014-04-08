@@ -1,19 +1,36 @@
 AC_INIT([PatchELFmod], m4_esyscmd([echo -n $(cat ./version)]))
 
-AC_CONFIG_SRCDIR([src])
+AC_CONFIG_SRCDIR([src/patchelfmod.cpp])
+
 AC_CONFIG_AUX_DIR([build-aux])
-
-AM_INIT_AUTOMAKE([-Wall -Werror dist-bzip2 foreign color-tests parallel-tests])
-AC_CHECK_HEADERS([assert.h elf.h errno.h fcntl.h limits.h stdarg.h stdio.h], [], [exit 0], [])
-
 AM_PROG_CC_C_O
-AC_PROG_CXX
+AM_INIT_AUTOMAKE([-Wall -Werror dist-bzip2 foreign color-tests parallel-tests])
 
-AC_CONFIG_FILES([
-        Makefile \
-        man/patchelfmod.1 \
-        src/Makefile \
-        tests/Makefile \
-        patchelfmod.spec
-        ])
+# Checks for programs.
+AC_PROG_CXX
+#AC_PROG_CC
+AC_PROG_LN_S
+AC_PROG_MAKE_SET
+
+# Checks for header files.
+AC_HEADER_STDC
+AC_CHECK_HEADERS([fcntl.h limits.h stdlib.h string.h unistd.h], [], [exit 0], [])
+
+# Checks for typedefs, structures, and compiler characteristics.
+AC_HEADER_STDBOOL
+AC_TYPE_MODE_T
+AC_TYPE_OFF_T
+AC_TYPE_SIZE_T
+
+# Checks for library functions.
+AC_FUNC_ERROR_AT_LINE
+AC_FUNC_MALLOC
+AC_CHECK_FUNCS([memmove memset strchr])
+
+AC_CONFIG_FILES([Makefile \
+                 src/Makefile \
+                 tests/Makefile \
+                 man/patchelfmod.1 \
+                 patchelfmod.spec
+                 ])
 AC_OUTPUT

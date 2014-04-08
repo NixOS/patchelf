@@ -1,10 +1,21 @@
 check_PROGRAMS = simple main main-scoped big-dynstr no-rpath
 
-src_TESTS = \
-  plain-fail.sh plain-run.sh shrink-rpath.sh set-interpreter-short.sh \
-  set-interpreter-long.sh set-rpath.sh no-rpath.sh big-dynstr.sh \
-  set-rpath-library.sh add-needed.sh add-needed-list.sh remove-needed.sh \
-  remove-needed-list.sh replace-needed.sh set-soname.sh
+src_TESTS = plain-fail.sh \
+            plain-run.sh \
+            shrink-rpath.sh \
+            set-interpreter-short.sh \
+            set-interpreter-long.sh \
+            set-rpath.sh \
+            no-rpath.sh \
+            big-dynstr.sh \
+            set-rpath-library.sh \
+            backup.sh \
+            add-needed.sh \
+            add-needed-list.sh \
+            remove-needed.sh \
+            remove-needed-list.sh \
+            replace-needed.sh \
+            set-soname.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)

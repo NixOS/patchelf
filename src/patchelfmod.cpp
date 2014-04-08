@@ -3,9 +3,9 @@
  *  and libraries.
  *
  *  Copyright (c) 2004-2014  Eelco Dolstra <eelco.dolstra@logicblox.com>
- *                     2011  Zack Weinberg
- *                     2013  rgcjonas
- *                     2014  djcj <djcj@gmx.de>
+ *                2011       Zack Weinberg
+ *                2013       rgcjonas
+ *                2014       djcj <djcj@gmx.de>
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -20,30 +20,12 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 #define LICENSE "GPL version 3 or later"
 
-#include <vector>
-#include <set>
-#include <map>
-#include <algorithm>
-#include <functional>
 
-#include <iostream>
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdarg.h>
 #include <assert.h>
-
-#include <string.h>
+#include <algorithm>
 #include <errno.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-
-#include <fcntl.h>
-#include <limits.h>
-
 /*
  *  You can find the latest elf.h here if you need it:
  *   http://www.gnu.org/software/libc/index.html
@@ -52,9 +34,25 @@
  *  Download it and place it in the directory of patchelfmod.cpp and
  *  replace the line    #include <elf.h>    with    #include "elf.h"
  */
-
 #include <elf.h>
-// #include "elf.h"
+#include <fcntl.h>
+
+#include <fstream>
+#include <functional>
+#include <iostream>
+#include <limits.h>
+#include <map>
+
+#include <set>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <vector>
 
 
 using namespace std;
@@ -97,6 +95,7 @@ class ElfFile
     bool isExecutable;
 
     typedef string SectionName;
+
     typedef map<SectionName, string> ReplacedSections;
 
     ReplacedSections replacedSections;
@@ -419,6 +418,40 @@ static void writeFile(string fileName, mode_t fileMode)
     if (chmod(fileName2.c_str(), fileMode) != 0) error("chmod");
 
     if (rename(fileName2.c_str(), fileName.c_str()) != 0) error("rename");
+}
+
+
+static void writeFileBackup(string fileName, mode_t fileMode)
+{
+    /* If activated, it saves a backup of the input file
+       without screwing up the file's integrity. */
+
+    string fileName2 = fileName + "~orig";
+
+    char buffer[1];
+
+    ifstream input(fileName.c_str(), ios::in);
+    if (input.fail()) {
+        error("Error opening input file");
+        exit(1);
+    }
+
+    ofstream output(fileName2.c_str(), ios::out);
+    if (output.fail()) {
+        error("Error opening output file");
+        exit(1);
+    }
+
+    do {
+        input.read(buffer, sizeof(buffer));
+        if (input.good())
+            output.write(buffer, sizeof(buffer));
+    } while (! input.eof());
+
+    input.close();
+    output.close();
+
+    if (chmod(fileName2.c_str(), fileMode) != 0) error("chmod");
 }
 
 
@@ -1130,12 +1163,14 @@ void ElfFile<ElfFileParamNames>::removeNeeded(set<string> libs)
                 debug("keeping DT_NEEDED entry `%s'\n", name);
                 *last++ = *dyn;
             }
-        } else
+        } else {
             *last++ = *dyn;
+        }
     }
 
     memset(last, 0, sizeof(Elf_Dyn) * (dyn - last));
 }
+
 
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::replaceNeeded(map<string, string> & libs)
@@ -1177,6 +1212,7 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(map<string, string> & libs)
         }
     }
 }
+
 
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::addNeeded(set<string> libs)
@@ -1296,6 +1332,8 @@ void ElfFile<ElfFileParamNames>::printSoname()
 }
 
 
+static bool saveBackup = false;
+
 static bool printInterpreter = false;
 static string newInterpreter;
 
@@ -1344,6 +1382,7 @@ static void patchElfmod2(ElfFile & elfFile, mode_t fileMode)
         elfFile.printSoname();
 
     if (elfFile.isChanged()){
+        if (saveBackup) writeFileBackup(fileName, fileMode);
         elfFile.rewriteSections();
         writeFile(fileName, fileMode);
     }
@@ -1423,9 +1462,10 @@ void showInfo(const string & progName)
   -S --set-soname <soname>\n\
      --soname <soname>\n\
   -P --print-soname\n\
+  -b --backup\n\
+  -d --debug\n\
   -h --help\n\
-  -V --version\n\
-  -d --debug\n\n"
+  -V --version\n\n"
 
 "Run '%s --help' for more information.\n", progName.c_str(), progName.c_str());
 }
@@ -1437,11 +1477,12 @@ void showHelp(const string & progName)
 
 "Options:\n\n\
 \
-  -h, --help                 Prints this help.\n\
-  -V, --version              Prints version information.\n\
+  -b, --backup               Saves a backup of the unmodified file with the suffix '~orig'.\n\
   -d, --debug                Prints details of the changes made to the input file.\n\
                              Alternatively you can use the environment\n\
-                             variable PATCHELFMOD_DEBUG.\n\n\n\
+                             variable PATCHELFMOD_DEBUG.\n\
+  -h, --help                 Prints this help.\n\
+  -V, --version              Prints version information.\n\n\n\
 \
 \
 Dynamic loader options:\n\n\
@@ -1580,6 +1621,9 @@ int main(int argc, char * * argv)
         }
         else if (arg == "--print-soname" || arg == "-P") {
             printSoname = true;
+        }
+        else if (arg == "--backup" || arg == "-b") {
+            saveBackup = true;
         }
         else if (arg == "--debug" || arg == "-d") {
             debugMode = true;
