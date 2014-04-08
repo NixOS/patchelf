@@ -108,8 +108,8 @@ An alias for '\-\-replace\-soname'.
 Prints the soname of a library.
 
 .SH LIMITATIONS
-Currently PatchELFmod can't add new RPATHS or remove existing ones.
-Use \fBchrpath\fR(1) to delete RPATHs.
+Currently PatchELFmod can't remove existing RPATHs.
+Use \fBchrpath\fR(1) instead.
 
 .SH BUGS
 The \fBstrip\fR(1) command from binutils generated broken executables when
