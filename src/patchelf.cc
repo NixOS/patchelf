@@ -146,6 +146,8 @@ public:
 
     string getSoname();
 
+    void setSoname(const string & newSoname);
+
     void setInterpreter(const string & newInterpreter);
 
     typedef enum { rpPrint, rpShrink, rpSet } RPathOp;
@@ -884,16 +886,38 @@ string ElfFile<ElfFileParamNames>::getSoname()
     Elf_Shdr & shdrDynStr = findSection(".dynstr");
     char * strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
 
-    Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
-    dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+    Elf_Dyn * dynSoname = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
     char * soname = 0;
-    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
-        if (rdi(dyn->d_tag) == DT_SONAME) {
-            soname = strTab + rdi(dyn->d_un.d_val);
+    for ( ; rdi(dynSoname->d_tag) != DT_NULL; dynSoname++) {
+        if (rdi(dynSoname->d_tag) == DT_SONAME) {
+            soname = strTab + rdi(dynSoname->d_un.d_val);
             break;
         }
     }
     return soname;
+}
+
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::setSoname(const string & newSoname)
+{
+    debug("setting soname to `%s'\n", newSoname.c_str());
+    Elf_Shdr & shdrDynStr = findSection(".dynstr");
+    char * strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
+
+    Elf_Shdr & shdrDynamic = findSection(".dynamic");
+    Elf_Dyn * dynSoname = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+    char * soname = 0;
+    for ( ; rdi(dynSoname->d_tag) != DT_NULL; dynSoname++) {
+        if (rdi(dynSoname->d_tag) == DT_SONAME) {
+            soname = strTab + rdi(dynSoname->d_un.d_val);
+            break;
+        }
+    }
+    if (strlen(soname) <= newSoname.size()) {
+        strcpy(soname, newSoname.c_str());
+        changed = true;
+        return;
+    }
 }
 
 template<ElfFileParams>
@@ -1115,6 +1139,8 @@ void ElfFile<ElfFileParamNames>::removeNeeded(set<string> libs)
 
 static bool printInterpreter = false;
 static bool printSoname = false;
+static bool setSoname = false;
+static string newSoname;
 static string newInterpreter;
 
 static bool shrinkRPath = false;
@@ -1134,6 +1160,9 @@ static void patchElf2(ElfFile & elfFile, mode_t fileMode)
 
     if (printSoname)
         printf("%s\n", elfFile.getSoname().c_str());
+
+    if (setSoname)
+        elfFile.setSoname(newSoname);
 
     if (newInterpreter != "")
         elfFile.setInterpreter(newInterpreter);
@@ -1195,6 +1224,7 @@ void showHelp(const string & progName)
   [--set-interpreter FILENAME]\n\
   [--print-interpreter]\n\
   [--print-soname]\n\
+  [--set-soname]\n\
   [--set-rpath RPATH]\n\
   [--shrink-rpath]\n\
   [--print-rpath]\n\
@@ -1227,6 +1257,11 @@ int main(int argc, char * * argv)
         }
         else if (arg == "--print-soname") {
             printSoname = true;
+        }
+        else if (arg == "--set-soname") {
+            if (++i == argc) error("missing argument");
+            setSoname = true;
+            newSoname = argv[i];
         }
         else if (arg == "--shrink-rpath") {
             shrinkRPath = true;
