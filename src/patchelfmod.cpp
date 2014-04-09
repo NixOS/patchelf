@@ -70,6 +70,8 @@ static bool debugMode = false;
 
 static bool forceRPath = false;
 
+static bool goldSupport = false;
+
 static string fileName;
 
 
@@ -183,7 +185,7 @@ public:
 
     void setInterpreter(const string & newInterpreter);
 
-    typedef enum { rpPrint, rpShrink, rpSet } RPathOp;
+    typedef enum { rpPrint, rpShrink, rpSet, rpDelete } RPathOp;
 
     void modifyRPath(RPathOp op, string newRPath);
 
@@ -193,9 +195,9 @@ public:
 
     void replaceNeeded(map<string, string> & libs);
 
-    void replaceSoname(const string & sonameToReplace);
+    typedef enum { printSoname, replaceSoname } sonameMode;
 
-    void printSoname();
+    void modifySoname(sonameMode op, const string & sonameToReplace);
 
 private:
 
@@ -423,8 +425,8 @@ static void writeFile(string fileName, mode_t fileMode)
 
 static void writeFileBackup(string fileName, mode_t fileMode)
 {
-    /* If activated, it saves a backup of the input file
-       without screwing up the file's integrity. */
+    /* Don't use the method in writeFile() to back up files
+       because it will screw up the files's integrity. */
 
     string fileName2 = fileName + "~orig";
 
@@ -663,7 +665,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
        to its offset; otherwise we hit the kernel bug.  This may
        require creating a hole in the executable.  The bigger the size
        of the uninitialised data segment, the bigger the hole. */
-    if (isExecutable) {
+    if (isExecutable && goldSupport) {
         if (startOffset >= startPage) {
             debug("shifting new PT_LOAD segment by %d bytes to work around a Linux kernel bug\n", startOffset - startPage);
         } else {
@@ -1015,6 +1017,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
             neededLibs.push_back(string(strTab + rdi(dyn->d_un.d_val)));
     }
 
+
     if (op == rpPrint) {
         if (rpath) {
             printf("%s", rpath ? rpath : "");
@@ -1022,19 +1025,19 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
                 debug("RPATH is empty\n");
             else
                 printf("\n");
-        } else debug("no RPATH found\n");
-        return;
-    }
-
-    if (op == rpShrink && !rpath) {
-        debug("no RPATH to shrink\n");
+        }
+        else debug("no RPATH found\n");
         return;
     }
 
 
     /* For each directory in the RPATH, check if it contains any
        needed library. */
-    if (op == rpShrink) {
+    if (op == rpShrink && !rpath) {
+        debug("no RPATH to shrink\n");
+        return;
+    }
+    else if (op == rpShrink) {
         static vector<bool> neededLibFound(neededLibs.size(), false);
 
         newRPath = "";
@@ -1074,6 +1077,29 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
             else
                 concatToRPath(newRPath, dirName);
         }
+    }
+
+
+    if (op == rpDelete && !rpath) {
+        debug("no RPATH to delete\n");
+        return;
+    }
+    else if (op == rpDelete && rpath) {
+        Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+            Elf_Dyn * last = dyn;
+        for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+            if (rdi(dyn->d_tag) == DT_RPATH) {
+                debug("removing DT_RPATH entry\n");
+                changed = true;
+            } else if (rdi(dyn->d_tag) == DT_RUNPATH) {
+                debug("removing DT_RUNPATH entry\n");
+                changed = true;
+            } else {
+                *last++ = *dyn;
+            }
+        }
+        memset(last, 0, sizeof(Elf_Dyn) * (dyn - last));
+        return;
     }
 
 
@@ -1267,7 +1293,7 @@ void ElfFile<ElfFileParamNames>::addNeeded(set<string> libs)
 
 
 template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::replaceSoname(const string & sonameToReplace)
+void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const string & sonameToReplace)
 {
     Elf_Shdr & shdrDynamic = findSection(".dynamic");
     Elf_Shdr & shdrDynStr = findSection(".dynstr");
@@ -1276,59 +1302,39 @@ void ElfFile<ElfFileParamNames>::replaceSoname(const string & sonameToReplace)
     Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
 
     unsigned int dynStrAddedBytes = 0;
+    bool sonameFound = false;
 
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_SONAME) {
             char * name = strTab + rdi(dyn->d_un.d_val);
-            if (name != sonameToReplace) {
-                debug("replacing DT_SONAME entry `%s' with `%s'\n", name, sonameToReplace.c_str());
+            if (op == printSoname) {
+                printf("%s\n", name);
+            }
+            else if (op == replaceSoname) {
+                if (name != sonameToReplace) {
+                    debug("replacing DT_SONAME entry `%s' with `%s'\n", name, sonameToReplace.c_str());
 
-                // technically, the string referred by d_val could be used otherwise, too (although unlikely)
-                // we'll therefore add a new string
-                debug("resizing .dynstr ...");
+                    // technically, the string referred by d_val could be used otherwise, too (although unlikely)
+                    // we'll therefore add a new string
+                    debug("resizing .dynstr ...");
 
-                string & newDynStr = replaceSection(".dynstr",
-                    rdi(shdrDynStr.sh_size) + sonameToReplace.size() + 1 + dynStrAddedBytes);
-                setSubstr(newDynStr, rdi(shdrDynStr.sh_size) + dynStrAddedBytes, sonameToReplace + '\0');
+                    string & newDynStr = replaceSection(".dynstr",
+                        rdi(shdrDynStr.sh_size) + sonameToReplace.size() + 1 + dynStrAddedBytes);
+                    setSubstr(newDynStr, rdi(shdrDynStr.sh_size) + dynStrAddedBytes, sonameToReplace + '\0');
 
-                dyn->d_un.d_val = shdrDynStr.sh_size + dynStrAddedBytes;
+                    dyn->d_un.d_val = shdrDynStr.sh_size + dynStrAddedBytes;
 
-                dynStrAddedBytes += sonameToReplace.size() + 1;
+                    dynStrAddedBytes += sonameToReplace.size() + 1;
 
-                changed = true;
-            } else {
-                debug("keeping DT_SONAME entry `%s'\n", name);
+                    changed = true;
+                    sonameFound = true;
+                }
+                else debug("keeping DT_SONAME entry `%s'\n", name);
             }
         }
     }
-}
 
-
-template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::printSoname()
-{
-    Elf_Shdr & shdrDynamic = findSection(".dynamic");
-    Elf_Shdr & shdrDynStr = findSection(".dynstr");
-    char * strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
-
-    Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
-
-    unsigned int dynStrAddedBytes = 0;
-
-    char * name = 0;
-    bool foundSoname = false;
-
-    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
-        if (rdi(dyn->d_tag) == DT_SONAME) {
-            name = strTab + rdi(dyn->d_un.d_val);
-            foundSoname = true;
-        }
-    }
-
-    if (foundSoname)
-        printf("%s\n", name);
-    else
-        debug("no DT_SONAME entry found\n");
+    if (sonameFound == false) debug("no DT_SONAME entry found\n");
 }
 
 
@@ -1341,6 +1347,7 @@ static bool shrinkRPath = false;
 static bool setRPath = false;
 static bool printRPath = false;
 static string newRPath;
+static bool deleteRPath = false;
 
 static set<string> neededLibsToRemove;
 static map<string, string> neededLibsToReplace;
@@ -1366,8 +1373,12 @@ static void patchElfmod2(ElfFile & elfFile, mode_t fileMode)
 
     if (shrinkRPath)
         elfFile.modifyRPath(elfFile.rpShrink, "");
-    else if (setRPath)
+
+    if (setRPath)
         elfFile.modifyRPath(elfFile.rpSet, newRPath);
+
+    if (deleteRPath)
+        elfFile.modifyRPath(elfFile.rpDelete, "");
 
     elfFile.removeNeeded(neededLibsToRemove);
 
@@ -1375,11 +1386,11 @@ static void patchElfmod2(ElfFile & elfFile, mode_t fileMode)
 
     elfFile.addNeeded(neededLibsToAdd);
 
-    if (sonameToReplace != "")
-        elfFile.replaceSoname(sonameToReplace);
-
     if (printSoname)
-        elfFile.printSoname();
+        elfFile.modifySoname(elfFile.printSoname, "");
+
+    if (sonameToReplace != "")
+        elfFile.modifySoname(elfFile.replaceSoname, sonameToReplace);
 
     if (elfFile.isChanged()){
         if (saveBackup) writeFileBackup(fileName, fileMode);
@@ -1441,29 +1452,36 @@ void split(const string & s, char c,
 
 void showInfo(const string & progName)
 {
-    fprintf(stderr, "Syntax: %s [option] <elffile>\n\n"
+    fprintf(stderr, "Syntax: %s [options] <elffile>\n\n"
 
 "Options:\n\
   -i --set-interpreter <interpreter>\n\
      --interpreter <interpreter>\n\
-  -I --print-interpreter\n\
+  -I --print-interpreter\n\n\
+\
   -R --set-rpath <rpath>\n\
      --rpath <rpath>\n\
+  -D --delete-rpath\n\
   -s --shrink-rpath\n\
   -p --print-rpath\n\
-  -f --force-rpath\n\
+  -f --force-rpath\n\n\
+\
   -a --add-needed <library>\n\
   -r --remove-needed <library>\n\
   -l --add-needed-list <library1>,<library2>,...\n\
      --add-list <library1>,<library2>,...\n\
   -L --remove-needed-list <library1>,<library2>,...\n\
      --remove-list <library1>,<library2>,...\n\
-  -n --replace-needed <library> <new-library>\n\
+  -n --replace-needed <library> <new-library>\n\n\
+\
   -S --set-soname <soname>\n\
      --soname <soname>\n\
-  -P --print-soname\n\
+  -P --print-soname\n\n\
+\
   -b --backup\n\
   -d --debug\n\
+  -w --with-gold-support\n\
+\
   -h --help\n\
   -V --version\n\n"
 
@@ -1473,40 +1491,56 @@ void showInfo(const string & progName)
 
 void showHelp(const string & progName)
 {
-    printf("Syntax: %s [option] <elffile>\n\n"
+    printf("Syntax: %s [options] <elffile>\n\n"
 
 "Options:\n\n\
 \
-  -b, --backup               Saves a backup of the unmodified file with the suffix '~orig'.\n\
-  -d, --debug                Prints details of the changes made to the input file.\n\
+  -h, --help                 Show this usage information.\n\
+  -V, --version              Display program version number.\n\
+  -b, --backup               Saves a backup of the unmodified file with the\n\
+                             suffix '~orig'.\n\
+  -d, --debug                Print details of the changes made to the input file.\n\
                              Alternatively you can use the environment\n\
-                             variable PATCHELFMOD_DEBUG.\n\
-  -h, --help                 Prints this help.\n\
-  -V, --version              Prints version information.\n\n\n\
+                             variable PATCHELFMOD_DEBUG.\n\n\
+\
+  -w, --with-gold-support    Support executables created by the Gold linker.\n\n\
+\
+                             These are marked as ET_DYN (not ET_EXEC) and have a\n\
+                             starting virtual address of 0 so they cannot grow\n\
+                             downwards. In order not to run into a Linux kernel bug,\n\
+                             the virtual address and the offset of the new PT_LOAD\n\
+                             segment have to be equal; otherwise ld-linux segfaults.\n\
+                             To ensure this, it may be necessary to add some padding\n\
+                             to the executable (potentially a lot of padding, if\n\
+                             the executable has a large uninitialised data segment).\n\n\
+\
+                             I don't know if this is still an issue or not. Therefore\n\
+                             this feature is now optional.\n\n\n\
 \
 \
 Dynamic loader options:\n\n\
 \
   -i, --set-interpreter <interpreter>\n\
-                             Changes the dynamic loader (\"ELF interpreter\")\n\
+                             Change the dynamic loader (\"ELF interpreter\")\n\
                              of an executable to <interpreter>.\n\
       --interpreter          An alias for '--set-interpreter'.\n\
-  -I, --print-interpreter    Prints the ELF interpreter of an executable.\n\n\n\
+  -I, --print-interpreter    Print the ELF interpreter of an executable.\n\n\n\
 \
 \
 RPATH options:\n\n\
 \
-  -R, --set-rpath <rpath>    Changes the RPATH of an executable or library to <rpath>.\n\
+  -R, --set-rpath <rpath>    Change the RPATH of an executable or library to <rpath>.\n\
       --rpath <rpath>        An alias for '--set-rpath'.\n\
-  -s, --shrink-rpath         Removes all directories from RPATH that do not contain\n\
+  -D, --delete-rpath         Remove an existing RPATH.\n\
+  -s, --shrink-rpath         Remove all directories from RPATH that do not contain\n\
                              a library referenced by DT_NEEDED fields of the executable\n\
                              or library.\n\
                              For instance, if an executable references one library\n\
                              libfoo.so, and has an RPATH \"/lib:/usr/lib:/foo/lib\",\n\
                              and libfoo.so can only be found in /foo/lib, then the\n\
                              new RPATH will be \"/foo/lib\".\n\
-  -p, --print-rpath          Prints the RPATH of an executable or library.\n\
-  -f, --force-rpath          Forces the use of the obsolete DT_RPATH instead of\n\
+  -p, --print-rpath          Print the RPATH of an executable or library.\n\
+  -f, --force-rpath          Force the use of the obsolete DT_RPATH instead of\n\
                              DT_RUNPATH.\n\
                              By default DT_RPATH is converted to DT_RUNPATH.\n\n\n\
 \
@@ -1514,9 +1548,9 @@ RPATH options:\n\n\
 DT_NEEDED options:\n\n\
 \
   -a, --add-needed <library>\n\
-                             Adds a dependency <library> on a dynamic library.\n\
+                             Add a dependency <library> on a dynamic library.\n\
   -r, --remove-needed <library>\n\
-                             Removes a dependency <library> from a dynamic library.\n\n\
+                             Remove a dependency <library> from a dynamic library.\n\n\
 \
   -l, --add-needed-list <library1>,<library2>,...\n\
                              The same as '--add-needed', but with several dynamic\n\
@@ -1531,16 +1565,16 @@ DT_NEEDED options:\n\n\
                              An alias for '--remove-needed-list'.\n\n\
 \
   -n, --replace-needed <library> <new-library>\n\
-                             Replaces a dependency <library> on a dynamic library with\n\
+                             Replace a dependency <library> on a dynamic library with\n\
                              a new dependency <new-library>.\n\
                              This option can be given multiple times.\n\n\n\
 \
 \
 DT_SONAME options:\n\n\
 \
-  -S, --set-soname <soname>  Changes the DT_SONAME entry of a library to <soname>.\n\
+  -S, --set-soname <soname>  Change the DT_SONAME entry of a library to <soname>.\n\
       --soname <soname>      An alias for '--replace-soname'.\n\
-  -P, --print-soname         Prints the soname of a library.\n\n", progName.c_str());
+  -P, --print-soname         Print the soname of a library.\n\n", progName.c_str());
 }
 
 
@@ -1556,23 +1590,43 @@ int main(int argc, char * * argv)
     int i;
     for (i = 1; i < argc; ++i) {
         string arg(argv[i]);
-        if (arg == "--set-interpreter" || arg == "--interpreter" || arg == "-i") {
+        if (arg == "--with-gold-support" || arg == "-w") {
+            /* I don't know if this bug in the Linux kernel still
+               appears, so I made this workaround optional.
+
+               Here's some information about it from
+               a commentary in "rewriteSectionsLibrary()":
+                 Even though this file is of type ET_DYN, it could actually be
+                 an executable.  For instance, Gold produces executables marked
+                 ET_DYN.  In that case we can still hit the kernel bug that
+                 necessitated rewriteSectionsExecutable().  However, such
+                 executables also tend to start at virtual address 0, so
+                 rewriteSectionsExecutable() won't work because it doesn't have
+                 any virtual address space to grow downwards into.  As a
+                 workaround, make sure that the virtual address of our new
+                 PT_LOAD segment relative to the first PT_LOAD segment is equal
+                 to its offset; otherwise we hit the kernel bug.  This may
+                 require creating a hole in the executable.  The bigger the size
+                 of the uninitialised data segment, the bigger the hole. */
+            goldSupport = true;
+        }
+        else if (arg == "--set-interpreter" || arg == "--interpreter" || arg == "-i") {
             if (++i == argc) error("missing argument");
             newInterpreter = argv[i];
         }
         else if (arg == "--print-interpreter" || arg == "-I") {
             printInterpreter = true;
         }
-        else if (arg == "--shrink-rpath" || arg == "-s") {
-            shrinkRPath = true;
-        }
         else if (arg == "--set-rpath" || arg == "--rpath" || arg == "-R") {
             if (++i == argc) error("missing argument");
             setRPath = true;
             newRPath = argv[i];
         }
-        else if (arg == "--print-rpath" || arg == "-p") {
-            printRPath = true;
+        else if (arg == "--delete-rpath" || arg == "-D") {
+            deleteRPath = true;
+        }
+        else if (arg == "--shrink-rpath" || arg == "-s") {
+            shrinkRPath = true;
         }
         else if (arg == "--force-rpath" || arg == "-f") {
             /* Generally we prefer to emit DT_RUNPATH instead of
@@ -1587,6 +1641,9 @@ int main(int argc, char * * argv)
                to DT_RUNPATH, and if neither is present, a DT_RPATH is
                added. */
             forceRPath = true;
+        }
+        else if (arg == "--print-rpath" || arg == "-p") {
+            printRPath = true;
         }
         else if (arg == "--add-needed" || arg == "-a") {
             if (++i == argc) error("missing argument");

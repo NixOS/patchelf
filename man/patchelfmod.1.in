@@ -9,7 +9,7 @@
 PatchELFmod - Modify ELF files
 
 .SH SYNOPSIS
-.B patchelfmod \fR[option] <elffile>
+.B patchelfmod \fR[options] <elffile>
 
 .SH DESCRIPTION
 PatchELFmod is a simple utility to modify header data of ELF executables
@@ -19,65 +19,84 @@ and manipulate the RPATH and DT_NEEDED entries of executables and libraries.
 
 .SH OPTIONS
 .TP
+\fB\-h\fR, \fB\-\-help\fR
+Show usage information.
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+Display program version number.
+.TP
 \fB\-b\fR, \fB\-\-backup\fR
-Saves a backup of the unmodified file with the suffix '~orig'.
+Saves a backup of the unmodified file with the
+suffix '~orig'.
 .TP
 \fB\-d\fR, \fB\-\-debug\fR
-Prints details of the changes made to the input file.
+Print details of the changes made to the input file.
 Alternatively you can use the environment
 variable PATCHELFMOD_DEBUG.
 .TP
-\fB\-h\fR, \fB\-\-help\fR
-Prints help information.
-.TP
-\fB\-V\fR, \fB\-\-version\fR
-Prints version information.
+\fB\-w\fR, \fB\-\-with\-gold\-support\fR
+Support executables created by the Gold linker.
+.IP
+These are marked as ET_DYN (not ET_EXEC) and have a
+starting virtual address of 0 so they cannot grow
+downwards. In order not to run into a Linux kernel bug,
+the virtual address and the offset of the new PT_LOAD
+segment have to be equal; otherwise ld\-linux segfaults.
+To ensure this, it may be necessary to add some padding
+to the executable (potentially a lot of padding, if
+the executable has a large uninitialised data segment).
+.IP
+I don't know if this is still an issue or not. Therefore
+this feature is now optional.
 .PP
 Dynamic loader options:
 .TP
 \fB\-i\fR, \fB\-\-set\-interpreter\fR <interpreter>
-Changes the dynamic loader ("ELF interpreter")
+Change the dynamic loader ("ELF interpreter")
 of an executable to <interpreter>.
 .TP
 \fB    \-\-interpreter\fR
 An alias for '\-\-set\-interpreter'.
 .TP
 \fB\-I\fR, \fB\-\-print\-interpreter\fR
-Prints the ELF interpreter of an executable.
+Print the ELF interpreter of an executable.
 .PP
 RPATH options:
 .TP
 \fB\-R\fR, \fB\-\-set\-rpath\fR <rpath>
-Changes the RPATH of an executable or library to <rpath>.
+Change the RPATH of an executable or library to <rpath>.
 .TP
 \fB    \-\-rpath\fR <rpath>
 An alias for '\-\-set\-rpath'.
 .TP
+\fB\-D\fR, \fB\-\-delete\-rpath\fR
+Remove an existing RPATH.
+.TP
 \fB\-s\fR, \fB\-\-shrink\-rpath\fR
-Removes all directories from RPATH that do not contain
+Remove all directories from RPATH that do not contain
 a library referenced by DT_NEEDED fields of the executable
 or library.
-.br
+.IP
 For instance, if an executable references one library
 libfoo.so, and has an RPATH "/lib:/usr/lib:/foo/lib",
 and libfoo.so can only be found in /foo/lib, then the
 new RPATH will be "/foo/lib".
 .TP
 \fB\-p\fR, \fB\-\-print\-rpath\fR
-Prints the RPATH of an executable or library.
+Print the RPATH of an executable or library.
 .TP
 \fB\-f\fR, \fB\-\-force\-rpath\fR
-Forces the use of the obsolete DT_RPATH instead of
+Force the use of the obsolete DT_RPATH instead of
 DT_RUNPATH.
 By default DT_RPATH is converted to DT_RUNPATH.
 .PP
 DT_NEEDED options:
 .TP
 \fB\-a\fR, \fB\-\-add\-needed\fR <library>
-Adds a dependency <library> on a dynamic library.
+Add a dependency <library> on a dynamic library.
 .TP
 \fB\-r\fR, \fB\-\-remove\-needed\fR <library>
-Removes a dependency <library> from a dynamic library.
+Remove a dependency <library> from a dynamic library.
 .TP
 \fB\-l\fR, \fB\-\-add\-needed\-list\fR <library1>,<library2>,...
 The same as '\-\-add\-needed', but with several dynamic
@@ -94,28 +113,27 @@ libraries declared at once through a comma seperated list.
 An alias for '\-\-remove\-needed\-list'.
 .TP
 \fB\-n\fR, \fB\-\-replace\-needed\fR <library> <new\-library>
-Replaces a dependency <library> on a dynamic library with
+Replace a dependency <library> on a dynamic library with
 a new dependency <new\-library>.
-.br
 This option can be given multiple times.
 .PP
 DT_SONAME options:
 .TP
 \fB\-S\fR, \fB\-\-set\-soname\fR <soname>
-Changes the DT_SONAME entry of a library to <soname>.
+Change the DT_SONAME entry of a library to <soname>.
 .TP
 \fB    \-\-soname\fR <soname>
 An alias for '\-\-replace\-soname'.
 .TP
 \fB\-P\fR, \fB\-\-print\-soname\fR
-Prints the soname of a library.
-
-.SH LIMITATIONS
-Currently PatchELFmod can't remove existing RPATHs.
-Use \fBchrpath\fR(1) instead.
+Print the soname of a library.
 
 .SH BUGS
-The \fBstrip\fR(1) command from binutils generated broken executables when
+Deleting and adding a new RPATH again and again will make the file
+grow a few KiB each time. This also happens if the RPATH was deleted
+with \fBchrpath\fR(1).
+.PP
+The \fBstrip\fR(1) command from binutils generates broken executables when
 applied to the output of patchelf (if '\-\-set-rpath' or '\-\-set-interpreter'
 with a larger path than the original is used).
 This appears to be a bug in binutils.

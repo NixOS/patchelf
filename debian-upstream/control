@@ -15,10 +15,9 @@ Vcs-Browser: https://github.com/darealshinji/patchelfmod
 Package: patchelfmod
 Section: utils
 Architecture: any
-Depends:
-  ${shlibs:Depends},
-  ${misc:Depends}
-Suggests: chrpath, binutils
+Depends: ${shlibs:Depends},
+         ${misc:Depends}
+Suggests: binutils
 Description: utility for patching ELF binaries
  Simple utility to modify header data of ELF executables and libraries.
  It can change the dynamic loader ("ELF interpreter") of executables,
@@ -28,10 +27,8 @@ Description: utility for patching ELF binaries
 Package: patchelfmod-dbg
 Section: utils
 Architecture: any
-Depends:
-  ${shlibs:Depends},
-  ${misc:Depends}
-Suggests: chrpath, binutils
+Depends: ${misc:Depends},
+         patchelfmod (= ${binary:Version})
 Description: utility for patching ELF binaries - debug symbols
  Simple utility to modify header data of ELF executables and libraries.
  It can change the dynamic loader ("ELF interpreter") of executables,

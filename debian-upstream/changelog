@@ -1,3 +1,14 @@
+patchelfmod (0.9-1) unstable; urgency=low
+
+  * New features:
+    * `--backup' saves a backup before modifying a file.
+    * `--delete-rpath' deletes RPATHs and RUNPATHs.
+    * `--with-gold-support' makes the 'hacky support'
+      for executables created by the Gold linker now optional.
+  * Put soname functions into single void.
+
+ -- Marshall Banana <djcj@gmx.de>  Wed, 09 Apr 2014 16:51:30 +0100
+
 patchelfmod (0.9) unstable; urgency=low
 
   * Fork "PatchELF" and rename project to "PatchELFmod".

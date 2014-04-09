@@ -16,4 +16,3 @@ md5sum --binary --tag main > main.md5
 
 sed 's/main/main~orig/g' main.md5 > main~orig.md5
 md5sum --check main~orig.md5
-
