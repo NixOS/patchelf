@@ -878,13 +878,20 @@ string ElfFile<ElfFileParamNames>::getInterpreter()
 template<ElfFileParams>
 string ElfFile<ElfFileParamNames>::getSoname()
 {
-    /* Simply searching for .dynamic section and getting its DT_SONAME entry content (if any)
-       TODO: add check of .dynstr <-> DT_STRTAB correspondance, as it's done in modifyRPath
-       TODO: for what is this check?? */
     Elf_Shdr & shdrDynamic = findSection(".dynamic");
-
     Elf_Shdr & shdrDynStr = findSection(".dynstr");
     char * strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
+
+    /* Find the DT_STRTAB entry in the dynamic section. */
+    Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+    Elf_Addr strTabAddr = 0;
+    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++)
+        if (rdi(dyn->d_tag) == DT_STRTAB) strTabAddr = rdi(dyn->d_un.d_ptr);
+    if (!strTabAddr) error("strange: no string table");
+
+    /* We assume that the virtual address in the DT_STRTAB entry
+       of the dynamic section corresponds to the .dynstr section. */
+    assert(strTabAddr == rdi(shdrDynStr.sh_addr));
 
     Elf_Dyn * dynSoname = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
     char * soname = 0;
@@ -905,11 +912,21 @@ string ElfFile<ElfFileParamNames>::getSoname()
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::setSoname(const string & newSoname)
 {
-    debug("setting new soname...\n");
+    Elf_Shdr & shdrDynamic = findSection(".dynamic");
     Elf_Shdr & shdrDynStr = findSection(".dynstr");
     char * strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
 
-    Elf_Shdr & shdrDynamic = findSection(".dynamic");
+    /* Find the DT_STRTAB entry in the dynamic section. */
+    Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+    Elf_Addr strTabAddr = 0;
+    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++)
+        if (rdi(dyn->d_tag) == DT_STRTAB) strTabAddr = rdi(dyn->d_un.d_ptr);
+    if (!strTabAddr) error("strange: no string table");
+
+    /* We assume that the virtual address in the DT_STRTAB entry
+       of the dynamic section corresponds to the .dynstr section. */
+    assert(strTabAddr == rdi(shdrDynStr.sh_addr));
+
     Elf_Dyn * dynSoname = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
     char * soname = 0;
     for ( ; rdi(dynSoname->d_tag) != DT_NULL; dynSoname++) {
