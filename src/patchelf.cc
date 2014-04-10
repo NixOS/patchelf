@@ -900,7 +900,7 @@ string ElfFile<ElfFileParamNames>::getSoname()
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::setSoname(const string & newSoname)
 {
-    debug("setting soname to `%s'\n", newSoname.c_str());
+    debug("setting new soname...\n");
     Elf_Shdr & shdrDynStr = findSection(".dynstr");
     char * strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
 
@@ -913,10 +913,24 @@ void ElfFile<ElfFileParamNames>::setSoname(const string & newSoname)
             break;
         }
     }
-    if (strlen(soname) <= newSoname.size()) {
+    if (newSoname.size() <= strlen(soname)) {
+        debug("old soname: `%s', new soname: `%s'\n", soname, newSoname.c_str());
         strcpy(soname, newSoname.c_str());
         changed = true;
-        return;
+    }
+    else {
+        /* Grow the .dynstr section to make room for the new DT_SONAME */
+        debug("new soname is too long, resizing .dynstr section...\n");
+
+        string & newDynStr = replaceSection(".dynstr",
+            rdi(shdrDynStr.sh_size) + newSoname.size() + 1);
+        setSubstr(newDynStr, rdi(shdrDynStr.sh_size), newSoname + '\0');
+        /* Update the DT_SONAME entry, if any */
+        if (dynSoname) {
+            debug("old soname: `%s', new soname: `%s'\n", soname, newSoname.c_str());
+            dynSoname->d_un.d_val = shdrDynStr.sh_size;
+            changed = true;
+        }
     }
 }
 
