@@ -20,7 +20,15 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#define LICENSE "GPL version 3 or later"
+
+#define COPYRIGHT "\n\
+Copyright (c) 2004-2014  Eelco Dolstra <eelco.dolstra@logicblox.com>\n\
+              2011       Zack Weinberg\n\
+              2013       rgcjonas\n\
+              2014       djcj <djcj@gmx.de>\n\
+This program is free software; you may redistribute it under the terms of\n\
+the GNU General Public License version 3 or (at your option) any later version.\n\
+This program has absolutely no warranty."
 
 
 #include <assert.h>
@@ -185,7 +193,7 @@ public:
 
     void setInterpreter(const string & newInterpreter);
 
-    typedef enum { rpPrint, rpShrink, rpSet, rpDelete } RPathOp;
+    typedef enum { rpPrint, rpType, rpShrink, rpSet, rpDelete, rpConvert } RPathOp;
 
     void modifyRPath(RPathOp op, string newRPath);
 
@@ -426,7 +434,7 @@ static void writeFile(string fileName, mode_t fileMode)
 static void writeFileBackup(string fileName, mode_t fileMode)
 {
     /* Don't use the method in writeFile() to back up files
-       because it will screw up the files's integrity. */
+       because it will screw up the file's integrity. */
 
     string fileName2 = fileName + "~orig";
 
@@ -1031,6 +1039,24 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
     }
 
 
+    if (op == rpType) {
+        bool rpathFound = false;
+        Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+        Elf_Dyn * last = dyn;
+        for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+            if (rdi(dyn->d_tag) == DT_RPATH) {
+                printf("DT_RPATH\n");
+                rpathFound = true;
+            } else if (rdi(dyn->d_tag) == DT_RUNPATH) {
+                printf("DT_RUNPATH\n");
+                rpathFound = true;
+            }
+        }
+        if (rpathFound == false) debug("no RPATH found\n");
+        return;
+    }
+
+
     /* For each directory in the RPATH, check if it contains any
        needed library. */
     if (op == rpShrink && !rpath) {
@@ -1086,7 +1112,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
     }
     else if (op == rpDelete && rpath) {
         Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
-            Elf_Dyn * last = dyn;
+        Elf_Dyn * last = dyn;
         for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
             if (rdi(dyn->d_tag) == DT_RPATH) {
                 debug("removing DT_RPATH entry\n");
@@ -1103,7 +1129,17 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
     }
 
 
+    /* Check if a DT_RPATH that could be converted to DT_RUNPATH
+       exists. */
+    if (op == rpConvert && !rpath) {
+        debug("no RPATH to convert\n");
+        return;
+    }
+
     if (string(rpath ? rpath : "") == newRPath) return;
+
+    /* convert existing DT_RPATH to DT_RUNPATH */
+    if (op == rpConvert && rpath) newRPath = string(rpath ? rpath : "");
 
     changed = true;
 
@@ -1346,8 +1382,10 @@ static string newInterpreter;
 static bool shrinkRPath = false;
 static bool setRPath = false;
 static bool printRPath = false;
+static bool printRPathType = false;
 static string newRPath;
 static bool deleteRPath = false;
+static bool convertRPath = false;
 
 static set<string> neededLibsToRemove;
 static map<string, string> neededLibsToReplace;
@@ -1371,6 +1409,9 @@ static void patchElfmod2(ElfFile & elfFile, mode_t fileMode)
     if (printRPath)
         elfFile.modifyRPath(elfFile.rpPrint, "");
 
+    if (printRPathType)
+        elfFile.modifyRPath(elfFile.rpType, "");
+
     if (shrinkRPath)
         elfFile.modifyRPath(elfFile.rpShrink, "");
 
@@ -1379,6 +1420,9 @@ static void patchElfmod2(ElfFile & elfFile, mode_t fileMode)
 
     if (deleteRPath)
         elfFile.modifyRPath(elfFile.rpDelete, "");
+
+    if (convertRPath)
+        elfFile.modifyRPath(elfFile.rpConvert, "");
 
     elfFile.removeNeeded(neededLibsToRemove);
 
@@ -1402,7 +1446,7 @@ static void patchElfmod2(ElfFile & elfFile, mode_t fileMode)
 
 static void patchElfmod()
 {
-    if (!printInterpreter && !printRPath && !printSoname)
+    if (!printInterpreter && !printRPath && !printRPathType && !printSoname)
         debug("patching ELF file `%s'\n", fileName.c_str());
 
     mode_t fileMode;
@@ -1462,9 +1506,13 @@ void showInfo(const string & progName)
   -R --set-rpath <rpath>\n\
      --rpath <rpath>\n\
   -D --delete-rpath\n\
-  -s --shrink-rpath\n\
   -p --print-rpath\n\
-  -f --force-rpath\n\n\
+  -t --print-rpath-type\n\
+     --type\n\
+  -s --shrink-rpath\n\
+  -f --force-rpath\n\
+  -c --convert-rpath\n\
+     --convert\n\n\
 \
   -a --add-needed <library>\n\
   -r --remove-needed <library>\n\
@@ -1495,86 +1543,94 @@ void showHelp(const string & progName)
 
 "Options:\n\n\
 \
-  -h, --help                 Show this usage information.\n\
-  -V, --version              Display program version number.\n\
-  -b, --backup               Saves a backup of the unmodified file with the\n\
-                             suffix '~orig'.\n\
-  -d, --debug                Print details of the changes made to the input file.\n\
-                             Alternatively you can use the environment\n\
-                             variable PATCHELFMOD_DEBUG.\n\n\
-\
-  -w, --with-gold-support    Support executables created by the Gold linker.\n\n\
-\
-                             These are marked as ET_DYN (not ET_EXEC) and have a\n\
-                             starting virtual address of 0 so they cannot grow\n\
-                             downwards. In order not to run into a Linux kernel bug,\n\
-                             the virtual address and the offset of the new PT_LOAD\n\
-                             segment have to be equal; otherwise ld-linux segfaults.\n\
-                             To ensure this, it may be necessary to add some padding\n\
-                             to the executable (potentially a lot of padding, if\n\
-                             the executable has a large uninitialised data segment).\n\n\
-\
-                             I don't know if this is still an issue or not. Therefore\n\
-                             this feature is now optional.\n\n\n\
+  -h, --help                  Show this usage information.\n\
+  -V, --version               Display program version number.\n\n\n\
 \
 \
 Dynamic loader options:\n\n\
 \
   -i, --set-interpreter <interpreter>\n\
-                             Change the dynamic loader (\"ELF interpreter\")\n\
-                             of an executable to <interpreter>.\n\
-      --interpreter          An alias for '--set-interpreter'.\n\
-  -I, --print-interpreter    Print the ELF interpreter of an executable.\n\n\n\
+                              Change the dynamic loader (\"ELF interpreter\")\n\
+                              of an executable to <interpreter>.\n\
+      --interpreter           An alias for '--set-interpreter'.\n\
+  -I, --print-interpreter     Print the ELF interpreter of an executable.\n\n\n\
 \
 \
 RPATH options:\n\n\
 \
-  -R, --set-rpath <rpath>    Change the RPATH of an executable or library to <rpath>.\n\
-      --rpath <rpath>        An alias for '--set-rpath'.\n\
-  -D, --delete-rpath         Remove an existing RPATH.\n\
-  -s, --shrink-rpath         Remove all directories from RPATH that do not contain\n\
-                             a library referenced by DT_NEEDED fields of the executable\n\
-                             or library.\n\
-                             For instance, if an executable references one library\n\
-                             libfoo.so, and has an RPATH \"/lib:/usr/lib:/foo/lib\",\n\
-                             and libfoo.so can only be found in /foo/lib, then the\n\
-                             new RPATH will be \"/foo/lib\".\n\
-  -p, --print-rpath          Print the RPATH of an executable or library.\n\
-  -f, --force-rpath          Force the use of the obsolete DT_RPATH instead of\n\
-                             DT_RUNPATH.\n\
-                             By default DT_RPATH is converted to DT_RUNPATH.\n\n\n\
+  -R, --set-rpath <rpath>     Change the RPATH of an executable or library to <rpath>.\n\
+      --rpath <rpath>         An alias for '--set-rpath'.\n\
+  -D, --delete-rpath          Remove an existing RPATH.\n\
+  -s, --shrink-rpath          Remove all directories from RPATH that do not contain\n\
+                              a library referenced by DT_NEEDED fields of the executable\n\
+                              or library.\n\
+                              For instance, if an executable references one library\n\
+                              libfoo.so, and has an RPATH \"/lib:/usr/lib:/foo/lib\",\n\
+                              and libfoo.so can only be found in /foo/lib, then the\n\
+                              new RPATH will be \"/foo/lib\".\n\
+  -p, --print-rpath           Print the RPATH of an executable or library.\n\
+  -t, --print-rpath-type      Print the type of the RPATH, whether it's DT_RPATH\n\
+                              or DT_RUNPATH.\n\
+      --rpath-type            An alias for '--print-rpath-type'.\n\
+  -f, --force-rpath           Force the use of the obsolete DT_RPATH instead of\n\
+                              DT_RUNPATH.\n\
+                              By default DT_RPATH is converted to DT_RUNPATH.\n\
+  -c, --convert-rpath         Convert an existing DT_RPATH to DT_RUNPATH.\n\
+      --convert               An alias for '--convert-rpath'.\n\n\n\
 \
 \
 DT_NEEDED options:\n\n\
 \
-  -a, --add-needed <library>\n\
-                             Add a dependency <library> on a dynamic library.\n\
+  -a, --add-needed <library>  Add a dependency <library> on a dynamic library.\n\
   -r, --remove-needed <library>\n\
-                             Remove a dependency <library> from a dynamic library.\n\n\
+                              Remove a dependency <library> from a dynamic library.\n\n\
 \
   -l, --add-needed-list <library1>,<library2>,...\n\
-                             The same as '--add-needed', but with several dynamic\n\
-                             libraries declared at once through a comma seperated list.\n\
+                              The same as '--add-needed', but with several dynamic\n\
+                              libraries declared at once through a comma seperated list.\n\
       --add-list <library1>,<library2>,...\n\
-                             An alias for '--add-needed-list'.\n\n\
+                              An alias for '--add-needed-list'.\n\n\
 \
   -L, --remove-needed-list <library1>,<library2>,...\n\
-                             The same as '--remove-needed', but with several dynamic\n\
-                             libraries declared at once through a comma seperated list.\n\
+                              The same as '--remove-needed', but with several dynamic\n\
+                              libraries declared at once through a comma seperated list.\n\
       --remove-list <library1>,<library2>,...\n\
-                             An alias for '--remove-needed-list'.\n\n\
+                              An alias for '--remove-needed-list'.\n\n\
 \
   -n, --replace-needed <library> <new-library>\n\
-                             Replace a dependency <library> on a dynamic library with\n\
-                             a new dependency <new-library>.\n\
-                             This option can be given multiple times.\n\n\n\
+                              Replace a dependency <library> on a dynamic library with\n\
+                              a new dependency <new-library>.\n\
+                              This option can be given multiple times.\n\n\n\
 \
 \
 DT_SONAME options:\n\n\
 \
-  -S, --set-soname <soname>  Change the DT_SONAME entry of a library to <soname>.\n\
-      --soname <soname>      An alias for '--replace-soname'.\n\
-  -P, --print-soname         Print the soname of a library.\n\n", progName.c_str());
+  -S, --set-soname <soname>   Change the DT_SONAME entry of a library to <soname>.\n\
+      --soname <soname>       An alias for '--replace-soname'.\n\
+  -P, --print-soname          Print the soname of a library.\n\n\n\
+\
+\
+Other options:\n\n\
+\
+  -b, --backup                Save a backup of the unmodified file with the\n\
+                              suffix '~orig'.\n\
+  -d, --debug                 Print details of the changes made to the input file.\n\
+                              Alternatively you can use the environment\n\
+                              variable PATCHELFMOD_DEBUG.\n\
+  -w, --with-gold-support     Support executables created by the Gold linker.\n\n\
+\
+                              These are marked as ET_DYN (not ET_EXEC) and have a\n\
+                              starting virtual address of 0 so they cannot grow\n\
+                              downwards. In order not to run into a Linux kernel bug,\n\
+                              the virtual address and the offset of the new PT_LOAD\n\
+                              segment have to be equal; otherwise ld-linux segfaults.\n\
+                              To ensure this, it may be necessary to add some padding\n\
+                              to the executable (potentially a lot of padding, if\n\
+                              the executable has a large uninitialised data segment).\n\n\
+\
+                              I don't know if this is still an issue or not. Therefore\n\
+                              this feature is now optional.\n\n\
+", progName.c_str());
 }
 
 
@@ -1625,6 +1681,15 @@ int main(int argc, char * * argv)
         else if (arg == "--delete-rpath" || arg == "-D") {
             deleteRPath = true;
         }
+        else if (arg == "--print-rpath" || arg == "-p") {
+            printRPath = true;
+        }
+        else if (arg == "--print-rpath-type" || arg == "--rpath-type" || arg == "-t") {
+            printRPathType = true;
+        }
+        else if (arg == "--convert-rpath" || arg == "--convert" || arg == "-c") {
+            convertRPath = true;
+        }
         else if (arg == "--shrink-rpath" || arg == "-s") {
             shrinkRPath = true;
         }
@@ -1641,9 +1706,6 @@ int main(int argc, char * * argv)
                to DT_RUNPATH, and if neither is present, a DT_RPATH is
                added. */
             forceRPath = true;
-        }
-        else if (arg == "--print-rpath" || arg == "-p") {
-            printRPath = true;
         }
         else if (arg == "--add-needed" || arg == "-a") {
             if (++i == argc) error("missing argument");
@@ -1693,8 +1755,8 @@ int main(int argc, char * * argv)
             /* '-v' is a "hidden alias" for '-V'.
                It's not listed in showInfo() or showHelp(). */
             printf(PACKAGE_STRING "\n"
-            /* LICENSE is defined at the head of this file */
-                  "License: " LICENSE "\n");
+            /* Copyright text is defined at the head of this file */
+                   COPYRIGHT "\n");
             return 0;
         }
         else break;

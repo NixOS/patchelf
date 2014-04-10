@@ -1,13 +1,15 @@
-patchelfmod (0.9-1) unstable; urgency=low
+patchelfmod (0.10) unstable; urgency=low
 
   * New features:
     * `--backup' saves a backup before modifying a file.
     * `--delete-rpath' deletes RPATHs and RUNPATHs.
+    * `--print-rpath-type' tells whether it's RPATH or RUNPATH.
+    * `--convert-rpath' converts an existing DT_RPATH to DT_RUNPATH.
     * `--with-gold-support' makes the 'hacky support'
       for executables created by the Gold linker now optional.
   * Put soname functions into single void.
 
- -- Marshall Banana <djcj@gmx.de>  Wed, 09 Apr 2014 16:51:30 +0100
+ -- Marshall Banana <djcj@gmx.de>  Thu, 10 Apr 2014 12:30:00 +0100
 
 patchelfmod (0.9) unstable; urgency=low
 

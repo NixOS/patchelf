@@ -18,36 +18,11 @@ of executables, change existing DT_SONAME entries of shared libraries
 and manipulate the RPATH and DT_NEEDED entries of executables and libraries.
 
 .SH OPTIONS
-.TP
 \fB\-h\fR, \fB\-\-help\fR
-Show usage information.
+Display usage information.
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 Display program version number.
-.TP
-\fB\-b\fR, \fB\-\-backup\fR
-Saves a backup of the unmodified file with the
-suffix '~orig'.
-.TP
-\fB\-d\fR, \fB\-\-debug\fR
-Print details of the changes made to the input file.
-Alternatively you can use the environment
-variable PATCHELFMOD_DEBUG.
-.TP
-\fB\-w\fR, \fB\-\-with\-gold\-support\fR
-Support executables created by the Gold linker.
-.IP
-These are marked as ET_DYN (not ET_EXEC) and have a
-starting virtual address of 0 so they cannot grow
-downwards. In order not to run into a Linux kernel bug,
-the virtual address and the offset of the new PT_LOAD
-segment have to be equal; otherwise ld\-linux segfaults.
-To ensure this, it may be necessary to add some padding
-to the executable (potentially a lot of padding, if
-the executable has a large uninitialised data segment).
-.IP
-I don't know if this is still an issue or not. Therefore
-this feature is now optional.
 .PP
 Dynamic loader options:
 .TP
@@ -76,19 +51,28 @@ Remove an existing RPATH.
 Remove all directories from RPATH that do not contain
 a library referenced by DT_NEEDED fields of the executable
 or library.
-.IP
 For instance, if an executable references one library
 libfoo.so, and has an RPATH "/lib:/usr/lib:/foo/lib",
-and libfoo.so can only be found in /foo/lib, then the
+and libfoo.so can only be found in \fI/foo/lib\fP, then the
 new RPATH will be "/foo/lib".
 .TP
 \fB\-p\fR, \fB\-\-print\-rpath\fR
 Print the RPATH of an executable or library.
 .TP
+\fB\-t\fR, \fB\-\-print\-rpath\-type\fR
+Print the type of the RPATH, whether it's DT_RPATH
+or DT_RUNPATH.
+.TP
+\fB    \-\-rpath\-type\fR
+An alias for '\-\-print\-rpath\-type'.
+.TP
 \fB\-f\fR, \fB\-\-force\-rpath\fR
 Force the use of the obsolete DT_RPATH instead of
 DT_RUNPATH.
 By default DT_RPATH is converted to DT_RUNPATH.
+.TP
+\fB\-c\fR, \fB\-\-convert\-rpath\fR
+Convert an existing DT_RPATH to DT_RUNPATH.
 .PP
 DT_NEEDED options:
 .TP
@@ -127,6 +111,32 @@ An alias for '\-\-replace\-soname'.
 .TP
 \fB\-P\fR, \fB\-\-print\-soname\fR
 Print the soname of a library.
+.PP
+Other options:
+.TP
+\fB\-b\fR, \fB\-\-backup\fR
+Save a backup of the unmodified file with the
+suffix '~orig'.
+.TP
+\fB\-d\fR, \fB\-\-debug\fR
+Print details of the changes made to the input file.
+Alternatively you can use the environment
+variable PATCHELFMOD_DEBUG.
+.TP
+\fB\-w\fR, \fB\-\-with\-gold\-support\fR
+Support executables created by the Gold linker.
+.IP
+These are marked as ET_DYN (not ET_EXEC) and have a
+starting virtual address of 0 so they cannot grow
+downwards. In order not to run into a Linux kernel bug,
+the virtual address and the offset of the new PT_LOAD
+segment have to be equal; otherwise ld\-linux segfaults.
+To ensure this, it may be necessary to add some padding
+to the executable (potentially a lot of padding, if
+the executable has a large uninitialised data segment).
+.IP
+I don't know if this is still an issue or not. Therefore
+this feature is now optional.
 
 .SH BUGS
 Deleting and adding a new RPATH again and again will make the file
@@ -138,14 +148,12 @@ applied to the output of patchelf (if '\-\-set-rpath' or '\-\-set-interpreter'
 with a larger path than the original is used).
 This appears to be a bug in binutils.
 
-.SH AUTHORS
-2004-2014, Eelco Dolstra <\fIeelco.dolstra@logicblox.com\fR>
-.br
-     2011, Zack Weinberg
-.br
-     2013, rgcjonas
-.br
-     2014, djcj <\fIdjcj@gmx.de\fR>
+.SH COPYRIGHT
+Copyright \(co  2004\-2014 Eelco Dolstra <eelco.dolstra@logicblox.com>,  2011 Zack Weinberg,  2013 rgcjonas,  2014 djcj <djcj@gmx.de>
+.PP
+This program is free software; you may redistribute it under the terms of
+the GNU General Public License version 3 or (at your option) any later version.
+This program has absolutely no warranty.
 .PP
 This manpage was written by djcj <\fIdjcj@gmx.de\fR>.
 

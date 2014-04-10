@@ -10,6 +10,7 @@ src_TESTS = plain-fail.sh \
             big-dynstr.sh \
             set-rpath-library.sh \
             delete-rpath.sh \
+            convert-rpath.sh \
             backup.sh \
             add-needed.sh \
             add-needed-list.sh \

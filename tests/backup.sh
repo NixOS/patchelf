@@ -6,13 +6,15 @@ mkdir -p ${SCRATCH}
 
 cp main ${SCRATCH}/
 
-cd ${SCRATCH}/
+../src/patchelfmod --set-rpath /set/RPath ${SCRATCH}/main
+original=$(md5sum --binary ${SCRATCH}/main | cut -d ' ' -f1)
 
-../../../src/patchelfmod --force-rpath --set-rpath /set/RPath main
+../src/patchelfmod --backup --set-rpath /set/new/RPath ${SCRATCH}/main
+backup=$(md5sum --binary ${SCRATCH}/main~orig | cut -d ' ' -f1)
 
-md5sum --binary --tag main > main.md5
-
-../../../src/patchelfmod --backup --force-rpath --set-rpath /set/new/RPath main
-
-sed 's/main/main~orig/g' main.md5 > main~orig.md5
-md5sum --check main~orig.md5
+echo "md5 original: $original"
+echo "md5 backup:   $backup"
+if test $original != $backup; then
+    echo "something went wrong!"
+    exit 1
+fi

@@ -6,7 +6,6 @@ of executables, change existing DT_SONAME entries of shared libraries
 and manipulate the RPATH and DT_NEEDED entries of executables and libraries.
 
 Run `patchelfmod --help` or see the manpage (`man patchelfmod`) for more information.
-For known bugs see BUGS file.
 
 
 **Installation:**<br>
@@ -22,7 +21,8 @@ make install-strip
 
 
 **License:**<br>
-Copyright (c)  see AUTHORS file
+Copyright (c) 2004-2014 Eelco Dolstra <eelco.dolstra@logicblox.com>,
+2011 Zack Weinberg, 2013 rgcjonas, 2014 djcj <djcj@gmx.de>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -39,6 +39,15 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
 **Release history:**
+
+0.10 (April 10, 2014):
+* `--backup' saves a backup before modifying a file.
+* `--delete-rpath' deletes RPATHs and RUNPATHs.
+* `--print-rpath-type' tells whether it's RPATH or RUNPATH.
+* `--convert-rpath' converts an existing DT_RPATH to DT_RUNPATH.
+* `--with-gold-support' makes the 'hacky support' for executables
+  created by the Gold linker now optional.
+* Put soname functions into single void.
 
 0.9 (April 06, 2014):
 * Fork "PatchELF" and rename project to "PatchELFmod".
