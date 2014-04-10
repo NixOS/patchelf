@@ -134,9 +134,6 @@ segment have to be equal; otherwise ld\-linux segfaults.
 To ensure this, it may be necessary to add some padding
 to the executable (potentially a lot of padding, if
 the executable has a large uninitialised data segment).
-.IP
-I don't know if this is still an issue or not. Therefore
-this feature is now optional.
 
 .SH BUGS
 Deleting and adding a new RPATH again and again will make the file

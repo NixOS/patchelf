@@ -12,8 +12,8 @@ Run `patchelfmod --help` or see the manpage (`man patchelfmod`) for more informa
 ```
 ./bootstrap.sh
 ./configure
-make check
-make install-strip
+make check strip
+make install
 ```
 
 
@@ -41,11 +41,11 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 **Release history:**
 
 0.10 (April 10, 2014):
-* `--backup' saves a backup before modifying a file.
-* `--delete-rpath' deletes RPATHs and RUNPATHs.
-* `--print-rpath-type' tells whether it's RPATH or RUNPATH.
-* `--convert-rpath' converts an existing DT_RPATH to DT_RUNPATH.
-* `--with-gold-support' makes the 'hacky support' for executables
+* '--backup' saves a backup before modifying a file.
+* '--delete-rpath' deletes RPATHs and RUNPATHs.
+* '--print-rpath-type' tells whether it's RPATH or RUNPATH.
+* '--convert-rpath' converts an existing DT_RPATH to DT_RUNPATH.
+* '--with-gold-support' makes the 'hacky support' for executables
   created by the Gold linker now optional.
 * Put soname functions into single void.
 

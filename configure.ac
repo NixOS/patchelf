@@ -1,4 +1,6 @@
-AC_INIT([PatchELFmod], m4_esyscmd([echo -n $(cat ./version)]), [https://github.com/darealshinji/patchelfmod])
+AC_INIT([PatchELFmod],
+        m4_esyscmd([echo -n $(cat ./version)]),
+        [https://github.com/darealshinji/patchelfmod])
 
 AC_CONFIG_SRCDIR([src/patchelfmod.cpp])
 
@@ -7,8 +9,9 @@ AM_PROG_CC_C_O
 AM_INIT_AUTOMAKE([-Wall -Werror dist-bzip2 foreign color-tests parallel-tests])
 
 # Checks for programs.
+AC_CHECK_PROG(STRIP, strip, [$(which strip) --verbose])
+AC_CHECK_PROG(MD5SUM, md5sum, [$(which md5sum)])  # used for tests/backup.sh
 AC_PROG_CXX
-#AC_PROG_CC
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
 

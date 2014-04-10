@@ -21,210 +21,7 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#define COPYRIGHT \
-"Copyright (c) 2004-2014  Eelco Dolstra <eelco.dolstra@logicblox.com>\n\
-              2011       Zack Weinberg\n\
-              2013       rgcjonas\n\
-              2014       djcj <djcj@gmx.de>\n"
-
-#define LICENSE "This program is free software; you may redistribute it under the terms of\n\
-the GNU General Public License version 3 or (at your option) any later version.\n\
-This program has absolutely no warranty.\n"
-
-
-#include <assert.h>
-#include <algorithm>
-#include <errno.h>
-/*
- *  You can find the latest elf.h here if you need it:
- *   http://www.gnu.org/software/libc/index.html
- *   https://sourceware.org/git/?p=glibc.git;a=blob;f=elf/elf.h;hb=HEAD
- *
- *  Download it and place it in the directory of patchelfmod.cpp and
- *  replace the line    #include <elf.h>    with    #include "elf.h"
- */
-#include <elf.h>
-#include <fcntl.h>
-
-#include <fstream>
-#include <functional>
-#include <iostream>
-#include <limits.h>
-#include <map>
-
-#include <set>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <vector>
-
-
-using namespace std;
-
-
-#ifdef MIPSEL
-/* The lemote fuloong 2f kernel defconfig sets a page size of 16KB */
-const unsigned int pageSize = 4096*4;
-#else
-const unsigned int pageSize = 4096;
-#endif
-
-
-static bool debugMode = false;
-
-static bool forceRPath = false;
-
-static bool goldSupport = false;
-
-static string fileName;
-
-
-off_t fileSize, maxSize;
-unsigned char * contents = 0;
-
-
-#define ElfFileParams class Elf_Ehdr, class Elf_Phdr, class Elf_Shdr, class Elf_Addr, class Elf_Off, class Elf_Dyn, class Elf_Sym
-#define ElfFileParamNames Elf_Ehdr, Elf_Phdr, Elf_Shdr, Elf_Addr, Elf_Off, Elf_Dyn, Elf_Sym
-
-
-template<ElfFileParams>
-class ElfFile
-{
-    Elf_Ehdr * hdr;
-    vector<Elf_Phdr> phdrs;
-    vector<Elf_Shdr> shdrs;
-
-    bool littleEndian;
-
-    bool changed;
-
-    bool isExecutable;
-
-    typedef string SectionName;
-
-    typedef map<SectionName, string> ReplacedSections;
-
-    ReplacedSections replacedSections;
-
-    string sectionNames; /* content of the .shstrtab section */
-
-    /* Align on 4 or 8 bytes boundaries on 32- or 64-bit platforms
-       respectively. */
-    unsigned int sectionAlignment;
-
-    vector<SectionName> sectionsByOldIndex;
-
-public:
-
-    ElfFile()
-    {
-        changed = false;
-        sectionAlignment = sizeof(Elf_Off);
-    }
-
-    bool isChanged()
-    {
-        return changed;
-    }
-
-    void parse();
-
-private:
-
-    struct CompPhdr
-    {
-        ElfFile * elfFile;
-        bool operator ()(const Elf_Phdr & x, const Elf_Phdr & y)
-        {
-            if (x.p_type == PT_PHDR) return true;
-            if (y.p_type == PT_PHDR) return false;
-            return elfFile->rdi(x.p_paddr) < elfFile->rdi(y.p_paddr);
-        }
-    };
-
-    friend struct CompPhdr;
-
-    void sortPhdrs();
-
-    struct CompShdr
-    {
-        ElfFile * elfFile;
-        bool operator ()(const Elf_Shdr & x, const Elf_Shdr & y)
-        {
-            return elfFile->rdi(x.sh_offset) < elfFile->rdi(y.sh_offset);
-        }
-    };
-
-    friend struct CompShdr;
-
-    void sortShdrs();
-
-    void shiftFile(unsigned int extraPages, Elf_Addr startPage);
-
-    string getSectionName(const Elf_Shdr & shdr);
-
-    Elf_Shdr & findSection(const SectionName & sectionName);
-
-    Elf_Shdr * findSection2(const SectionName & sectionName);
-
-    unsigned int findSection3(const SectionName & sectionName);
-
-    string & replaceSection(const SectionName & sectionName,
-        unsigned int size);
-
-    void writeReplacedSections(Elf_Off & curOff,
-        Elf_Addr startAddr, Elf_Off startOffset);
-
-    void rewriteHeaders(Elf_Addr phdrAddress);
-
-    void rewriteSectionsLibrary();
-
-    void rewriteSectionsExecutable();
-
-public:
-
-    void rewriteSections();
-
-    string getInterpreter();
-
-    void setInterpreter(const string & newInterpreter);
-
-    typedef enum { rpPrint, rpType, rpShrink, rpSet, rpDelete, rpConvert } RPathOp;
-
-    void modifyRPath(RPathOp op, string newRPath);
-
-    void addNeeded(set<string> libs);
-
-    void removeNeeded(set<string> libs);
-
-    void replaceNeeded(map<string, string> & libs);
-
-    typedef enum { printSoname, replaceSoname } sonameMode;
-
-    void modifySoname(sonameMode op, const string & sonameToReplace);
-
-private:
-
-    /* Convert an integer in big or little endian representation (as
-       specified by the ELF header) to this platform's integer
-       representation. */
-    template<class I>
-    I rdi(I i);
-
-    /* Convert back to the ELF representation. */
-    template<class I>
-    I wri(I & t, unsigned long long i)
-    {
-        t = rdi((I) i);
-        return i;
-    }
-};
-
+#include "patchelfmod.h"
 
 /* !!! G++ creates broken code if this function is inlined, don't know
    why... */
@@ -1375,25 +1172,19 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const string & sona
 }
 
 
-static bool saveBackup = false;
+void split(const string & s, char c, vector<string> & v) {
+    string::size_type i = 0;
+    string::size_type j = s.find(c);
 
-static bool printInterpreter = false;
-static string newInterpreter;
+    while (j != string::npos) {
+        v.push_back(s.substr(i, j-i));
+        i = ++j;
+        j = s.find(c, j);
 
-static bool shrinkRPath = false;
-static bool setRPath = false;
-static bool printRPath = false;
-static bool printRPathType = false;
-static string newRPath;
-static bool deleteRPath = false;
-static bool convertRPath = false;
-
-static set<string> neededLibsToRemove;
-static map<string, string> neededLibsToReplace;
-static set<string> neededLibsToAdd;
-
-static string sonameToReplace;
-static bool printSoname = false;
+       if (j == string::npos)
+           v.push_back(s.substr(i, s.length( )));
+    }
+}
 
 
 template<class ElfFile>
@@ -1404,41 +1195,45 @@ static void patchElfmod2(ElfFile & elfFile, mode_t fileMode)
     if (printInterpreter)
         printf("%s\n", elfFile.getInterpreter().c_str());
 
-    if (newInterpreter != "")
+    else if (newInterpreter != "")
         elfFile.setInterpreter(newInterpreter);
 
-    if (printRPath)
+    else if (printRPath)
         elfFile.modifyRPath(elfFile.rpPrint, "");
 
-    if (printRPathType)
+    else if (printRPathType)
         elfFile.modifyRPath(elfFile.rpType, "");
 
-    if (shrinkRPath)
+    else if (shrinkRPath)
         elfFile.modifyRPath(elfFile.rpShrink, "");
 
-    if (setRPath)
+    else if (setRPath)
         elfFile.modifyRPath(elfFile.rpSet, newRPath);
 
-    if (deleteRPath)
+    else if (deleteRPath)
         elfFile.modifyRPath(elfFile.rpDelete, "");
 
-    if (convertRPath)
+    else if (convertRPath)
         elfFile.modifyRPath(elfFile.rpConvert, "");
 
-    elfFile.removeNeeded(neededLibsToRemove);
+    else if (!neededLibsToRemove.empty())
+        elfFile.removeNeeded(neededLibsToRemove);
 
-    elfFile.replaceNeeded(neededLibsToReplace);
+    else if (!neededLibsToReplace.empty())
+        elfFile.replaceNeeded(neededLibsToReplace);
 
-    elfFile.addNeeded(neededLibsToAdd);
+    else if (!neededLibsToAdd.empty())
+        elfFile.addNeeded(neededLibsToAdd);
 
-    if (printSoname)
+    else if (printSoname)
         elfFile.modifySoname(elfFile.printSoname, "");
 
-    if (sonameToReplace != "")
+    else if (sonameToReplace != "")
         elfFile.modifySoname(elfFile.replaceSoname, sonameToReplace);
 
     if (elfFile.isChanged()){
         if (saveBackup) writeFileBackup(fileName, fileMode);
+
         elfFile.rewriteSections();
         writeFile(fileName, fileMode);
     }
@@ -1476,22 +1271,6 @@ static void patchElfmod()
     else {
         error("ELF executable is not 32/64-bit, little/big-endian, version 1");
     }
-}
-
-
-void split(const string & s, char c,
-           vector<string> & v) {
-   string::size_type i = 0;
-   string::size_type j = s.find(c);
-
-   while (j != string::npos) {
-      v.push_back(s.substr(i, j-i));
-      i = ++j;
-      j = s.find(c, j);
-
-      if (j == string::npos)
-         v.push_back(s.substr(i, s.length( )));
-   }
 }
 
 
@@ -1628,9 +1407,6 @@ Other options:\n\n\
                               To ensure this, it may be necessary to add some padding\n\
                               to the executable (potentially a lot of padding, if\n\
                               the executable has a large uninitialised data segment).\n\n\
-\
-                              I don't know if this is still an issue or not. Therefore\n\
-                              this feature is now optional.\n\n\
 ", progName.c_str());
 }
 
@@ -1642,12 +1418,16 @@ int main(int argc, char * * argv)
         return 1;
     }
 
+    /* Setting the environment variable to _anything_ will
+       activate debug mode. I currently don't know how to
+       make it deactivate when set to "0" or "false". */
     if (getenv("PATCHELFMOD_DEBUG") != NULL) debugMode = true;
 
     int i;
     for (i = 1; i < argc; ++i) {
         string arg(argv[i]);
-        if (arg == "--with-gold-support" || arg == "-w") {
+        if (arg == "--with-gold-support"
+         || arg == "-w") {
             /* I don't know if this bug in the Linux kernel still
                appears, so I made this workaround optional.
 
@@ -1667,34 +1447,47 @@ int main(int argc, char * * argv)
                  of the uninitialised data segment, the bigger the hole. */
             goldSupport = true;
         }
-        else if (arg == "--set-interpreter" || arg == "--interpreter" || arg == "-i") {
+        else if (arg == "--set-interpreter"
+              || arg == "--interpreter"
+              || arg == "-i") {
             if (++i == argc) error("missing argument");
             newInterpreter = argv[i];
         }
-        else if (arg == "--print-interpreter" || arg == "-I") {
+        else if (arg == "--print-interpreter"
+              || arg == "-I") {
             printInterpreter = true;
         }
-        else if (arg == "--set-rpath" || arg == "--rpath" || arg == "-R") {
+        else if (arg == "--set-rpath"
+              || arg == "--rpath"
+              || arg == "-R") {
             if (++i == argc) error("missing argument");
             setRPath = true;
             newRPath = argv[i];
         }
-        else if (arg == "--delete-rpath" || arg == "-D") {
+        else if (arg == "--delete-rpath"
+              || arg == "-D") {
             deleteRPath = true;
         }
-        else if (arg == "--print-rpath" || arg == "-p") {
+        else if (arg == "--print-rpath"
+              || arg == "-p") {
             printRPath = true;
         }
-        else if (arg == "--print-rpath-type" || arg == "--rpath-type" || arg == "-t") {
+        else if (arg == "--print-rpath-type"
+              || arg == "--rpath-type"
+              || arg == "-t") {
             printRPathType = true;
         }
-        else if (arg == "--convert-rpath" || arg == "--convert" || arg == "-c") {
+        else if (arg == "--convert-rpath"
+              || arg == "--convert"
+              || arg == "-c") {
             convertRPath = true;
         }
-        else if (arg == "--shrink-rpath" || arg == "-s") {
+        else if (arg == "--shrink-rpath"
+              || arg == "-s") {
             shrinkRPath = true;
         }
-        else if (arg == "--force-rpath" || arg == "-f") {
+        else if (arg == "--force-rpath"
+              || arg == "-f") {
             /* Generally we prefer to emit DT_RUNPATH instead of
                DT_RPATH, as the latter is obsolete.  However, there is
                a slight semantic difference: DT_RUNPATH is "scoped",
@@ -1708,53 +1501,67 @@ int main(int argc, char * * argv)
                added. */
             forceRPath = true;
         }
-        else if (arg == "--add-needed" || arg == "-a") {
+        else if (arg == "--add-needed"
+              || arg == "-a") {
             if (++i == argc) error("missing argument");
             neededLibsToAdd.insert(argv[i]);
         }
-        else if (arg == "--remove-needed" || arg == "-r") {
+        else if (arg == "--remove-needed"
+              || arg == "-r") {
             if (++i == argc) error("missing argument");
             neededLibsToRemove.insert(argv[i]);
         }
-        else if (arg == "--add-needed-list" || arg == "--add-list" || arg == "-l") {
+        else if (arg == "--add-needed-list"
+              || arg == "--add-list"
+              || arg == "-l") {
             if (++i == argc) error("missing argument");
             vector<string> v;
             split(argv[i], ',', v);
             for (int i = 0; i < v.size( ); ++i)
                 if (v[i] != "") neededLibsToAdd.insert(v[i]);
         }
-        else if (arg == "--remove-needed-list" || arg == "--remove-list" || arg == "-L") {
+        else if (arg == "--remove-needed-list"
+              || arg == "--remove-list"
+              || arg == "-L") {
             if (++i == argc) error("missing argument");
             vector<string> v;
             split(argv[i], ',', v);
             for (int i = 0; i < v.size( ); ++i)
                 neededLibsToRemove.insert(v[i]);
         }
-        else if (arg == "--replace-needed" || arg == "-n") {
+        else if (arg == "--replace-needed"
+              || arg == "-n") {
             if (i+2 >= argc) error("missing argument(s)");
             neededLibsToReplace[ argv[i+1] ] = argv[i+2];
             i += 2;
         }
-        else if (arg == "--set-soname" || arg == "--soname" || arg == "-S") {
+        else if (arg == "--set-soname"
+              || arg == "--soname"
+              || arg == "-S") {
             if (++i == argc) error("missing argument");
             sonameToReplace = argv[i];
         }
-        else if (arg == "--print-soname" || arg == "-P") {
+        else if (arg == "--print-soname"
+              || arg == "-P") {
             printSoname = true;
         }
-        else if (arg == "--backup" || arg == "-b") {
+        else if (arg == "--backup"
+              || arg == "-b") {
             saveBackup = true;
         }
-        else if (arg == "--debug" || arg == "-d") {
+        else if (arg == "--debug"
+              || arg == "-d") {
             debugMode = true;
         }
         else if (arg == "--help" || arg == "-h") {
             showHelp(argv[0]);
             return 0;
         }
-        else if (arg == "--version" || arg == "-V" || arg == "-v") {
-            /* '-v' is a "hidden alias" for '-V'.
-               It's not listed in showInfo() or showHelp(). */
+        /* '-v' is a "hidden alias" for '-V'.
+            It's not listed in showInfo() or showHelp(). */
+        else if (arg == "--version"
+              || arg == "-V"
+              || arg == "-v") {
             printf(PACKAGE_STRING "\n\n"
                    /*
                    Copyright and license text is defined
