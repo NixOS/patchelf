@@ -21,14 +21,15 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#define COPYRIGHT "\n\
-Copyright (c) 2004-2014  Eelco Dolstra <eelco.dolstra@logicblox.com>\n\
+#define COPYRIGHT \
+"Copyright (c) 2004-2014  Eelco Dolstra <eelco.dolstra@logicblox.com>\n\
               2011       Zack Weinberg\n\
               2013       rgcjonas\n\
-              2014       djcj <djcj@gmx.de>\n\
-This program is free software; you may redistribute it under the terms of\n\
+              2014       djcj <djcj@gmx.de>\n"
+
+#define LICENSE "This program is free software; you may redistribute it under the terms of\n\
 the GNU General Public License version 3 or (at your option) any later version.\n\
-This program has absolutely no warranty."
+This program has absolutely no warranty.\n"
 
 
 #include <assert.h>
@@ -1754,9 +1755,14 @@ int main(int argc, char * * argv)
         else if (arg == "--version" || arg == "-V" || arg == "-v") {
             /* '-v' is a "hidden alias" for '-V'.
                It's not listed in showInfo() or showHelp(). */
-            printf(PACKAGE_STRING "\n"
-            /* Copyright text is defined at the head of this file */
-                   COPYRIGHT "\n");
+            printf(PACKAGE_STRING "\n\n"
+                   /*
+                   Copyright and license text is defined
+                   at the head of this file */
+                   COPYRIGHT
+                   PACKAGE_BUGREPORT "\n\n"
+                   LICENSE
+                   );
             return 0;
         }
         else break;

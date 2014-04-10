@@ -1,4 +1,4 @@
-AC_INIT([PatchELFmod], m4_esyscmd([echo -n $(cat ./version)]))
+AC_INIT([PatchELFmod], m4_esyscmd([echo -n $(cat ./version)]), [https://github.com/darealshinji/patchelfmod])
 
 AC_CONFIG_SRCDIR([src/patchelfmod.cpp])
 
