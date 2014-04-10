@@ -894,7 +894,12 @@ string ElfFile<ElfFileParamNames>::getSoname()
             break;
         }
     }
-    return soname;
+    if (rdi(dynSoname->d_tag) == DT_NULL) {
+        error("Specified ELF file does not contain any DT_SONAME entry in .dynamic section!");
+    }
+    else {
+        return soname;
+    }
 }
 
 template<ElfFileParams>
@@ -913,6 +918,9 @@ void ElfFile<ElfFileParamNames>::setSoname(const string & newSoname)
             break;
         }
     }
+    if (rdi(dynSoname->d_tag) == DT_NULL)
+        error("Specified ELF file does not contain any DT_SONAME entry in .dynamic section!");
+
     if (newSoname.size() <= strlen(soname)) {
         debug("old soname: `%s', new soname: `%s'\n", soname, newSoname.c_str());
         strcpy(soname, newSoname.c_str());
