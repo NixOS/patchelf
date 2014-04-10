@@ -1238,7 +1238,7 @@ void showHelp(const string & progName)
   [--set-interpreter FILENAME]\n\
   [--print-interpreter]\n\
   [--print-soname]\n\
-  [--set-soname]\n\
+  [--set-soname] SONAME\n\
   [--set-rpath RPATH]\n\
   [--shrink-rpath]\n\
   [--print-rpath]\n\
