@@ -48,6 +48,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 * '--with-gold-support' makes the 'hacky support' for executables
   created by the Gold linker now optional.
 * Put soname functions into single void.
+* Move some code to header file.
 
 0.9 (April 06, 2014):
 * Fork "PatchELF" and rename project to "PatchELFmod".
