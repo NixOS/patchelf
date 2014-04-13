@@ -1249,7 +1249,6 @@ static void patchElfmod()
 
     readFile(fileName, &fileMode);
 
-
     /* Check the ELF header for basic validity. */
     if (fileSize < (off_t) sizeof(Elf32_Ehdr)) error("missing ELF header");
 
@@ -1565,7 +1564,7 @@ int main(int argc, char * * argv)
             printf(PACKAGE_STRING "\n\n"
                    /*
                    Copyright and license text is defined
-                   at the head of this file */
+                   in patchelfmod.h */
                    COPYRIGHT
                    PACKAGE_BUGREPORT "\n\n"
                    LICENSE
