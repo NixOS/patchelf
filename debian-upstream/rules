@@ -3,9 +3,6 @@
 %:
 	dh $@ --parallel --with autoreconf
 
-override_dh_autoreconf:
-	./bootstrap.sh
-
 override_dh_strip:
 	dh_strip --dbg-package=patchelfmod-dbg
 

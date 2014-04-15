@@ -1,9 +1,6 @@
 .\" The 'options' section of this manpage was
 .\" generated with help2man 1.43.3.
 .\"
-.\" Process this file with
-.\" groff -man -Tascii patchelfmod.1
-.\"
 .TH PATCHELFMOD "1" "APRIL 2014" "@PACKAGE_VERSION@"
 .SH NAME
 PatchELFmod - Modify ELF files
@@ -146,7 +143,7 @@ with a larger path than the original is used).
 This appears to be a bug in binutils.
 
 .SH COPYRIGHT
-Copyright \(co  2004\-2014 Eelco Dolstra <eelco.dolstra@logicblox.com>,  2011 Zack Weinberg,  2013 rgcjonas,  2014 djcj <djcj@gmx.de>
+Copyright \(co  2004\-2014 Eelco Dolstra <eelco.dolstra@logicblox.com>,  2011 Zack Weinberg,  2012 vdanjean,  2013 rgcjonas,  2014 djcj <djcj@gmx.de>
 .PP
 This program is free software; you may redistribute it under the terms of
 the GNU General Public License version 3 or (at your option) any later version.
