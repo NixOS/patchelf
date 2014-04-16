@@ -8,9 +8,7 @@ cp no-rpath ${SCRATCH}/
 
 oldRPath=$(../src/patchelfmod --print-rpath ${SCRATCH}/no-rpath)
 if test -n "$oldRPath"; then exit 1; fi
-../src/patchelfmod \
-  --set-interpreter "$(../src/patchelf --print-interpreter ../src/patchelf)" \
-  --set-rpath /foo:/bar:/xxxxxxxxxxxxxxx ${SCRATCH}/no-rpath
+../src/patchelfmod --set-rpath /foo:/bar:/xxxxxxxxxxxxxxx ${SCRATCH}/no-rpath
 
 newRPath=$(../src/patchelfmod --print-rpath ${SCRATCH}/no-rpath)
 if ! echo "$newRPath" | grep -q '/foo:/bar'; then
