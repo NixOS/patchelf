@@ -1,11 +1,11 @@
-PatchELFmod
+PatchELF
 ===============
-**PatchELFmod** is a simple utility to modify header data of ELF executables
+**PatchELF** is a simple utility to modify header data of ELF executables
 and libraries. It can change the dynamic loader ("ELF interpreter")
 of executables, change existing DT_SONAME entries of shared libraries
 and manipulate the RPATH and DT_NEEDED entries of executables and libraries.
 
-Run `patchelfmod --help` or see the manpage (`man patchelfmod`) for more information.
+Run `patchelf --help` or see the manpage (`man patchelf`) for more information.
 
 
 **Installation:**<br>
@@ -17,7 +17,7 @@ make install
 ```
 
 
-**Homepage:** https://github.com/darealshinji/patchelfmod<br>
+**Homepage:** http://nixos.org/patchelf.html<br>
 
 
 **License:**<br>
@@ -39,31 +39,6 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
 **Release history:**
-
-0.10 (April 10, 2014):
-* '--backup' saves a backup before modifying a file.
-* '--delete-rpath' deletes RPATHs and RUNPATHs.
-* '--print-rpath-type' tells whether it's RPATH or RUNPATH.
-* '--convert-rpath' converts an existing DT_RPATH to DT_RUNPATH.
-* '--with-gold-support' makes the 'hacky support' for executables
-  created by the Gold linker now optional.
-* Put soname functions into single void.
-* Move some code to header file.
-
-0.9 (April 06, 2014):
-* Fork "PatchELF" and rename project to "PatchELFmod".
-* Add the following new options:
-  --add-needed & --replace-needed (contributed by rgcjonas),
-  --add-needed-list, --remove-needed-list,
-  --set-soname, --print-soname
-* Add short aliases for each option (-h, -I, -a, -S, ...)
-* Add tests for new options.
-* Changes in the no-rpath test (contributed by vdanjean),
-  but without multi-arch tests.
-* Add Debian folder.
-* Rewrite manpage from scratch.
-* Mentioning of ALL known authors.
-* Other changes.
 
 0.8 (January 15, 2014):
 * Fix a segfault caused by certain illegal entries in symbol tables.

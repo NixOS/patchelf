@@ -1,7 +1,7 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: patchelfmod
-Upstream-Contact: djcj <djcj@gmx.de>
-Source: https://github.com/darealshinji/patchelfmod
+Upstream-Name: patchelf
+Upstream-Contact: Eelco Dolstra <eelco.dolstra@logicblox.com>
+Source: https://github.com/NixOS/patchelf
 
 Files: *
 Copyright:

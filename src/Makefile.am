@@ -1,3 +1,3 @@
-bin_PROGRAMS = patchelfmod
+bin_PROGRAMS = patchelf
 
-patchelfmod_SOURCES = patchelfmod.cpp
+patchelf_SOURCES = patchelf.cpp

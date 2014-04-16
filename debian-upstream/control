@@ -1,14 +1,14 @@
-Source: patchelfmod
+Source: patchelf
 Priority: extra
-Maintainer: Marshall Banana <djcj@gmx.de>
+Maintainer: Eelco Dolstra <eelco.dolstra@logicblox.com>
 Build-Depends: debhelper (>= 9~),
                dh-autoreconf
 Standards-Version: 3.9.4
 Section: utils
-Homepage: https://github.com/darealshinji/patchelfmod
-Vcs-Git: https://github.com/darealshinji/patchelfmod.git
+Homepage: http://nixos.org/patchelf.html
+Vcs-Git: https://github.com/NixOS/patchelf.git
 
-Package: patchelfmod
+Package: patchelf
 Architecture: any
 Depends: ${shlibs:Depends},
          ${misc:Depends}
@@ -19,15 +19,15 @@ Description: utility for patching ELF binaries
  change existing DT_SONAME entries of shared libraries and manipulate
  the RPATH and DT_NEEDED entries of executables and libraries.
 
-Package: patchelfmod-dbg
+Package: patchelf-dbg
 Section: debug
 Architecture: any
 Depends: ${misc:Depends},
-         patchelfmod (= ${binary:Version})
+         patchelf (= ${binary:Version})
 Description: utility for patching ELF binaries - debug symbols
  Simple utility to modify header data of ELF executables and libraries.
  It can change the dynamic loader ("ELF interpreter") of executables,
  change existing DT_SONAME entries of shared libraries and manipulate
  the RPATH and DT_NEEDED entries of executables and libraries.
  .
- This package contains the debug symbols for PatchELFmod.
+ This package contains the debug symbols for PatchELF.

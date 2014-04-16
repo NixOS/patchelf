@@ -1,8 +1,8 @@
-AC_INIT([PatchELFmod],
+AC_INIT([PatchELF],
         m4_esyscmd([echo -n $(cat ./version)]),
-        [https://github.com/darealshinji/patchelfmod])
+        [https://github.com/NixOS/patchelf])
 
-AC_CONFIG_SRCDIR([src/patchelfmod.cpp])
+AC_CONFIG_SRCDIR([src/patchelf.cpp])
 
 AC_CONFIG_AUX_DIR([build-aux])
 AM_PROG_CC_C_O
@@ -33,7 +33,7 @@ AC_CHECK_FUNCS([memmove memset strchr])
 AC_CONFIG_FILES([Makefile \
                  src/Makefile \
                  tests/Makefile \
-                 man/patchelfmod.1 \
-                 patchelfmod.spec
+                 man/patchelf.1 \
+                 patchelf.spec
                  ])
 AC_OUTPUT

@@ -1,15 +1,15 @@
 .\" The 'options' section of this manpage was
 .\" generated with help2man 1.43.3.
 .\"
-.TH PATCHELFMOD "1" "APRIL 2014" "@PACKAGE_VERSION@"
+.TH PATCHELF "1" "APRIL 2014" "@PACKAGE_VERSION@"
 .SH NAME
-PatchELFmod - Modify ELF files
+PatchELF - Modify ELF files
 
 .SH SYNOPSIS
-.B patchelfmod \fR[options] <elffile>
+.B patchelf \fR[options] <elffile>
 
 .SH DESCRIPTION
-PatchELFmod is a simple utility to modify header data of ELF executables
+PatchELF is a simple utility to modify header data of ELF executables
 and libraries. It can change the dynamic loader ("ELF interpreter")
 of executables, change existing DT_SONAME entries of shared libraries
 and manipulate the RPATH and DT_NEEDED entries of executables and libraries.
@@ -118,7 +118,7 @@ suffix '~orig'.
 \fB\-d\fR, \fB\-\-debug\fR
 Print details of the changes made to the input file.
 Alternatively you can use the environment
-variable PATCHELFMOD_DEBUG.
+variable PATCHELF_DEBUG.
 .TP
 \fB\-w\fR, \fB\-\-with\-gold\-support\fR
 Support executables created by the Gold linker.

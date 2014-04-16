@@ -1,5 +1,5 @@
 /*
- *  PatchELFmod is a simple utility for modifing existing ELF executables
+ *  PatchELF is a simple utility for modifing existing ELF executables
  *  and libraries.
  *
  *  Copyright (c) 2004-2014  Eelco Dolstra <eelco.dolstra@logicblox.com>
@@ -40,7 +40,7 @@ This program has absolutely no warranty.\n"
  *   http://www.gnu.org/software/libc/index.html
  *   https://sourceware.org/git/?p=glibc.git;a=blob;f=elf/elf.h;hb=HEAD
  *
- *  Download it and place it in the directory of patchelfmod.cpp and
+ *  Download it and place it in the directory of patchelf.cpp and
  *  replace the line    #include <elf.h>    with    #include "elf.h"
  */
 #include <elf.h>
