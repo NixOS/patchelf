@@ -1045,7 +1045,7 @@ void ElfFile<ElfFileParamNames>::addRemoveNeeded(neededOp op, set<string> libs)
     unsigned int length = 0;
     for (set<string>::iterator it = libs.begin(); it != libs.end(); it++)
         length += it->size() + 1;
-    
+
     string & newDynStr = replaceSection(".dynstr",
         rdi(shdrDynStr.sh_size) + length + 1);
     set<Elf64_Xword> libStrings;
@@ -1056,7 +1056,7 @@ void ElfFile<ElfFileParamNames>::addRemoveNeeded(neededOp op, set<string> libs)
         libStrings.insert(rdi(shdrDynStr.sh_size) + pos);
         pos += it->size() + 1;
     }
-    
+
     /* add all new needed entries to the dynamic section */
     string & newDynamic = replaceSection(".dynamic",
         rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn) * libs.size());
@@ -1077,7 +1077,7 @@ void ElfFile<ElfFileParamNames>::addRemoveNeeded(neededOp op, set<string> libs)
         wri(newDyn.d_un.d_val, *it);
         setSubstr(newDynamic, i * sizeof(Elf_Dyn), string((char *) &newDyn, sizeof(Elf_Dyn)));
     }
-    
+
     changed = true;
 }
 
