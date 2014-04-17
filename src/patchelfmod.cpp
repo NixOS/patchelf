@@ -1132,14 +1132,17 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const string & sona
 
     Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
 
+    bool foundSoname = false;
     unsigned int dynStrAddedBytes = 0;
 
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_SONAME) {
             char * name = strTab + rdi(dyn->d_un.d_val);
-
-            if (op == printSoname)
+            if (op == printSoname) {
                 printf("%s\n", name);
+                foundSoname = true;
+                break;
+            }
             else if (op == replaceSoname) {
                 if (name != sonameToReplace) {
                     debug("replacing DT_SONAME entry `%s' with `%s'\n", name, sonameToReplace.c_str());
@@ -1161,8 +1164,10 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const string & sona
                 else debug("keeping DT_SONAME entry `%s'\n", name);
             }
         }
-        else debug("no DT_SONAME entry found\n");
     }
+
+    if (op == printSoname && !foundSoname)
+        debug("no DT_SONAME entry found\n");
 }
 
 
