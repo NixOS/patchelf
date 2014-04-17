@@ -199,9 +199,9 @@ public:
 
     void modifyRPath(RPathOp op, string newRPath);
 
-    void addNeeded(set<string> libs);
+    typedef enum { addNeeded, removeNeeded } neededOp;
 
-    void removeNeeded(set<string> libs);
+    void addRemoveNeeded(neededOp op, set<string> libs);
 
     void replaceNeeded(map<string, string> & libs);
 
