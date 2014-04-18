@@ -484,11 +484,13 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
        of the uninitialised data segment, the bigger the hole. */
     if (isExecutable && goldSupport) {
         if (startOffset >= startPage) {
-            debug("shifting new PT_LOAD segment by %d bytes to work around a Linux kernel bug\n", startOffset - startPage);
+            debug("shifting new PT_LOAD segment by %d bytes to work around a Linux kernel bug\n",
+                  startOffset - startPage);
         } else {
             size_t hole = startPage - startOffset;
             /* Print a warning, because the hole could be very big. */
-            fprintf(stderr, "warning: working around a Linux kernel bug by creating a hole of %zu bytes in ‘%s’\n", hole, fileName.c_str());
+            fprintf(stderr, "warning: working around a Linux kernel bug by creating a hole of "\
+                    "%zu bytes in ‘%s’\n", hole, fileName.c_str());
             assert(hole % pageSize == 0);
             /* !!! We could create an actual hole in the file here,
                but it's probably not worth the effort. */
@@ -736,13 +738,18 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
             unsigned int shndx = rdi(sym->st_shndx);
             if (shndx != SHN_UNDEF && shndx < SHN_LORESERVE) {
                 if (shndx >= sectionsByOldIndex.size()) {
-                    fprintf(stderr, "warning: entry %d in symbol table refers to a non-existent section, skipping\n", shndx);
+                    fprintf(stderr, "warning: entry %d in symbol table refers to a non-existent "\
+                            "section, skipping\n", shndx);
                     continue;
                 }
                 string section = sectionsByOldIndex.at(shndx);
                 assert(!section.empty());
                 unsigned int newIndex = findSection3(section); // inefficient
-                debug("rewriting symbol %d: index = %d (%s) -> %d\n", entry, shndx, section.c_str(), newIndex);
+                /* This is the only full-debug message at the moment,
+                   so for now there's no need for a full_debug void. */
+                if (debugModeFull)
+                    debug("rewriting symbol %d: index = %d (%s) -> %d\n", entry, shndx,
+                          section.c_str(), newIndex);
                 wri(sym->st_shndx, newIndex);
                 /* Rewrite st_value.  FIXME: we should do this for all
                    types, but most don't actually change. */
@@ -849,15 +856,19 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
 
 
     if (op == rpType) {
+        bool foundRPath = false;
         Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
         Elf_Dyn * last = dyn;
         for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
-            if (rdi(dyn->d_tag) == DT_RPATH)
+            if (rdi(dyn->d_tag) == DT_RPATH) {
                 printf("DT_RPATH\n");
-            else if (rdi(dyn->d_tag) == DT_RUNPATH)
+                foundRPath = true;
+            } else if (rdi(dyn->d_tag) == DT_RUNPATH) {
                 printf("DT_RUNPATH\n");
-            else debug("no RPATH found\n");
+                foundRPath = true;
+            }
         }
+        if (!foundRPath) debug("no RPATH found\n");
         return;
     }
 
@@ -1103,8 +1114,8 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(map<string, string> & libs)
                 
                 debug("replacing DT_NEEDED entry `%s' with `%s'\n", name, replacement.c_str());
                 
-                // technically, the string referred by d_val could be used otherwise, too (although unlikely)
-                // we'll therefore add a new string
+                // technically, the string referred by d_val could be used otherwise,
+                // too (although unlikely) we'll therefore add a new string
                 debug("resizing .dynstr ...");
                 
                 string & newDynStr = replaceSection(".dynstr",
@@ -1147,8 +1158,8 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const string & sona
                 if (name != sonameToReplace) {
                     debug("replacing DT_SONAME entry `%s' with `%s'\n", name, sonameToReplace.c_str());
 
-                    // technically, the string referred by d_val could be used otherwise, too (although unlikely)
-                    // we'll therefore add a new string
+                    // technically, the string referred by d_val could be used otherwise,
+                    // too (although unlikely) we'll therefore add a new string
                     debug("resizing .dynstr ...");
 
                     string & newDynStr = replaceSection(".dynstr",
@@ -1289,6 +1300,7 @@ void showInfo(const string & progName)
 \
   -b --backup\n\
   -d --debug\n\
+  -F --full-debug\n\
   -w --with-gold-support\n\
 \
   -h --help\n\
@@ -1376,8 +1388,8 @@ Other options:\n\n\
   -b, --backup                Save a backup of the unmodified file with the\n\
                               suffix '~orig'.\n\
   -d, --debug                 Print details of the changes made to the input file.\n\
-                              Alternatively you can use the environment\n\
-                              variable PATCHELFMOD_DEBUG.\n\
+  -F, --full-debug            Same as '--debug', but including information about\n\
+                              rewriting symbols, which can be quite a lot.\n\
   -w, --with-gold-support     Support executables created by the Gold linker.\n\n\
 \
                               These are marked as ET_DYN (not ET_EXEC) and have a\n\
@@ -1398,11 +1410,6 @@ int main(int argc, char * * argv)
         showInfo(argv[0]);
         return 1;
     }
-
-    /* Setting the environment variable to _anything_ will
-       activate debug mode. I currently don't know how to
-       make it deactivate when set to "0" or "false". */
-    if (getenv("PATCHELFMOD_DEBUG") != NULL) debugMode = true;
 
     int i;
     for (i = 1; i < argc; ++i) {
@@ -1533,6 +1540,11 @@ int main(int argc, char * * argv)
         else if (arg == "--debug"
               || arg == "-d") {
             debugMode = true;
+        }
+        else if (arg == "--full-debug"
+              || arg == "-F") {
+            debugMode = true;
+            debugModeFull = true;
         }
         else if (arg == "--help"
               || arg == "-h") {

@@ -117,8 +117,10 @@ suffix '~orig'.
 .TP
 \fB\-d\fR, \fB\-\-debug\fR
 Print details of the changes made to the input file.
-Alternatively you can use the environment
-variable PATCHELF_DEBUG.
+.TP
+\fB\-F\fR, \fB\-\-full\-debug\fR
+Same as '\-\-debug', but including information about
+rewriting symbols, which can be quite a lot.
 .TP
 \fB\-w\fR, \fB\-\-with\-gold\-support\fR
 Support executables created by the Gold linker.

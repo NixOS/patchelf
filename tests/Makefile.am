@@ -24,8 +24,6 @@ build_TESTS = \
 
 TESTS= $(src_TESTS) $(build_TESTS)
 
-TESTS_ENVIRONMENT = PATCHELF_DEBUG=1
-
 CLEANFILES = big-dynstr.c
 clean-local:
 	$(RM) -r scratch $(no_rpath_arch_TESTS)

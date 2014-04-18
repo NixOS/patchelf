@@ -11,7 +11,7 @@ cp libbar.so ${SCRATCH}/libs/
 cp libfoo.so ${SCRATCH}/libs/libfoo1.so
 cp libbar.so ${SCRATCH}/libs/libbar1.so
 
-../src/patchelf --add-needed libfoo1.so --add-needed libbar1.so ${SCRATCH}/simple
+../src/patchelf -d --add-needed libfoo1.so --add-needed libbar1.so ${SCRATCH}/simple
 
 export LD_LIBRARY_PATH=$(pwd)/${SCRATCH}/libs
 

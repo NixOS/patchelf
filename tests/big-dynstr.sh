@@ -10,9 +10,9 @@ cp big-dynstr ${SCRATCH}/
 cp libfoo.so ${SCRATCH}/libsA/
 cp libbar.so ${SCRATCH}/libsB/
 
-oldRPath=$(../src/patchelf --print-rpath ${SCRATCH}/big-dynstr)
+oldRPath=$(../src/patchelf -d --print-rpath ${SCRATCH}/big-dynstr)
 if test -z "$oldRPath"; then oldRPath="/oops"; fi
-../src/patchelf --force-rpath --set-rpath $oldRPath:$(pwd)/${SCRATCH}/libsA:$(pwd)/${SCRATCH}/libsB ${SCRATCH}/big-dynstr
+../src/patchelf -d --force-rpath --set-rpath $oldRPath:$(pwd)/${SCRATCH}/libsA:$(pwd)/${SCRATCH}/libsB ${SCRATCH}/big-dynstr
 
 if test "$(uname)" = FreeBSD; then
     export LD_LIBRARY_PATH=$(pwd)/${SCRATCH}/libsB

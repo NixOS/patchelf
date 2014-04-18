@@ -6,10 +6,10 @@ mkdir -p ${SCRATCH}
 
 cp main ${SCRATCH}/
 
-../src/patchelf --set-rpath /set/RPath ${SCRATCH}/main
+../src/patchelf -d --set-rpath /set/RPath ${SCRATCH}/main
 original=$(md5sum --binary ${SCRATCH}/main | cut -d ' ' -f1)
 
-../src/patchelf --backup --set-rpath /set/new/RPath ${SCRATCH}/main
+../src/patchelf -d --backup --set-rpath /set/new/RPath ${SCRATCH}/main
 backup=$(md5sum --binary ${SCRATCH}/main~orig | cut -d ' ' -f1)
 
 echo "md5 original: $original"
