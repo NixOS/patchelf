@@ -10,12 +10,12 @@ cp main ${SCRATCH}/
 cp libfoo.so ${SCRATCH}/libsA/
 cp libbar.so ${SCRATCH}/libsB/
 
-oldRPath=$(../src/patchelfmod --print-rpath ${SCRATCH}/main)
+oldRPath=$(../src/patchelfmod -d --print-rpath ${SCRATCH}/main)
 if test -z "$oldRPath"; then oldRPath="/oops"; fi
-../src/patchelfmod --force-rpath --set-rpath $oldRPath:$(pwd)/${SCRATCH}/libsA:$(pwd)/${SCRATCH}/libsB ${SCRATCH}/main
-../src/patchelfmod --force-rpath --set-rpath $oldRPath:$(pwd)/${SCRATCH}/libsA:$(pwd)/${SCRATCH}/libsB ${SCRATCH}/libsA/libfoo.so
+../src/patchelfmod -d --force-rpath --set-rpath $oldRPath:$(pwd)/${SCRATCH}/libsA:$(pwd)/${SCRATCH}/libsB ${SCRATCH}/main
+../src/patchelfmod -d --force-rpath --set-rpath $oldRPath:$(pwd)/${SCRATCH}/libsA:$(pwd)/${SCRATCH}/libsB ${SCRATCH}/libsA/libfoo.so
 
-RPathType=$(../src/patchelfmod --print-rpath-type ${SCRATCH}/main)
+RPathType=$(../src/patchelfmod -d --print-rpath-type ${SCRATCH}/main)
 if test "$RPathType" = "$(echo 'DT_RPATH')"; then
     echo "$RPathType"
 else
@@ -35,9 +35,9 @@ if test "$exitCode" != 46; then
     exit 1
 fi
 
-../src/patchelfmod --convert-rpath ${SCRATCH}/main
+../src/patchelfmod -d --convert-rpath ${SCRATCH}/main
 
-RPathType=$(../src/patchelfmod --print-rpath-type ${SCRATCH}/main)
+RPathType=$(../src/patchelfmod -d --print-rpath-type ${SCRATCH}/main)
 if test "$RPathType" = "$(echo 'DT_RUNPATH')"; then
     echo "$RPathType"
 else

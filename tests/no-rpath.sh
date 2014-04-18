@@ -6,11 +6,11 @@ mkdir -p ${SCRATCH}
 
 cp no-rpath ${SCRATCH}/
 
-oldRPath=$(../src/patchelfmod --print-rpath ${SCRATCH}/no-rpath)
+oldRPath=$(../src/patchelfmod -d --print-rpath ${SCRATCH}/no-rpath)
 if test -n "$oldRPath"; then exit 1; fi
-../src/patchelfmod --set-rpath /foo:/bar:/xxxxxxxxxxxxxxx ${SCRATCH}/no-rpath
+../src/patchelfmod -d --set-rpath /foo:/bar:/xxxxxxxxxxxxxxx ${SCRATCH}/no-rpath
 
-newRPath=$(../src/patchelfmod --print-rpath ${SCRATCH}/no-rpath)
+newRPath=$(../src/patchelfmod -d --print-rpath ${SCRATCH}/no-rpath)
 if ! echo "$newRPath" | grep -q '/foo:/bar'; then
     echo "incomplete RPATH"
     exit 1

@@ -6,8 +6,8 @@ mkdir -p ${SCRATCH}
 
 cp libbar.so ${SCRATCH}/
 
-../src/patchelfmod --delete-rpath ${SCRATCH}/libbar.so
-newRPath=$(../src/patchelfmod --print-rpath ${SCRATCH}/libbar.so)
+../src/patchelfmod -d --delete-rpath ${SCRATCH}/libbar.so
+newRPath=$(../src/patchelfmod -d --print-rpath ${SCRATCH}/libbar.so)
 
 if test "$newRPath" != ""; then
     echo "couldn't delete RPATH!"

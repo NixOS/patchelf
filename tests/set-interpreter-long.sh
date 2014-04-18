@@ -3,7 +3,7 @@ SCRATCH=scratch/$(basename $0 .sh)
 
 ./simple
 
-oldInterpreter=$(../src/patchelfmod --print-interpreter ./simple)
+oldInterpreter=$(../src/patchelfmod -d --print-interpreter ./simple)
 echo "current interpreter is $oldInterpreter"
 
 if test "$(uname)" = Linux; then
@@ -16,7 +16,7 @@ mkdir -p ${SCRATCH}
 
 newInterpreter=$(pwd)/${SCRATCH}/iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
 cp simple ${SCRATCH}/
-../src/patchelfmod --set-interpreter "$newInterpreter" ${SCRATCH}/simple
+../src/patchelfmod -d --set-interpreter "$newInterpreter" ${SCRATCH}/simple
 
 echo "running with missing interpreter..."
 if ${SCRATCH}/simple; then

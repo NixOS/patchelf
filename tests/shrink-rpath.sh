@@ -1,7 +1,7 @@
 #! /bin/sh -e
 SCRATCH=scratch/$(basename $0 .sh)
 
-rpath=$(../src/patchelfmod --print-rpath ./libbar.so)
+rpath=$(../src/patchelfmod -d --print-rpath ./libbar.so)
 echo "RPATH before: $rpath"
 if ! echo "$rpath" | grep -q /no-such-path; then
     echo "incomplete RPATH"
@@ -11,9 +11,9 @@ fi
 rm -rf ${SCRATCH}
 mkdir -p ${SCRATCH}
 cp libbar.so ${SCRATCH}/
-../src/patchelfmod --shrink-rpath ${SCRATCH}/libbar.so
+../src/patchelfmod -d --shrink-rpath ${SCRATCH}/libbar.so
 
-rpath=$(../src/patchelfmod --print-rpath ${SCRATCH}/libbar.so)
+rpath=$(../src/patchelfmod -d --print-rpath ${SCRATCH}/libbar.so)
 echo "RPATH after: $rpath"
 if echo "$rpath" | grep -q /no-such-path; then
     echo "RPATH not shrunk"

@@ -77,6 +77,8 @@ const unsigned int pageSize = 4096;
 
 static bool debugMode = false;
 
+static bool debugModeFull = false;
+
 static bool forceRPath = false;
 
 static bool goldSupport = false;
