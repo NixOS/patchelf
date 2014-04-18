@@ -40,6 +40,14 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 **Release history:**
 
+0.11 (April 19, 2014):
+* remove environment variable PATCHELFMOD_DEBUG
+* fix some debug messages
+* Add '--full-debug', which is the same as '--debug', but
+  including information about rewriting symbols, which can
+  be quite a lot
+* code optimization
+
 0.10 (April 10, 2014):
 * '--backup' saves a backup before modifying a file.
 * '--delete-rpath' deletes RPATHs and RUNPATHs.
