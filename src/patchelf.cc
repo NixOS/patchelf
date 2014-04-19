@@ -144,6 +144,10 @@ public:
 
     string getInterpreter();
 
+    string getSoname();
+
+    void setSoname(const string & newSoname);
+
     void setInterpreter(const string & newInterpreter);
 
     typedef enum { rpPrint, rpShrink, rpSet } RPathOp;
@@ -871,6 +875,89 @@ string ElfFile<ElfFileParamNames>::getInterpreter()
     return string((char *) contents + rdi(shdr.sh_offset), rdi(shdr.sh_size));
 }
 
+template<ElfFileParams>
+string ElfFile<ElfFileParamNames>::getSoname()
+{
+    Elf_Shdr & shdrDynamic = findSection(".dynamic");
+    Elf_Shdr & shdrDynStr = findSection(".dynstr");
+    char * strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
+
+    /* Find the DT_STRTAB entry in the dynamic section. */
+    Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+    Elf_Addr strTabAddr = 0;
+    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++)
+        if (rdi(dyn->d_tag) == DT_STRTAB) strTabAddr = rdi(dyn->d_un.d_ptr);
+    if (!strTabAddr) error("strange: no string table");
+
+    /* We assume that the virtual address in the DT_STRTAB entry
+       of the dynamic section corresponds to the .dynstr section. */
+    assert(strTabAddr == rdi(shdrDynStr.sh_addr));
+
+    Elf_Dyn * dynSoname = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+    char * soname = 0;
+    for ( ; rdi(dynSoname->d_tag) != DT_NULL; dynSoname++) {
+        if (rdi(dynSoname->d_tag) == DT_SONAME) {
+            soname = strTab + rdi(dynSoname->d_un.d_val);
+            break;
+        }
+    }
+    if (rdi(dynSoname->d_tag) == DT_NULL) {
+        error("Specified ELF file does not contain any DT_SONAME entry in .dynamic section!");
+    }
+    else {
+        return soname;
+    }
+}
+
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::setSoname(const string & newSoname)
+{
+    Elf_Shdr & shdrDynamic = findSection(".dynamic");
+    Elf_Shdr & shdrDynStr = findSection(".dynstr");
+    char * strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
+
+    /* Find the DT_STRTAB entry in the dynamic section. */
+    Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+    Elf_Addr strTabAddr = 0;
+    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++)
+        if (rdi(dyn->d_tag) == DT_STRTAB) strTabAddr = rdi(dyn->d_un.d_ptr);
+    if (!strTabAddr) error("strange: no string table");
+
+    /* We assume that the virtual address in the DT_STRTAB entry
+       of the dynamic section corresponds to the .dynstr section. */
+    assert(strTabAddr == rdi(shdrDynStr.sh_addr));
+
+    Elf_Dyn * dynSoname = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+    char * soname = 0;
+    for ( ; rdi(dynSoname->d_tag) != DT_NULL; dynSoname++) {
+        if (rdi(dynSoname->d_tag) == DT_SONAME) {
+            soname = strTab + rdi(dynSoname->d_un.d_val);
+            break;
+        }
+    }
+    if (rdi(dynSoname->d_tag) == DT_NULL)
+        error("Specified ELF file does not contain any DT_SONAME entry in .dynamic section!");
+
+    if (newSoname.size() <= strlen(soname)) {
+        debug("old soname: `%s', new soname: `%s'\n", soname, newSoname.c_str());
+        strcpy(soname, newSoname.c_str());
+        changed = true;
+    }
+    else {
+        /* Grow the .dynstr section to make room for the new DT_SONAME */
+        debug("new soname is too long, resizing .dynstr section...\n");
+
+        string & newDynStr = replaceSection(".dynstr",
+            rdi(shdrDynStr.sh_size) + newSoname.size() + 1);
+        setSubstr(newDynStr, rdi(shdrDynStr.sh_size), newSoname + '\0');
+        /* Update the DT_SONAME entry, if any */
+        if (dynSoname) {
+            debug("old soname: `%s', new soname: `%s'\n", soname, newSoname.c_str());
+            dynSoname->d_un.d_val = shdrDynStr.sh_size;
+            changed = true;
+        }
+    }
+}
 
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::setInterpreter(const string & newInterpreter)
@@ -1090,6 +1177,9 @@ void ElfFile<ElfFileParamNames>::removeNeeded(set<string> libs)
 
 
 static bool printInterpreter = false;
+static bool printSoname = false;
+static bool setSoname = false;
+static string newSoname;
 static string newInterpreter;
 
 static bool shrinkRPath = false;
@@ -1106,6 +1196,12 @@ static void patchElf2(ElfFile & elfFile, mode_t fileMode)
 
     if (printInterpreter)
         printf("%s\n", elfFile.getInterpreter().c_str());
+
+    if (printSoname)
+        printf("%s\n", elfFile.getSoname().c_str());
+
+    if (setSoname)
+        elfFile.setSoname(newSoname);
 
     if (newInterpreter != "")
         elfFile.setInterpreter(newInterpreter);
@@ -1129,7 +1225,7 @@ static void patchElf2(ElfFile & elfFile, mode_t fileMode)
 
 static void patchElf()
 {
-    if (!printInterpreter && !printRPath)
+    if (!printInterpreter && !printRPath && !printSoname)
         debug("patching ELF file `%s'\n", fileName.c_str());
 
     mode_t fileMode;
@@ -1166,6 +1262,8 @@ void showHelp(const string & progName)
         fprintf(stderr, "syntax: %s\n\
   [--set-interpreter FILENAME]\n\
   [--print-interpreter]\n\
+  [--print-soname]\t\tPrints 'DT_SONAME' entry of .dynamic section. Raises an error if DT_SONAME doesn't exist\n\
+  [--set-soname SONAME]\t\tSets 'DT_SONAME' entry to SONAME. Raises an error if DT_SONAME doesn't exist\n\
   [--set-rpath RPATH]\n\
   [--shrink-rpath]\n\
   [--print-rpath]\n\
@@ -1195,6 +1293,14 @@ int main(int argc, char * * argv)
         }
         else if (arg == "--print-interpreter") {
             printInterpreter = true;
+        }
+        else if (arg == "--print-soname") {
+            printSoname = true;
+        }
+        else if (arg == "--set-soname") {
+            if (++i == argc) error("missing argument");
+            setSoname = true;
+            newSoname = argv[i];
         }
         else if (arg == "--shrink-rpath") {
             shrinkRPath = true;
