@@ -1262,8 +1262,8 @@ void showHelp(const string & progName)
         fprintf(stderr, "syntax: %s\n\
   [--set-interpreter FILENAME]\n\
   [--print-interpreter]\n\
-  [--print-soname]\n\
-  [--set-soname] SONAME\n\
+  [--print-soname]\t\tPrints 'DT_SONAME' entry of .dynamic section. Raises an error if DT_SONAME doesn't exist\n\
+  [--set-soname SONAME]\t\tSets 'DT_SONAME' entry to SONAME. Raises an error if DT_SONAME doesn't exist\n\
   [--set-rpath RPATH]\n\
   [--shrink-rpath]\n\
   [--print-rpath]\n\
