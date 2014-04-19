@@ -35,14 +35,6 @@ This program has absolutely no warranty.\n"
 #include <assert.h>
 #include <algorithm>
 #include <errno.h>
-/*
- *  You can find the latest elf.h here if you need it:
- *   http://www.gnu.org/software/libc/index.html
- *   https://sourceware.org/git/?p=glibc.git;a=blob;f=elf/elf.h;hb=HEAD
- *
- *  Download it and place it in the directory of patchelfmod.cpp and
- *  replace the line    #include <elf.h>    with    #include "elf.h"
- */
 #include <elf.h>
 #include <fcntl.h>
 
