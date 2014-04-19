@@ -2,7 +2,7 @@ check_PROGRAMS = simple main main-scoped big-dynstr
 
 TESTS = plain-fail.sh plain-run.sh shrink-rpath.sh set-interpreter-short.sh \
   set-interpreter-long.sh set-rpath.sh no-rpath.sh big-dynstr.sh \
-  set-rpath-library.sh
+  set-rpath-library.sh soname.sh
 EXTRA_DIST = no-rpath $(TESTS)
 
 TESTS_ENVIRONMENT = PATCHELF_DEBUG=1
@@ -44,7 +44,7 @@ big_dynstr_LDFLAGS = $(LDFLAGS_local)
 # - without libtool, only archives (static libraries) can be built by automake
 # - with libtool, it is difficult to control options
 # - with libtool, it is not possible to compile convenience *dynamic* libraries :-(
-check_PROGRAMS += libfoo.so libfoo-scoped.so libbar.so libbar-scoped.so
+check_PROGRAMS += libfoo.so libfoo-scoped.so libbar.so libbar-scoped.so libsimple.so
 
 libfoo_so_SOURCES = foo.c
 libfoo_so_LDADD = -lbar $(AM_LDADD)
@@ -62,3 +62,5 @@ libbar_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-rpath,`pwd`/no-such-path
 libbar_scoped_so_SOURCES = bar.c
 libbar_scoped_so_LDFLAGS = $(LDFLAGS_sharedlib)
 
+libsimple_so_SOURCES = simple.c
+libsimple_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-soname,libsimple.so.1.0
