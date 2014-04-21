@@ -73,30 +73,19 @@ Convert an existing DT_RPATH to DT_RUNPATH.
 .PP
 DT_NEEDED options:
 .TP
-\fB\-a\fR, \fB\-\-add\-needed\fR <library>
+These options can be given multiple times.
+.TP
+\fB\-a\fR, \fB\-\-add\-needed\fR <library>[,<library>...]
 Add a dependency <library> on a dynamic library.
+Can be a single library or a comma seperated list.
 .TP
-\fB\-r\fR, \fB\-\-remove\-needed\fR <library>
+\fB\-r\fR, \fB\-\-remove\-needed\fR <library>[,<library>...]
 Remove a dependency <library> from a dynamic library.
-.TP
-\fB\-l\fR, \fB\-\-add\-needed\-list\fR <library1>,<library2>,...
-The same as '\-\-add\-needed', but with several dynamic
-libraries declared at once through a comma seperated list.
-.TP
-\fB    \-\-add\-list\fR <library1>,<library2>,...
-An alias for '\-\-add\-needed\-list'.
-.TP
-\fB\-L\fR, \fB\-\-remove\-needed\-list\fR <library1>,<library2>,...
-The same as '\-\-remove\-needed', but with several dynamic
-libraries declared at once through a comma seperated list.
-.TP
-\fB    \-\-remove\-list\fR <library1>,<library2>,...
-An alias for '\-\-remove\-needed\-list'.
+Can be a single library or a comma seperated list.
 .TP
 \fB\-n\fR, \fB\-\-replace\-needed\fR <library> <new\-library>
 Replace a dependency <library> on a dynamic library with
 a new dependency <new\-library>.
-This option can be given multiple times.
 .PP
 DT_SONAME options:
 .TP
