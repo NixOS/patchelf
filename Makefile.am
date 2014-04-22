@@ -1,7 +1,8 @@
 SUBDIRS = src tests
 
-EXTRA_DIST = COPYING README patchelf.spec version $(man1_MANS)
+man1_MANS = man/patchelf.1
 
-man1_MANS = patchelf.1
+doc_DATA = AUTHORS BUGS README.md
 
-doc_DATA = README
+strip: all
+	$(STRIP) src/patchelf

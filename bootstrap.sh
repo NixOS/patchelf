@@ -1,2 +1,7 @@
 #! /bin/sh -e
-autoreconf --verbose --install --force --warnings=all
+
+echo "Running autoreconf..."
+autoreconf -ivf "$@"
+
+echo "Now run './configure' and then 'make' to build PatchELF"
+

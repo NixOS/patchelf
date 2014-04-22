@@ -1,0 +1,11 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@ --parallel --with autoreconf
+
+override_dh_strip:
+	dh_strip --dbg-package=patchelf-dbg
+
+override_dh_installdocs:
+	dh_installdocs --link-doc=patchelf
+

@@ -4,3 +4,12 @@ Bug in Linux kernel, in fs/binfmt_elf.c:
 
 This is wrong since the actual virtual address of the program headers
 may be somewhere else.
+
+
+
+The `strip' command from binutils generated broken executables when
+applied to the output of patchelf (if `--set-rpath' or
+`--set-interpreter' with a larger path than the original is used).
+This appears to be a bug in binutils
+(http://bugs.strategoxt.org/browse/NIXPKGS-85).
+
