@@ -13,9 +13,7 @@ src_TESTS = plain-fail.sh \
             convert-rpath.sh \
             backup.sh \
             add-needed.sh \
-            add-needed-list.sh \
             remove-needed.sh \
-            remove-needed-list.sh \
             replace-needed.sh \
             set-soname.sh
 

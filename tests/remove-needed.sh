@@ -6,8 +6,11 @@ mkdir -p ${SCRATCH}
 
 cp simple ${SCRATCH}/
 
-../src/patchelf -d --add-needed-list libfoo0.so,libbar0.so ${SCRATCH}/simple
+../src/patchelf -d --add-needed libfoo0.so,libfoo1.so,libfoo2.so,libfoo3.so ${SCRATCH}/simple
+../src/patchelf -d --add-needed libbar0.so,libbar1.so,libbar2.so,libbar3.so ${SCRATCH}/simple
 ../src/patchelf -d --remove-needed libfoo0.so --remove-needed libbar0.so ${SCRATCH}/simple
+../src/patchelf -d --remove-needed libfoo1.so,libfoo2.so,libfoo3.so ${SCRATCH}/simple
+../src/patchelf -d --remove-needed libbar1.so,libbar2.so,libbar3.so ${SCRATCH}/simple
 
 export LD_LIBRARY_PATH=$(pwd)/${SCRATCH}/libs
 

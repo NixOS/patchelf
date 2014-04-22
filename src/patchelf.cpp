@@ -51,14 +51,20 @@ void split(const string & s, char c, vector<string> & v) {
     string::size_type i = 0;
     string::size_type j = s.find(c);
 
-    while (j != string::npos) {
-        v.push_back(s.substr(i, j-i));
-        i = ++j;
-        j = s.find(c, j);
+    /* check if string s even contains char c */
+    if (s.find(c) != string::npos) {
 
-       if (j == string::npos)
-           v.push_back(s.substr(i, s.length( )));
+        /* split the string */
+        while (j != string::npos) {
+            v.push_back(s.substr(i, j-i));
+            i = ++j;
+            j = s.find(c, j);
+
+           if (j == string::npos)
+               v.push_back(s.substr(i, s.length( )));
+        }
     }
+    else v.push_back(s);
 }
 
 
@@ -1301,7 +1307,7 @@ void showInfo(const string & progName)
   -b --backup\n\
   -d --debug\n\
   -F --full-debug\n\
-  -w --with-gold-support\n\
+  -w --with-gold-support\n\n\
 \
   -h --help\n\
   -V --version\n\n"
@@ -1354,22 +1360,12 @@ RPATH options:\n\n\
 \
 DT_NEEDED options:\n\n\
 \
-  -a, --add-needed <library>  Add a dependency <library> on a dynamic library.\n\
-  -r, --remove-needed <library>\n\
-                              Remove a dependency <library> from a dynamic library.\n\n\
-\
-  -l, --add-needed-list <library1>,<library2>,...\n\
-                              The same as '--add-needed', but with several dynamic\n\
-                              libraries declared at once through a comma seperated list.\n\
-      --add-list <library1>,<library2>,...\n\
-                              An alias for '--add-needed-list'.\n\n\
-\
-  -L, --remove-needed-list <library1>,<library2>,...\n\
-                              The same as '--remove-needed', but with several dynamic\n\
-                              libraries declared at once through a comma seperated list.\n\
-      --remove-list <library1>,<library2>,...\n\
-                              An alias for '--remove-needed-list'.\n\n\
-\
++  -a, --add-needed <library>[,<library>...]\n\
+                              Add a dependency <library> on a dynamic library.\n\
+                              Can be a single library or a comma seperated list.\n\
+  -r, --remove-needed <library>[,<library>...]\n\
+                              Remove a dependency <library> from a dynamic library.\n\
+                              Can be a single library or a comma seperated list.\n\
   -n, --replace-needed <library> <new-library>\n\
                               Replace a dependency <library> on a dynamic library with\n\
                               a new dependency <new-library>.\n\
@@ -1492,25 +1488,13 @@ int main(int argc, char * * argv)
         else if (arg == "--add-needed"
               || arg == "-a") {
             if (++i == argc) error("missing argument");
-            neededLibsToAdd.insert(argv[i]);
-        }
-        else if (arg == "--remove-needed"
-              || arg == "-r") {
-            if (++i == argc) error("missing argument");
-            neededLibsToRemove.insert(argv[i]);
-        }
-        else if (arg == "--add-needed-list"
-              || arg == "--add-list"
-              || arg == "-l") {
-            if (++i == argc) error("missing argument");
             vector<string> v;
             split(argv[i], ',', v);
             for (int i = 0; i < v.size( ); ++i)
                 if (v[i] != "") neededLibsToAdd.insert(v[i]);
         }
-        else if (arg == "--remove-needed-list"
-              || arg == "--remove-list"
-              || arg == "-L") {
+        else if (arg == "--remove-needed"
+              || arg == "-r") {
             if (++i == argc) error("missing argument");
             vector<string> v;
             split(argv[i], ',', v);
