@@ -1,3 +1,9 @@
+patchelfmod (0.12.1) unstable; urgency=low
+
+  * add changelog file
+
+ -- Marshall Banana <djcj@gmx.de>  Wed, 23 Apr 2014 02:53:00 +0100
+
 patchelfmod (0.12) unstable; urgency=low
 
   * '--add-needed' and '--remove-needed' can now handle comma

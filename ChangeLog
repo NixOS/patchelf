@@ -1,3 +1,6 @@
+0.12.1 (April 23, 2014):
+* add changelog file
+
 0.12 (April 23, 2014):
 * '--add-needed' and '--remove-needed' can now handle comma
   separated lists
