@@ -1,3 +1,10 @@
+patchelfmod (0.12) unstable; urgency=low
+
+  * '--add-needed' and '--remove-needed' can now handle comma
+    separated lists
+
+ -- Marshall Banana <djcj@gmx.de>  Wed, 23 Apr 2014 02:23:00 +0100
+
 patchelfmod (0.11) unstable; urgency=low
 
   * remove environment variable PATCHELFMOD_DEBUG

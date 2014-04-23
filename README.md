@@ -40,6 +40,10 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 **Release history:**
 
+0.12 (April 23, 2014):
+* '--add-needed' and '--remove-needed' can now handle comma
+  separated lists
+
 0.11 (April 19, 2014):
 * remove environment variable PATCHELFMOD_DEBUG
 * fix some debug messages
