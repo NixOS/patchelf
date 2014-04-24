@@ -2,6 +2,24 @@
 
 /aclocal.m4
 /configure
+/config.log
+/config.status
+/depcomp
+/install-sh
+/missing
 /build-aux/
 
+/patchelf.spec
+/src/patchelf
+
 Makefile.in
+Makefile
+
+.deps
+*.o
+
+/tests/*.log
+/tests/*.trs
+/tests/no-rpath
+/tests/no-rpath-*.sh
+/tests/*.so
