@@ -1,21 +1,50 @@
-check_PROGRAMS = simple main main-scoped big-dynstr
+check_PROGRAMS = simple main main-scoped big-dynstr no-rpath
 
-TESTS = plain-fail.sh plain-run.sh shrink-rpath.sh set-interpreter-short.sh \
+no_rpath_arch_TESTS = \
+  no-rpath-amd64.sh \
+  no-rpath-armel.sh \
+  no-rpath-armhf.sh \
+  no-rpath-hurd-i386.sh \
+  no-rpath-i386.sh \
+  no-rpath-ia64.sh \
+  no-rpath-kfreebsd-amd64.sh \
+  no-rpath-kfreebsd-i386.sh \
+  no-rpath-mips.sh \
+  no-rpath-mipsel.sh \
+  no-rpath-powerpc.sh \
+  no-rpath-s390.sh \
+  no-rpath-sh4.sh \
+  no-rpath-sparc.sh
+
+XFAIL_TESTS = no-rpath-ia64.sh
+
+src_TESTS = \
+  plain-fail.sh plain-run.sh shrink-rpath.sh set-interpreter-short.sh \
   set-interpreter-long.sh set-rpath.sh no-rpath.sh big-dynstr.sh \
   set-rpath-library.sh soname.sh
-EXTRA_DIST = no-rpath $(TESTS)
+
+build_TESTS = \
+  $(no_rpath_arch_TESTS)
+
+TESTS = $(src_TESTS) $(build_TESTS)
+
+EXTRA_DIST = no-rpath-prebuild $(src_TESTS) no-rpath-prebuild.sh
 
 TESTS_ENVIRONMENT = PATCHELF_DEBUG=1
 
+$(no_rpath_arch_TESTS): no-rpath-prebuild.sh
+	@ln -s $< $@
+
 CLEANFILES = big-dynstr.c
 clean-local:
-	$(RM) -r scratch
+	$(RM) -r scratch $(no_rpath_arch_TESTS)
 
 # by default, use -fpic to compile
 AM_CFLAGS = -fpic
 LDFLAGS_local = -Wl,--disable-new-dtags -Wl,-rpath-link=. -L. $(AM_LDFLAGS)
 LDFLAGS_sharedlib = -Wl,--disable-new-dtags -shared -L. $(AM_LDFLAGS)
 export NIX_DONT_SET_RPATH=1
+export NIX_LDFLAGS=
 
 simple_SOURCES = simple.c
 # no -fpic for simple.o
@@ -64,3 +93,7 @@ libbar_scoped_so_LDFLAGS = $(LDFLAGS_sharedlib)
 
 libsimple_so_SOURCES = simple.c
 libsimple_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-soname,libsimple.so.1.0
+
+no_rpath_SOURCES = no-rpath.c
+# no -fpic for no-rpath.o
+no_rpath_CFLAGS =
