@@ -3,9 +3,9 @@
  *  and libraries.
  *
  *  Copyright (c) 2004-2014  Eelco Dolstra <eelco.dolstra@logicblox.com>
- *                2011       Zack Weinberg
- *                2013       rgcjonas
  *                2014       djcj <djcj@gmx.de>
+ *
+ *  Contributors: Zack Weinberg, rgcjonas
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -21,7 +21,12 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+
+using namespace std;
+
+
 #include "patchelf.h"
+
 
 /* !!! G++ creates broken code if this function is inlined, don't know
    why... */
@@ -41,10 +46,6 @@ I ElfFile<ElfFileParamNames>::rdi(I i)
     }
     return r;
 }
-
-
-/* Ugly: used to erase DT_RUNPATH when using --force-rpath. */
-#define DT_IGNORE       0x00726e67
 
 
 void split(const string & s, char c, vector<string> & v) {
