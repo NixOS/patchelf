@@ -3,9 +3,9 @@
  *  and libraries.
  *
  *  Copyright (c) 2004-2014  Eelco Dolstra <eelco.dolstra@logicblox.com>
- *                2011       Zack Weinberg
- *                2013       rgcjonas
  *                2014       djcj <djcj@gmx.de>
+ *
+ *  Contributors: Zack Weinberg, rgcjonas
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -23,9 +23,9 @@
 
 #define COPYRIGHT \
 "Copyright (c) 2004-2014  Eelco Dolstra <eelco.dolstra@logicblox.com>\n\
-              2011       Zack Weinberg\n\
-              2013       rgcjonas\n\
-              2014       djcj <djcj@gmx.de>\n"
+              2014       djcj <djcj@gmx.de>\n\
+\
+Contributors: Zack Weinberg, rgcjonas\n"
 
 #define LICENSE "This program is free software; you may redistribute it under the terms of\n\
 the GNU General Public License version 3 or (at your option) any later version.\n\
@@ -56,7 +56,8 @@ This program has absolutely no warranty.\n"
 #include <vector>
 
 
-using namespace std;
+/* Ugly: used to erase DT_RUNPATH when using --force-rpath. */
+#define DT_IGNORE       0x00726e67
 
 
 #ifdef MIPSEL
