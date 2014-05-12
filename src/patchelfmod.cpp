@@ -1292,7 +1292,7 @@ void showInfo(const string & progName)
 }
 
 
-int showHelp(const string & progName)
+void showHelp(const string & progName)
 {
     printf("Syntax: %s [options] <elffile>\n\n"
 
@@ -1373,11 +1373,10 @@ int showHelp(const string & progName)
     "                              to the executable (potentially a lot of padding, if\n"
     "                              the executable has a large uninitialised data segment).\n"
     "\n", progName.c_str());
-    return 0;
 }
 
 
-int version()
+void version()
 {
     printf(PACKAGE_STRING "\n\n"
            /*
@@ -1387,7 +1386,6 @@ int version()
            PACKAGE_BUGREPORT "\n\n"
            LICENSE
            );
-    return 0;
 }
 
 
@@ -1421,6 +1419,7 @@ int main(int argc, char **argv)
         showInfo(argv[0]);
         return 1;
     }
+
     int i;
     for (i = 1; i < argc; ++i) {
         string arg(argv[i]);
@@ -1499,8 +1498,14 @@ int main(int argc, char **argv)
             debugMode = true;
             debugModeFull = true;
         }
-        else if h showHelp(argv[0]);
-        else if V version();
+        else if h {
+            showHelp(argv[0]);
+            return 0;
+        }
+        else if V {
+            version();
+            return 0;
+        }
         else break;
     }
 
