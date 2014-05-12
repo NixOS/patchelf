@@ -6,3 +6,5 @@ doc_DATA = AUTHORS BUGS README.md
 
 strip: all
 	$(STRIP) src/patchelfmod
+
+test: check

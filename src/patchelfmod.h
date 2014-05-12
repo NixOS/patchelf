@@ -69,11 +69,8 @@ const unsigned int pageSize = 4096;
 
 
 static bool debugMode = false;
-
 static bool debugModeFull = false;
-
 static bool forceRPath = false;
-
 static bool goldSupport = false;
 
 static string fileName;
@@ -129,6 +126,27 @@ public:
 
     void parse();
 
+    void rewriteSections();
+
+    string getInterpreter();
+
+    void setInterpreter(const string & newInterpreter);
+
+    typedef enum { rpPrint, rpType, rpShrink, rpSet, rpDelete,
+        rpConvert } RPathOp;
+
+    void modifyRPath(RPathOp op, string newRPath);
+
+    typedef enum { addNeeded, removeNeeded } neededOp;
+
+    void addRemoveNeeded(neededOp op, set<string> libs);
+
+    void replaceNeeded(map<string, string> & libs);
+
+    typedef enum { printSoname, replaceSoname } sonameMode;
+
+    void modifySoname(sonameMode op, const string & sonameToReplace);
+
 private:
 
     struct CompPhdr
@@ -180,31 +198,6 @@ private:
     void rewriteSectionsLibrary();
 
     void rewriteSectionsExecutable();
-
-public:
-
-    void rewriteSections();
-
-    string getInterpreter();
-
-    void setInterpreter(const string & newInterpreter);
-
-    typedef enum { rpPrint, rpType, rpShrink, rpSet, rpDelete,
-        rpConvert } RPathOp;
-
-    void modifyRPath(RPathOp op, string newRPath);
-
-    typedef enum { addNeeded, removeNeeded } neededOp;
-
-    void addRemoveNeeded(neededOp op, set<string> libs);
-
-    void replaceNeeded(map<string, string> & libs);
-
-    typedef enum { printSoname, replaceSoname } sonameMode;
-
-    void modifySoname(sonameMode op, const string & sonameToReplace);
-
-private:
 
     /* Convert an integer in big or little endian representation (as
        specified by the ELF header) to this platform's integer
