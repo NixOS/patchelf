@@ -38,18 +38,19 @@ This program has absolutely no warranty.\n"
 #include <elf.h>
 #include <fcntl.h>
 
+#include <getopt.h>
 #include <fstream>
 #include <functional>
 #include <iostream>
 #include <limits.h>
-#include <map>
 
+#include <map>
 #include <set>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -77,7 +78,7 @@ static string fileName;
 
 
 off_t fileSize, maxSize;
-unsigned char * contents = 0;
+unsigned char *contents = 0;
 
 
 #define ElfFileParams class Elf_Ehdr, class Elf_Phdr, class Elf_Shdr, class Elf_Addr, class Elf_Off, class Elf_Dyn, class Elf_Sym
@@ -87,7 +88,7 @@ unsigned char * contents = 0;
 template<ElfFileParams>
 class ElfFile
 {
-    Elf_Ehdr * hdr;
+    Elf_Ehdr *hdr;
     vector<Elf_Phdr> phdrs;
     vector<Elf_Shdr> shdrs;
 
@@ -130,7 +131,7 @@ public:
 
     string getInterpreter();
 
-    void setInterpreter(const string & newInterpreter);
+    void setInterpreter(const string &newInterpreter);
 
     typedef enum { rpPrint, rpType, rpShrink, rpSet, rpDelete,
         rpConvert } RPathOp;
@@ -141,18 +142,18 @@ public:
 
     void addRemoveNeeded(neededOp op, set<string> libs);
 
-    void replaceNeeded(map<string, string> & libs);
+    void replaceNeeded(string &libs);
 
     typedef enum { printSoname, replaceSoname } sonameMode;
 
-    void modifySoname(sonameMode op, const string & sonameToReplace);
+    void modifySoname(sonameMode op, const string &sonameToReplace);
 
 private:
 
     struct CompPhdr
     {
-        ElfFile * elfFile;
-        bool operator ()(const Elf_Phdr & x, const Elf_Phdr & y)
+        ElfFile *elfFile;
+        bool operator ()(const Elf_Phdr &x, const Elf_Phdr &y)
         {
             if (x.p_type == PT_PHDR) return true;
             if (y.p_type == PT_PHDR) return false;
@@ -166,8 +167,8 @@ private:
 
     struct CompShdr
     {
-        ElfFile * elfFile;
-        bool operator ()(const Elf_Shdr & x, const Elf_Shdr & y)
+        ElfFile *elfFile;
+        bool operator ()(const Elf_Shdr &x, const Elf_Shdr &y)
         {
             return elfFile->rdi(x.sh_offset) < elfFile->rdi(y.sh_offset);
         }
@@ -179,18 +180,18 @@ private:
 
     void shiftFile(unsigned int extraPages, Elf_Addr startPage);
 
-    string getSectionName(const Elf_Shdr & shdr);
+    string getSectionName(const Elf_Shdr &shdr);
 
-    Elf_Shdr & findSection(const SectionName & sectionName);
+    Elf_Shdr &findSection(const SectionName &sectionName);
 
-    Elf_Shdr * findSection2(const SectionName & sectionName);
+    Elf_Shdr *findSection2(const SectionName &sectionName);
 
-    unsigned int findSection3(const SectionName & sectionName);
+    unsigned int findSection3(const SectionName &sectionName);
 
-    string & replaceSection(const SectionName & sectionName,
+    string &replaceSection(const SectionName &sectionName,
         unsigned int size);
 
-    void writeReplacedSections(Elf_Off & curOff,
+    void writeReplacedSections(Elf_Off &curOff,
         Elf_Addr startAddr, Elf_Off startOffset);
 
     void rewriteHeaders(Elf_Addr phdrAddress);
@@ -207,7 +208,7 @@ private:
 
     /* Convert back to the ELF representation. */
     template<class I>
-    I wri(I & t, unsigned long long i)
+    I wri(I &t, unsigned long long i)
     {
         t = rdi((I) i);
         return i;
@@ -229,7 +230,7 @@ static bool deleteRPath = false;
 static bool convertRPath = false;
 
 static set<string> neededLibsToRemove;
-static map<string, string> neededLibsToReplace;
+static string neededLibsToReplace;
 static set<string> neededLibsToAdd;
 
 static string sonameToReplace;

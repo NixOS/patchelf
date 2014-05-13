@@ -48,7 +48,8 @@ I ElfFile<ElfFileParamNames>::rdi(I i)
 }
 
 
-void split(const string & s, char c, vector<string> & v) {
+vector<string> v;
+void split(const string &s, char c, vector<string> &v) {
     string::size_type i = 0;
     string::size_type j = s.find(c);
 
@@ -153,12 +154,12 @@ void ElfFile<ElfFileParamNames>::parse()
 
     /* Copy the program and section headers. */
     for (int i = 0; i < rdi(hdr->e_phnum); ++i) {
-        phdrs.push_back(* ((Elf_Phdr *) (contents + rdi(hdr->e_phoff)) + i));
+        phdrs.push_back(*((Elf_Phdr *) (contents + rdi(hdr->e_phoff)) + i));
         if (rdi(phdrs[i].p_type) == PT_INTERP) isExecutable = true;
     }
 
     for (int i = 0; i < rdi(hdr->e_shnum); ++i)
-        shdrs.push_back(* ((Elf_Shdr *) (contents + rdi(hdr->e_shoff)) + i));
+        shdrs.push_back(*((Elf_Shdr *) (contents + rdi(hdr->e_shoff)) + i));
 
     /* Get the section header string table section (".shstrtab").  Its
        index in the section header table is given by e_shstrndx field
@@ -321,7 +322,7 @@ void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, Elf_Addr sta
        PT_INTERP segment into memory.  Otherwise glibc will choke. */
     phdrs.resize(rdi(hdr->e_phnum) + 1);
     wri(hdr->e_phnum, rdi(hdr->e_phnum) + 1);
-    Elf_Phdr & phdr = phdrs[rdi(hdr->e_phnum) - 1];
+    Elf_Phdr &phdr = phdrs[rdi(hdr->e_phnum) - 1];
     wri(phdr.p_type, PT_LOAD);
     wri(phdr.p_offset, 0);
     wri(phdr.p_vaddr, wri(phdr.p_paddr, startPage));
@@ -332,14 +333,14 @@ void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, Elf_Addr sta
 
 
 template<ElfFileParams>
-string ElfFile<ElfFileParamNames>::getSectionName(const Elf_Shdr & shdr)
+string ElfFile<ElfFileParamNames>::getSectionName(const Elf_Shdr &shdr)
 {
     return string(sectionNames.c_str() + rdi(shdr.sh_name));
 }
 
 
 template<ElfFileParams>
-Elf_Shdr & ElfFile<ElfFileParamNames>::findSection(const SectionName & sectionName)
+Elf_Shdr &ElfFile<ElfFileParamNames>::findSection(const SectionName &sectionName)
 {
     Elf_Shdr *shdr = findSection2(sectionName);
     if (!shdr)
@@ -349,7 +350,7 @@ Elf_Shdr & ElfFile<ElfFileParamNames>::findSection(const SectionName & sectionNa
 
 
 template<ElfFileParams>
-Elf_Shdr *ElfFile<ElfFileParamNames>::findSection2(const SectionName & sectionName)
+Elf_Shdr *ElfFile<ElfFileParamNames>::findSection2(const SectionName &sectionName)
 {
     unsigned int i = findSection3(sectionName);
     return i ? &shdrs[i] : 0;
@@ -357,7 +358,7 @@ Elf_Shdr *ElfFile<ElfFileParamNames>::findSection2(const SectionName & sectionNa
 
 
 template<ElfFileParams>
-unsigned int ElfFile<ElfFileParamNames>::findSection3(const SectionName & sectionName)
+unsigned int ElfFile<ElfFileParamNames>::findSection3(const SectionName &sectionName)
 {
     for (unsigned int i = 1; i < rdi(hdr->e_shnum); ++i)
         if (getSectionName(shdrs[i]) == sectionName) return i;
@@ -366,7 +367,7 @@ unsigned int ElfFile<ElfFileParamNames>::findSection3(const SectionName & sectio
 
 
 template<ElfFileParams>
-string & ElfFile<ElfFileParamNames>::replaceSection(const SectionName & sectionName,
+string &ElfFile<ElfFileParamNames>::replaceSection(const SectionName &sectionName,
     unsigned int size)
 {
     ReplacedSections::iterator i = replacedSections.find(sectionName);
@@ -375,7 +376,7 @@ string & ElfFile<ElfFileParamNames>::replaceSection(const SectionName & sectionN
     if (i != replacedSections.end()) {
         s = string(i->second);
     } else {
-        Elf_Shdr & shdr = findSection(sectionName);
+        Elf_Shdr &shdr = findSection(sectionName);
         s = string((char *) contents + rdi(shdr.sh_offset), rdi(shdr.sh_size));
     }
 
@@ -387,7 +388,7 @@ string & ElfFile<ElfFileParamNames>::replaceSection(const SectionName & sectionN
 
 
 template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
+void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off &curOff,
     Elf_Addr startAddr, Elf_Off startOffset)
 {
     /* Overwrite the old section contents with 'X's.  Do this
@@ -397,7 +398,7 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
          i != replacedSections.end(); ++i)
     {
         string sectionName = i->first;
-        Elf_Shdr & shdr = findSection(sectionName);
+        Elf_Shdr &shdr = findSection(sectionName);
         memset(contents + rdi(shdr.sh_offset), 'X', rdi(shdr.sh_size));
     }
 
@@ -405,7 +406,7 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
          i != replacedSections.end(); ++i)
     {
         string sectionName = i->first;
-        Elf_Shdr & shdr = findSection(sectionName);
+        Elf_Shdr &shdr = findSection(sectionName);
         debug("rewriting section `%s' from offset 0x%x (size %d) to offset 0x%x (size %d)\n",
             sectionName.c_str(), rdi(shdr.sh_offset), rdi(shdr.sh_size), curOff, i->second.size());
 
@@ -512,7 +513,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
        headers into memory. */
     phdrs.resize(rdi(hdr->e_phnum) + 1);
     wri(hdr->e_phnum, rdi(hdr->e_phnum) + 1);
-    Elf_Phdr & phdr = phdrs[rdi(hdr->e_phnum) - 1];
+    Elf_Phdr &phdr = phdrs[rdi(hdr->e_phnum) - 1];
     wri(phdr.p_type, PT_LOAD);
     wri(phdr.p_offset, startOffset);
     wri(phdr.p_vaddr, wri(phdr.p_paddr, startPage));
@@ -565,7 +566,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
     Elf_Addr startAddr = rdi(shdrs[lastReplaced + 1].sh_addr);
     string prevSection;
     for (unsigned int i = 1; i <= lastReplaced; ++i) {
-        Elf_Shdr & shdr(shdrs[i]);
+        Elf_Shdr &shdr(shdrs[i]);
         string sectionName = getSectionName(shdr);
         debug("looking at section `%s'\n", sectionName.c_str());
         /* !!! Why do we stop after a .dynstr section? I can't
@@ -768,7 +769,7 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
 }
 
 
-static void setSubstr(string & s, unsigned int pos, const string & t)
+static void setSubstr(string &s, unsigned int pos, const string &t)
 {
     assert(pos + t.size() <= s.size());
     copy(t.begin(), t.end(), s.begin() + pos);
@@ -778,21 +779,21 @@ static void setSubstr(string & s, unsigned int pos, const string & t)
 template<ElfFileParams>
 string ElfFile<ElfFileParamNames>::getInterpreter()
 {
-    Elf_Shdr & shdr = findSection(".interp");
+    Elf_Shdr &shdr = findSection(".interp");
     return string((char *) contents + rdi(shdr.sh_offset), rdi(shdr.sh_size));
 }
 
 
 template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::setInterpreter(const string & newInterpreter)
+void ElfFile<ElfFileParamNames>::setInterpreter(const string &newInterpreter)
 {
-    string & section = replaceSection(".interp", newInterpreter.size() + 1);
+    string &section = replaceSection(".interp", newInterpreter.size() + 1);
     setSubstr(section, 0, newInterpreter + '\0');
     changed = true;
 }
 
 
-static void concatToRPath(string & rpath, const string & path)
+static void concatToRPath(string &rpath, const string &path)
 {
     if (!rpath.empty()) rpath += ":";
     rpath += path;
@@ -802,11 +803,11 @@ static void concatToRPath(string & rpath, const string & path)
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
 {
-    Elf_Shdr & shdrDynamic = findSection(".dynamic");
+    Elf_Shdr &shdrDynamic = findSection(".dynamic");
 
     /* !!! We assume that the virtual address in the DT_STRTAB entry
        of the dynamic section corresponds to the .dynstr section. */
-    Elf_Shdr & shdrDynStr = findSection(".dynstr");
+    Elf_Shdr &shdrDynStr = findSection(".dynstr");
     char *strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
 
     /* Find the DT_STRTAB entry in the dynamic section. */
@@ -996,7 +997,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
     /* Grow the .dynstr section to make room for the new RPATH. */
     debug("rpath is too long, resizing...\n");
 
-    string & newDynStr = replaceSection(".dynstr", rdi(shdrDynStr.sh_size) + newRPath.size() + 1);
+    string &newDynStr = replaceSection(".dynstr", rdi(shdrDynStr.sh_size) + newRPath.size() + 1);
     setSubstr(newDynStr, rdi(shdrDynStr.sh_size), newRPath + '\0');
 
     /* Update the DT_RUNPATH and DT_RPATH entries. */
@@ -1007,7 +1008,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
     else {
         /* There is no DT_RUNPATH entry in the .dynamic section, so we
            have to grow the .dynamic section. */
-        string & newDynamic = replaceSection(".dynamic",
+        string &newDynamic = replaceSection(".dynamic",
             rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn));
 
         unsigned int idx = 0;
@@ -1032,8 +1033,8 @@ void ElfFile<ElfFileParamNames>::addRemoveNeeded(neededOp op, set<string> libs)
 {
     if (libs.empty()) return;
 
-    Elf_Shdr & shdrDynamic = findSection(".dynamic");
-    Elf_Shdr & shdrDynStr = findSection(".dynstr");
+    Elf_Shdr &shdrDynamic = findSection(".dynamic");
+    Elf_Shdr &shdrDynStr = findSection(".dynstr");
     char *strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
 
     Elf_Dyn *dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
@@ -1064,7 +1065,7 @@ void ElfFile<ElfFileParamNames>::addRemoveNeeded(neededOp op, set<string> libs)
     for (set<string>::iterator it = libs.begin(); it != libs.end(); it++)
         length += it->size() + 1;
 
-    string & newDynStr = replaceSection(".dynstr",
+    string &newDynStr = replaceSection(".dynstr",
         rdi(shdrDynStr.sh_size) + length + 1);
     set<Elf64_Xword> libStrings;
 
@@ -1076,7 +1077,7 @@ void ElfFile<ElfFileParamNames>::addRemoveNeeded(neededOp op, set<string> libs)
     }
 
     /* add all new needed entries to the dynamic section */
-    string & newDynamic = replaceSection(".dynamic",
+    string &newDynamic = replaceSection(".dynamic",
         rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn) * libs.size());
 
     unsigned int idx = 0;
@@ -1101,38 +1102,42 @@ void ElfFile<ElfFileParamNames>::addRemoveNeeded(neededOp op, set<string> libs)
 
 
 template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::replaceNeeded(map<string, string> & libs)
+void ElfFile<ElfFileParamNames>::replaceNeeded(string &libs)
 {
     if (libs.empty()) return;
-    
-    Elf_Shdr & shdrDynamic = findSection(".dynamic");
-    Elf_Shdr & shdrDynStr = findSection(".dynstr");
+
+    split(libs, ',', v);
+    if (v[0] == "" || v[1] == "")
+        fprintf(stderr, "warning: empty argument in `%s'\n", libs.c_str());
+    const string &oldlib = v[0];
+    const string &replacement = v[1];
+
+    Elf_Shdr &shdrDynamic = findSection(".dynamic");
+    Elf_Shdr &shdrDynStr = findSection(".dynstr");
     char *strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
 
     Elf_Dyn *dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
-    
+
     unsigned int dynStrAddedBytes = 0;
-    
+
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_NEEDED) {
             char *name = strTab + rdi(dyn->d_un.d_val);
-            if (libs.find(name) != libs.end()) {
-                const string & replacement = libs[name];
-                
+            if (name == oldlib) {
                 debug("replacing DT_NEEDED entry `%s' with `%s'\n", name, replacement.c_str());
-                
+
                 // technically, the string referred by d_val could be used otherwise,
                 // too (although unlikely) we'll therefore add a new string
                 debug("resizing .dynstr ...");
-                
-                string & newDynStr = replaceSection(".dynstr",
+
+                string &newDynStr = replaceSection(".dynstr",
                     rdi(shdrDynStr.sh_size) + replacement.size() + 1 + dynStrAddedBytes);
                 setSubstr(newDynStr, rdi(shdrDynStr.sh_size) + dynStrAddedBytes, replacement + '\0');
-                
+
                 dyn->d_un.d_val = shdrDynStr.sh_size + dynStrAddedBytes;
-               
+
                 dynStrAddedBytes += replacement.size() + 1;
-                
+
                 changed = true;
             }
             else debug("keeping DT_NEEDED entry `%s'\n", name);
@@ -1142,10 +1147,10 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(map<string, string> & libs)
 
 
 template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const string & sonameToReplace)
+void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const string &sonameToReplace)
 {
-    Elf_Shdr & shdrDynamic = findSection(".dynamic");
-    Elf_Shdr & shdrDynStr = findSection(".dynstr");
+    Elf_Shdr &shdrDynamic = findSection(".dynamic");
+    Elf_Shdr &shdrDynStr = findSection(".dynstr");
     char *strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
 
     Elf_Dyn *dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
@@ -1169,7 +1174,7 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const string & sona
                     // too (although unlikely) we'll therefore add a new string
                     debug("resizing .dynstr ...");
 
-                    string & newDynStr = replaceSection(".dynstr",
+                    string &newDynStr = replaceSection(".dynstr",
                         rdi(shdrDynStr.sh_size) + sonameToReplace.size() + 1 + dynStrAddedBytes);
                     setSubstr(newDynStr, rdi(shdrDynStr.sh_size) + dynStrAddedBytes, sonameToReplace + '\0');
 
@@ -1190,7 +1195,7 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const string & sona
 
 
 template<class ElfFile>
-static void patchElfmod2(ElfFile & elfFile, mode_t fileMode)
+static void patchElfmod2(ElfFile &elfFile, mode_t fileMode)
 {
     elfFile.parse();
 
@@ -1251,7 +1256,7 @@ static void patchElfmod()
 }
 
 
-void showInfo(const string & progName)
+void usage(const string &progName)
 {
     fprintf(stderr,
     "Syntax: %s [options] <elffile>\n\n"
@@ -1274,7 +1279,7 @@ void showInfo(const string & progName)
 
     "  -a --add-needed <library>[,<library>...]\n"
     "  -r --remove-needed <library>[,<library>...]\n"
-    "  -n --replace-needed <library> <new-library>\n\n"
+    "  -n --replace-needed <library>,<new-library>\n\n"
 
     "  -S --set-soname <soname>\n"
     "     --soname <soname>\n"
@@ -1289,10 +1294,42 @@ void showInfo(const string & progName)
     "  -V --version\n\n"
 
     "Run '%s --help' for more information.\n", progName.c_str(), progName.c_str());
+    std::exit(1);
 }
 
 
-void showHelp(const string & progName)
+static struct option long_options[] = {
+    { "set-interpreter",   required_argument, 0, 'i' },
+    { "interpreter",       required_argument, 0, 'i' },
+    { "print-interpreter",       no_argument, 0, 'I' },
+    { "set-rpath",         required_argument, 0, 'R' },
+    { "rpath",             required_argument, 0, 'R' },
+    { "delete-rpath",            no_argument, 0, 'D' },
+    { "print-rpath",             no_argument, 0, 'p' },
+    { "print-rpath-type",        no_argument, 0, 't' },
+    { "type",                    no_argument, 0, 't' },
+    { "shrink-rpath",            no_argument, 0, 's' },
+    { "force-rpath",             no_argument, 0, 'f' },
+    { "convert-rpath",           no_argument, 0, 'c' },
+    { "convert",                 no_argument, 0, 'c' },
+    { "add-needed",        required_argument, 0, 'a' },
+    { "remove-needed",     required_argument, 0, 'r' },
+    { "replace-needed",    required_argument, 0, 'n' },
+    { "set-soname",        required_argument, 0, 'S' },
+    { "soname",            required_argument, 0, 'S' },
+    { "print-soname",            no_argument, 0, 'P' },
+    { "backup",                  no_argument, 0, 'b' },
+    { "debug",                   no_argument, 0, 'd' },
+    { "full-debug",              no_argument, 0, 'F' },
+    { "with-gold-support",       no_argument, 0, 'w' },
+    { "help",                    no_argument, 0, 'h' },
+    { "version",                 no_argument, 0, 'V' },
+    { "version",                 no_argument, 0, 'v' },
+    { 0, 0, 0, 0 }
+};
+
+
+void showHelp(const string &progName)
 {
     printf("Syntax: %s [options] <elffile>\n\n"
 
@@ -1338,13 +1375,14 @@ void showHelp(const string & progName)
 
     "  -a, --add-needed <library>[,<library>...]\n"
     "                              Add a dependency <library> on a dynamic library.\n"
-    "                              Can be a single library or a comma seperated list.\n"
+    "                              Can be a single library or a comma separated list.\n"
     "  -r, --remove-needed <library>[,<library>...]\n"
     "                              Remove a dependency <library> from a dynamic library.\n"
-    "                              Can be a single library or a comma seperated list.\n"
-    "  -n, --replace-needed <library> <new-library>\n"
+    "                              Can be a single library or a comma separated list.\n"
+    "  -n, --replace-needed <library>,<new-library>\n"
     "                              Replace a dependency <library> on a dynamic library with\n"
-    "                              a new dependency <new-library>.\n"
+    "                              a new dependency <new-library>. Arguments must be\n"
+    "                              separated by comma.\n"
     "                              This option can be given multiple times.\n\n\n"
 
 
@@ -1373,6 +1411,7 @@ void showHelp(const string & progName)
     "                              to the executable (potentially a lot of padding, if\n"
     "                              the executable has a large uninitialised data segment).\n"
     "\n", progName.c_str());
+    std::exit(1);
 }
 
 
@@ -1386,133 +1425,103 @@ void version()
            PACKAGE_BUGREPORT "\n\n"
            LICENSE
            );
+    std::exit(1);
 }
-
-
-#define  MISSARGUMENT  if (++i == argc) error("missing argument");
-#define   w  (arg == "--with-gold-support" || arg == "-w")
-#define   I  (arg == "--print-interpreter" || arg == "-I")
-#define  _i  (arg == "--set-interpreter"   || arg == "-i" || arg == "--interpreter")
-#define   R  (arg == "--set-rpath"         || arg == "-R" || arg == "--rpath")
-#define   D  (arg == "--delete-rpath"      || arg == "-D")
-#define   p  (arg == "--print-rpath"       || arg == "-p")
-#define   t  (arg == "--print-rpath-type"  || arg == "-t" || arg == "--rpath-type")
-#define   c  (arg == "--convert-rpath"     || arg == "-c" || arg == "--convert")
-#define   s  (arg == "--shrink-rpath"      || arg == "-s")
-#define   f  (arg == "--force-rpath"       || arg == "-f")
-#define   a  (arg == "--add-needed"        || arg == "-a")
-#define   r  (arg == "--remove-needed"     || arg == "-r")
-#define   n  (arg == "--replace-needed"    || arg == "-n")
-#define   S  (arg == "--set-soname"        || arg == "-S" || arg == "--soname")
-#define   P  (arg == "--print-soname"      || arg == "-P")
-#define   b  (arg == "--backup"            || arg == "-b")
-#define   d  (arg == "--debug"             || arg == "-d")
-#define   F  (arg == "--full-debug"        || arg == "-F")
-#define   h  (arg == "--help"              || arg == "-h")
-#define   V  (arg == "--version"           || arg == "-v" || arg == "-V")
-/* '-v' is a "hidden alias" for '-V'. It's not listed in showInfo() or showHelp(). */
 
 
 int main(int argc, char **argv)
 {
     if (argc <= 1) {
-        showInfo(argv[0]);
-        return 1;
+        usage(argv[0]);
     }
 
-    int i;
-    for (i = 1; i < argc; ++i) {
-        string arg(argv[i]);
-        vector<string> v;
-
-        if w goldSupport = true;
-            /* I don't know if this bug in the Linux kernel still
-               appears, so I made this workaround optional.
-
-               Here's some information about it from
-               a commentary in "rewriteSectionsLibrary()":
-                 Even though this file is of type ET_DYN, it could actually be
-                 an executable.  For instance, Gold produces executables marked
-                 ET_DYN.  In that case we can still hit the kernel bug that
-                 necessitated rewriteSectionsExecutable().  However, such
-                 executables also tend to start at virtual address 0, so
-                 rewriteSectionsExecutable() won't work because it doesn't have
-                 any virtual address space to grow downwards into.  As a
-                 workaround, make sure that the virtual address of our new
-                 PT_LOAD segment relative to the first PT_LOAD segment is equal
-                 to its offset; otherwise we hit the kernel bug.  This may
-                 require creating a hole in the executable.  The bigger the size
-                 of the uninitialised data segment, the bigger the hole. */
-        else if _i {
-            MISSARGUMENT
-            newInterpreter = argv[i];
+    int ch;
+    while ((ch = getopt_long(argc, argv, ":wbdfi:IR:Dptsca:r:n:S:PFhVv",
+                             long_options, NULL)) != -1) {
+        switch (ch)
+        {
+             case 'w':
+                 goldSupport = true;
+                 break;
+             case 'b':
+                 saveBackup = true;
+                 break;
+             case 'd':
+                 debugMode = true;
+                 break;
+             case 'F':
+                 debugMode = true;
+                 debugModeFull = true;
+                 break;
+             case 'h':
+                 usage(argv[0]);
+                 break;
+             case 'V':
+                 version();
+                 break;
+             case 'v':
+                 version();
+                 break;
+             case 'I':
+                 printInterpreter = true;
+                 break;
+             case 'i':
+                 newInterpreter = optarg;
+                 break;
+             case 'R':
+                 setRPath = true;
+                 newRPath = optarg;
+                 break;
+             case 'D':
+                 deleteRPath = true;
+                 break;
+             case 'p':
+                 printRPath = true;
+                 break;
+             case 't':
+                 printRPathType = true;
+                 break;
+             case 'c':
+                 convertRPath = true;
+                 break;
+             case 's':
+                 shrinkRPath = true;
+                 break;
+             case 'f':
+                 forceRPath = true;
+                 break;
+             case 'a':
+                 split(optarg, ',', v);
+                 for (int i = 0; i < v.size( ); ++i)
+                      if (v[i] != "") neededLibsToAdd.insert(v[i]);
+                 break;
+             case 'r':
+                 split(optarg, ',', v);
+                 for (int i = 0; i < v.size( ); ++i)
+                      neededLibsToRemove.insert(v[i]);
+                 break;
+             case 'n':
+                 neededLibsToReplace = optarg;
+                 break;
+             case 'S':
+                 sonameToReplace = optarg;
+                 break;
+             case 'P':
+                 printSoname = true;
+                 break;
+             default:
+                 fprintf(stderr, "missing or wrong argument(s)\n\n");
+                 usage(argv[0]);
+                 break;
         }
-        else if I printInterpreter = true;
-        else if R {
-            MISSARGUMENT
-            setRPath = true;
-            newRPath = argv[i];
-        }
-        else if D deleteRPath = true;
-        else if p printRPath = true;
-        else if t printRPathType = true;
-        else if c convertRPath = true;
-        else if s shrinkRPath = true;
-        else if f forceRPath = true;
-            /* Generally we prefer to emit DT_RUNPATH instead of
-               DT_RPATH, as the latter is obsolete.  However, there is
-               a slight semantic difference: DT_RUNPATH is "scoped",
-               it only affects the executable or library in question,
-               not its recursive imports.  So maybe you really want to
-               force the use of DT_RPATH.  That's what this option
-               does.  Without it, DT_RPATH (if encountered) is
-               converted to DT_RUNPATH, and if neither is present, a
-               DT_RUNPATH is added.  With it, DT_RPATH isn't converted
-               to DT_RUNPATH, and if neither is present, a DT_RPATH is
-               added. */
-        else if a {
-            MISSARGUMENT
-            split(argv[i], ',', v);
-            for (int i = 0; i < v.size( ); ++i)
-                if (v[i] != "") neededLibsToAdd.insert(v[i]);
-        }
-        else if r {
-            MISSARGUMENT
-            split(argv[i], ',', v);
-            for (int i = 0; i < v.size( ); ++i)
-                neededLibsToRemove.insert(v[i]);
-        }
-        else if n {
-            if (i+2 >= argc) error("missing argument(s)");
-            neededLibsToReplace[ argv[i+1] ] = argv[i+2];
-            i += 2;
-        }
-        else if S {
-            MISSARGUMENT
-            sonameToReplace = argv[i];
-        }
-        else if P printSoname = true;
-        else if b saveBackup = true;
-        else if d debugMode = true;
-        else if F {
-            debugMode = true;
-            debugModeFull = true;
-        }
-        else if h {
-            showHelp(argv[0]);
-            return 0;
-        }
-        else if V {
-            version();
-            return 0;
-        }
-        else break;
     }
 
-    if (i == argc) error("missing filename");
-    fileName = argv[i];
-
-    patchElfmod();
-
+    for (; optind < argc; ++optind)
+    {
+        char *file = argv[optind];
+        fileName = string(file);
+        patchElfmod();
     return 0;
+    }
 }
+

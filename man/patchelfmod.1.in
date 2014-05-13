@@ -83,9 +83,10 @@ Can be a single library or a comma seperated list.
 Remove a dependency <library> from a dynamic library.
 Can be a single library or a comma seperated list.
 .TP
-\fB\-n\fR, \fB\-\-replace\-needed\fR <library> <new\-library>
+\fB\-n\fR, \fB\-\-replace\-needed\fR <library>,<new\-library>
 Replace a dependency <library> on a dynamic library with
 a new dependency <new\-library>.
+Arguments must be separated by comma.
 .PP
 DT_SONAME options:
 .TP
