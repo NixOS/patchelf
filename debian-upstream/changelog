@@ -2,14 +2,14 @@ patchelfmod (0.12.1) unstable; urgency=low
 
   * add changelog file
 
- -- Marshall Banana <djcj@gmx.de>  Wed, 23 Apr 2014 02:53:00 +0100
+ -- Marshall Banana <djcj@gmx.de>  Wed, 23 Apr 2014 02:53:00 +0000
 
 patchelfmod (0.12) unstable; urgency=low
 
   * '--add-needed' and '--remove-needed' can now handle comma
     separated lists
 
- -- Marshall Banana <djcj@gmx.de>  Wed, 23 Apr 2014 02:23:00 +0100
+ -- Marshall Banana <djcj@gmx.de>  Wed, 23 Apr 2014 02:23:00 +0000
 
 patchelfmod (0.11) unstable; urgency=low
 
@@ -20,7 +20,7 @@ patchelfmod (0.11) unstable; urgency=low
     be quite a lot
   * code optimization
 
- -- Marshall Banana <djcj@gmx.de>  Sat, 19 Apr 2014 01:20:00 +0100
+ -- Marshall Banana <djcj@gmx.de>  Sat, 19 Apr 2014 01:20:00 +0000
 
 patchelfmod (0.10) unstable; urgency=low
 
@@ -34,7 +34,7 @@ patchelfmod (0.10) unstable; urgency=low
   * Put soname functions into single void.
   * Move some code to header file.
 
- -- Marshall Banana <djcj@gmx.de>  Thu, 10 Apr 2014 12:30:00 +0100
+ -- Marshall Banana <djcj@gmx.de>  Thu, 10 Apr 2014 12:30:00 +0000
 
 patchelfmod (0.9) unstable; urgency=low
 
@@ -52,7 +52,7 @@ patchelfmod (0.9) unstable; urgency=low
     * Mentioning of ALL known authors.
   * Some minor changes
 
- -- Marshall Banana <djcj@gmx.de>  Sun, 06 Apr 2014 15:00:00 +0100
+ -- Marshall Banana <djcj@gmx.de>  Sun, 06 Apr 2014 15:00:00 +0000
 
 patchelf (0.8) unstable; urgency=low
 

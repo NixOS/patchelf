@@ -130,22 +130,18 @@ public:
     void rewriteSections();
 
     string getInterpreter();
-
+    void printInterpreter();
     void setInterpreter(const string &newInterpreter);
 
     typedef enum { rpPrint, rpType, rpShrink, rpSet, rpDelete,
         rpConvert } RPathOp;
-
     void modifyRPath(RPathOp op, string newRPath);
 
     typedef enum { addNeeded, removeNeeded } neededOp;
-
     void addRemoveNeeded(neededOp op, set<string> libs);
-
     void replaceNeeded(string &libs);
 
     typedef enum { printSoname, replaceSoname } sonameMode;
-
     void modifySoname(sonameMode op, const string &sonameToReplace);
 
 private:
@@ -215,6 +211,7 @@ private:
     }
 };
 
+vector<string> v;
 
 static bool saveBackup = false;
 

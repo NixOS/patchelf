@@ -48,7 +48,6 @@ I ElfFile<ElfFileParamNames>::rdi(I i)
 }
 
 
-vector<string> v;
 void split(const string &s, char c, vector<string> &v) {
     string::size_type i = 0;
     string::size_type j = s.find(c);
@@ -785,6 +784,14 @@ string ElfFile<ElfFileParamNames>::getInterpreter()
 
 
 template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::printInterpreter()
+{
+    if (findSection2(".interp"))
+        printf("%s\n", getInterpreter().c_str());
+}
+
+
+template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::setInterpreter(const string &newInterpreter)
 {
     string &section = replaceSection(".interp", newInterpreter.size() + 1);
@@ -1199,26 +1206,23 @@ static void patchElfmod2(ElfFile &elfFile, mode_t fileMode)
 {
     elfFile.parse();
 
-    if (printInterpreter) printf("%s\n", elfFile.getInterpreter().c_str());
-    else if (newInterpreter != "")  elfFile.setInterpreter(newInterpreter);
-    else if (printRPath)            elfFile.modifyRPath(elfFile.rpPrint, "");
-    else if (printRPathType)        elfFile.modifyRPath(elfFile.rpType, "");
-    else if (shrinkRPath)           elfFile.modifyRPath(elfFile.rpShrink, "");
-    else if (setRPath)              elfFile.modifyRPath(elfFile.rpSet, newRPath);
-    else if (deleteRPath)           elfFile.modifyRPath(elfFile.rpDelete, "");
-    else if (convertRPath)          elfFile.modifyRPath(elfFile.rpConvert, "");
-    else if (!neededLibsToAdd.empty()) 
-                                    elfFile.addRemoveNeeded(elfFile.addNeeded, neededLibsToAdd);
-    else if (!neededLibsToRemove.empty()) 
-                                    elfFile.addRemoveNeeded(elfFile.removeNeeded, neededLibsToRemove);
-    else if (!neededLibsToReplace.empty())
-                                    elfFile.replaceNeeded(neededLibsToReplace);
-    else if (printSoname)           elfFile.modifySoname(elfFile.printSoname, "");
-    else if (sonameToReplace != "") elfFile.modifySoname(elfFile.replaceSoname, sonameToReplace);
+    if (printInterpreter) elfFile.printInterpreter();
+    if (printRPath)       elfFile.modifyRPath(elfFile.rpPrint, "");
+    if (printRPathType)   elfFile.modifyRPath(elfFile.rpType, "");
+    if (printSoname)      elfFile.modifySoname(elfFile.printSoname, "");
+
+    if (newInterpreter != "")              elfFile.setInterpreter(newInterpreter);
+    else if (shrinkRPath)                  elfFile.modifyRPath(elfFile.rpShrink, "");
+    else if (setRPath)                     elfFile.modifyRPath(elfFile.rpSet, newRPath);
+    else if (deleteRPath)                  elfFile.modifyRPath(elfFile.rpDelete, "");
+    else if (convertRPath)                 elfFile.modifyRPath(elfFile.rpConvert, "");
+    else if (!neededLibsToAdd.empty())     elfFile.addRemoveNeeded(elfFile.addNeeded, neededLibsToAdd);
+    else if (!neededLibsToRemove.empty())  elfFile.addRemoveNeeded(elfFile.removeNeeded, neededLibsToRemove);
+    else if (!neededLibsToReplace.empty()) elfFile.replaceNeeded(neededLibsToReplace);
+    else if (sonameToReplace != "")        elfFile.modifySoname(elfFile.replaceSoname, sonameToReplace);
 
     if (elfFile.isChanged()){
         if (saveBackup) writeFileBackup(fileName, fileMode);
-
         elfFile.rewriteSections();
         writeFile(fileName, fileMode);
     }
@@ -1411,7 +1415,7 @@ void showHelp(const string &progName)
     "                              to the executable (potentially a lot of padding, if\n"
     "                              the executable has a large uninitialised data segment).\n"
     "\n", progName.c_str());
-    std::exit(1);
+    std::exit(0);
 }
 
 
@@ -1425,7 +1429,7 @@ void version()
            PACKAGE_BUGREPORT "\n\n"
            LICENSE
            );
-    std::exit(1);
+    std::exit(0);
 }
 
 
@@ -1521,7 +1525,6 @@ int main(int argc, char **argv)
         char *file = argv[optind];
         fileName = string(file);
         patchElfmod();
-    return 0;
+        return 0;
     }
 }
-
