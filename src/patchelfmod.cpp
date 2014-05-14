@@ -1451,6 +1451,7 @@ void showHelp(const string &progName)
     "                              rewriting symbols, which can be quite a lot.\n"
     "  -A, --print-all             Runs all print options at once. This equals '-FIptPN'.\n"
     "  -w, --with-gold-support     Support executables created by the Gold linker.\n\n"
+
     "                              These are marked as ET_DYN (not ET_EXEC) and have a\n"
     "                              starting virtual address of 0 so they cannot grow\n"
     "                              downwards. In order not to run into a Linux kernel bug,\n"
