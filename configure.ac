@@ -18,7 +18,7 @@ AC_PROG_MAKE_SET
 
 # Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS([fcntl.h limits.h stdlib.h string.h unistd.h], [], [exit 0], [])
+AC_CHECK_HEADERS([fcntl.h getopt.h limits.h stdlib.h string.h unistd.h], [], [exit 0], [])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_HEADER_STDBOOL

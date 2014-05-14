@@ -752,8 +752,6 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                 string section = sectionsByOldIndex.at(shndx);
                 assert(!section.empty());
                 unsigned int newIndex = findSection3(section); // inefficient
-                /* This is the only full-debug message at the moment,
-                   so for now there's no need for a full_debug void. */
                 if (debugModeFull)
                     debug("rewriting symbol %d: index = %d (%s) -> %d\n", entry, shndx,
                           section.c_str(), newIndex);
@@ -786,8 +784,10 @@ string ElfFile<ElfFileParamNames>::getInterpreter()
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::printInterpreter()
 {
+    if (debugModeFull) debug("Interpreter: ");
     if (findSection2(".interp"))
         printf("%s\n", getInterpreter().c_str());
+    else debug("cannot find section .interp\n");
 }
 
 
@@ -858,12 +858,13 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
 
 
     if (op == rpPrint) {
+        if (debugModeFull) debug("RPATH: ");
         if (rpath) {
-            printf("%s", rpath ? rpath : "");
+            rpath ? rpath : "";
             if (string(rpath) == "")
                 debug("RPATH is empty\n");
             else
-                printf("\n");
+                printf("%s\n", rpath);
         }
         else debug("no RPATH found\n");
         return;
@@ -872,8 +873,11 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
 
     if (op == rpType) {
         bool foundRPath = false;
+
         Elf_Dyn *dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
         Elf_Dyn *last = dyn;
+
+        if (debugModeFull) debug("RPATH type: ");
         for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
             if (rdi(dyn->d_tag) == DT_RPATH) {
                 printf("DT_RPATH\n");
@@ -1165,6 +1169,8 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const string &sonam
     bool foundSoname = false;
     unsigned int dynStrAddedBytes = 0;
 
+    if (debugModeFull) debug("SONAME: ");
+
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_SONAME) {
             char *name = strTab + rdi(dyn->d_un.d_val);
@@ -1446,6 +1452,25 @@ int main(int argc, char **argv)
         {
              case 'w':
                  goldSupport = true;
+                 /*
+                   I don't know if this bug in the Linux kernel still
+                   appears, so I made this workaround optional.
+                   Here's some information about it from
+                   a commentary in "rewriteSectionsLibrary()":
+
+                   Even though this file is of type ET_DYN, it could actually be
+                   an executable.  For instance, Gold produces executables marked
+                   ET_DYN.  In that case we can still hit the kernel bug that
+                   necessitated rewriteSectionsExecutable().  However, such
+                   executables also tend to start at virtual address 0, so
+                   rewriteSectionsExecutable() won't work because it doesn't have
+                   any virtual address space to grow downwards into.  As a
+                   workaround, make sure that the virtual address of our new
+                   PT_LOAD segment relative to the first PT_LOAD segment is equal
+                   to its offset; otherwise we hit the kernel bug.  This may
+                   require creating a hole in the executable.  The bigger the size
+                   of the uninitialised data segment, the bigger the hole.
+                 */
                  break;
              case 'b':
                  saveBackup = true;
@@ -1493,6 +1518,19 @@ int main(int argc, char **argv)
                  break;
              case 'f':
                  forceRPath = true;
+                 /*
+                   Generally we prefer to emit DT_RUNPATH instead of
+                   DT_RPATH, as the latter is obsolete.  However, there is
+                   a slight semantic difference: DT_RUNPATH is "scoped",
+                   it only affects the executable or library in question,
+                   not its recursive imports.  So maybe you really want to
+                   force the use of DT_RPATH.  That's what this option
+                   does.  Without it, DT_RPATH (if encountered) is
+                   converted to DT_RUNPATH, and if neither is present, a
+                   DT_RUNPATH is added.  With it, DT_RPATH isn't converted
+                   to DT_RUNPATH, and if neither is present, a DT_RPATH is
+                   added.
+                 */
                  break;
              case 'a':
                  split(optarg, ',', v);
