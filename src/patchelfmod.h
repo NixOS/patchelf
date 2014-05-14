@@ -140,6 +140,7 @@ public:
     typedef enum { addNeeded, removeNeeded } neededOp;
     void addRemoveNeeded(neededOp op, set<string> libs);
     void replaceNeeded(string &libs);
+    void printNeededLibs();
 
     typedef enum { printSoname, replaceSoname } sonameMode;
     void modifySoname(sonameMode op, const string &sonameToReplace);
@@ -227,9 +228,12 @@ static bool deleteRPath = false;
 static bool convertRPath = false;
 
 static set<string> neededLibsToRemove;
-static string neededLibsToReplace;
 static set<string> neededLibsToAdd;
+static string neededLibsToReplace;
+static bool printNeeded = false;
 
 static string sonameToReplace;
 static bool printSoname = false;
+
+static bool printAll = false;
 

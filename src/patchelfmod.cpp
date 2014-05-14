@@ -1158,6 +1158,26 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(string &libs)
 
 
 template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::printNeededLibs()
+{
+    Elf_Shdr &shdrDynamic = findSection(".dynamic");
+    Elf_Shdr &shdrDynStr = findSection(".dynstr");
+    char *strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
+
+    Elf_Dyn *dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+
+    debug("DT_NEEDED entries:\n");
+    Elf_Dyn *last = dyn;
+    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+        if (rdi(dyn->d_tag) == DT_NEEDED) {
+            char *name = strTab + rdi(dyn->d_un.d_val);
+            printf("%s\n", name);
+        }
+    }
+}
+
+
+template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const string &sonameToReplace)
 {
     Elf_Shdr &shdrDynamic = findSection(".dynamic");
@@ -1170,7 +1190,6 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const string &sonam
     unsigned int dynStrAddedBytes = 0;
 
     if (debugModeFull) debug("SONAME: ");
-
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_SONAME) {
             char *name = strTab + rdi(dyn->d_un.d_val);
@@ -1212,10 +1231,22 @@ static void patchElfmod2(ElfFile &elfFile, mode_t fileMode)
 {
     elfFile.parse();
 
+    if (printAll)
+    {
+        debugMode = true;
+        debugModeFull = true;
+        printInterpreter = true;
+        printRPath = true;
+        printRPathType = true;
+        printSoname = true;
+        printNeeded = true;
+    }
+
     if (printInterpreter) elfFile.printInterpreter();
     if (printRPath)       elfFile.modifyRPath(elfFile.rpPrint, "");
     if (printRPathType)   elfFile.modifyRPath(elfFile.rpType, "");
     if (printSoname)      elfFile.modifySoname(elfFile.printSoname, "");
+    if (printNeeded)      elfFile.printNeededLibs();
 
     if (newInterpreter != "")              elfFile.setInterpreter(newInterpreter);
     else if (shrinkRPath)                  elfFile.modifyRPath(elfFile.rpShrink, "");
@@ -1227,7 +1258,8 @@ static void patchElfmod2(ElfFile &elfFile, mode_t fileMode)
     else if (!neededLibsToReplace.empty()) elfFile.replaceNeeded(neededLibsToReplace);
     else if (sonameToReplace != "")        elfFile.modifySoname(elfFile.replaceSoname, sonameToReplace);
 
-    if (elfFile.isChanged()){
+    if (elfFile.isChanged())
+    {
         if (saveBackup) writeFileBackup(fileName, fileMode);
         elfFile.rewriteSections();
         writeFile(fileName, fileMode);
@@ -1237,7 +1269,11 @@ static void patchElfmod2(ElfFile &elfFile, mode_t fileMode)
 
 static void patchElfmod()
 {
-    if (!printInterpreter && !printRPath && !printRPathType && !printSoname)
+    if (!printInterpreter &&
+        !printRPath &&
+        !printRPathType &&
+        !printSoname &&
+        !printNeeded)
         debug("patching ELF file `%s'\n", fileName.c_str());
 
     mode_t fileMode;
@@ -1304,7 +1340,7 @@ void usage(const string &progName)
     "  -V --version\n\n"
 
     "Run '%s --help' for more information.\n", progName.c_str(), progName.c_str());
-    std::exit(1);
+    std::exit(0);
 }
 
 
@@ -1325,9 +1361,11 @@ static struct option long_options[] = {
     { "add-needed",        required_argument, 0, 'a' },
     { "remove-needed",     required_argument, 0, 'r' },
     { "replace-needed",    required_argument, 0, 'n' },
+    { "print-needed",            no_argument, 0, 'N' },
     { "set-soname",        required_argument, 0, 'S' },
     { "soname",            required_argument, 0, 'S' },
     { "print-soname",            no_argument, 0, 'P' },
+    { "print-all",               no_argument, 0, 'A' },
     { "backup",                  no_argument, 0, 'b' },
     { "debug",                   no_argument, 0, 'd' },
     { "full-debug",              no_argument, 0, 'F' },
@@ -1393,7 +1431,8 @@ void showHelp(const string &progName)
     "                              Replace a dependency <library> on a dynamic library with\n"
     "                              a new dependency <new-library>. Arguments must be\n"
     "                              separated by comma.\n"
-    "                              This option can be given multiple times.\n\n\n"
+    "                              This option can be given multiple times.\n"
+    "  -N, --print-needed          Prints all DT_NEEDED entries.\n\n\n"
 
 
     "DT_SONAME options:\n\n"
@@ -1410,8 +1449,8 @@ void showHelp(const string &progName)
     "  -d, --debug                 Print details of the changes made to the input file.\n"
     "  -F, --full-debug            Same as '--debug', but including information about\n"
     "                              rewriting symbols, which can be quite a lot.\n"
+    "  -A, --print-all             Runs all print options at once. This equals '-FIptPN'.\n"
     "  -w, --with-gold-support     Support executables created by the Gold linker.\n\n"
-
     "                              These are marked as ET_DYN (not ET_EXEC) and have a\n"
     "                              starting virtual address of 0 so they cannot grow\n"
     "                              downwards. In order not to run into a Linux kernel bug,\n"
@@ -1421,7 +1460,7 @@ void showHelp(const string &progName)
     "                              to the executable (potentially a lot of padding, if\n"
     "                              the executable has a large uninitialised data segment).\n"
     "\n", progName.c_str());
-    std::exit(0);
+    std::exit(1);
 }
 
 
@@ -1435,7 +1474,7 @@ void version()
            PACKAGE_BUGREPORT "\n\n"
            LICENSE
            );
-    std::exit(0);
+    std::exit(1);
 }
 
 
@@ -1446,7 +1485,7 @@ int main(int argc, char **argv)
     }
 
     int ch;
-    while ((ch = getopt_long(argc, argv, ":wbdfi:IR:Dptsca:r:n:S:PFhVv",
+    while ((ch = getopt_long(argc, argv, ":wbdfi:IR:Dptsca:r:n:NS:PAFhVv",
                              long_options, NULL)) != -1) {
         switch (ch)
         {
@@ -1483,7 +1522,7 @@ int main(int argc, char **argv)
                  debugModeFull = true;
                  break;
              case 'h':
-                 usage(argv[0]);
+                 showHelp(argv[0]);
                  break;
              case 'V':
                  version();
@@ -1545,11 +1584,17 @@ int main(int argc, char **argv)
              case 'n':
                  neededLibsToReplace = optarg;
                  break;
+             case 'N':
+                 printNeeded = true;
+                 break;
              case 'S':
                  sonameToReplace = optarg;
                  break;
              case 'P':
                  printSoname = true;
+                 break;
+             case 'A':
+                 printAll = true;
                  break;
              default:
                  fprintf(stderr, "missing or wrong argument(s)\n\n");

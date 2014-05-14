@@ -87,6 +87,9 @@ Can be a single library or a comma seperated list.
 Replace a dependency <library> on a dynamic library with
 a new dependency <new\-library>.
 Arguments must be separated by comma.
+.TP
+\fB\-N\fR, \fB\-\-print\-needed\fR
+Prints all DT_NEEDED entries.
 .PP
 DT_SONAME options:
 .TP
@@ -111,6 +114,9 @@ Print details of the changes made to the input file.
 \fB\-F\fR, \fB\-\-full\-debug\fR
 Same as '\-\-debug', but including information about
 rewriting symbols, which can be quite a lot.
+.TP
+\fB\-A\fR, \fB\-\-print\-all\fR
+Runs all print options at once. This equals '\-FIptPN'.
 .TP
 \fB\-w\fR, \fB\-\-with\-gold\-support\fR
 Support executables created by the Gold linker.
@@ -148,4 +154,6 @@ This manpage was written by djcj <\fIdjcj@gmx.de\fR>.
 
 .SH "SEE ALSO"
 .BR elf (5),
-.BR ld.so (8)
+.BR execstack(8),
+.BR ld.so (8),
+.BR readelf (1)
