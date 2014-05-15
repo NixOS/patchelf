@@ -1,3 +1,13 @@
+patchelfmod (0.13) unstable; urgency=low
+
+  * parse arguments with getopt
+  * '--replace-needed' now requires comma-separated arguments
+  * enable parallel use of print options
+  * additional full-debug messages
+  * add '--print-needed' and '--print-all'
+
+ -- Marshall Banana <djcj@gmx.de>  Thu, 15 May 2014 06:05:28 +0200
+
 patchelfmod (0.12.1) unstable; urgency=low
 
   * add changelog file

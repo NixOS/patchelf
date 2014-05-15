@@ -1,3 +1,10 @@
+0.13 (May 15, 2014):
+* parse arguments with getopt
+* '--replace-needed' now requires comma-separated arguments
+* enable parallel use of print options
+* additional full-debug messages
+* add '--print-needed' and '--print-all'
+
 0.12.1 (April 23, 2014):
 * add changelog file
 
