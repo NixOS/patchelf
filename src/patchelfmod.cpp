@@ -863,8 +863,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
     if (op == rpPrint) {
         if (debugModeFull) debug("RPATH: ");
         if (rpath) {
-            rpath ? rpath : "";
-            if (string(rpath) == "")
+            if (string(rpath ? rpath : "") == "")
                 debug("RPATH is empty\n");
             else
                 printf("%s\n", rpath);
