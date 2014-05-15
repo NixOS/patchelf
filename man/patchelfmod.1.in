@@ -154,6 +154,6 @@ This manpage was written by djcj <\fIdjcj@gmx.de\fR>.
 
 .SH "SEE ALSO"
 .BR elf (5),
-.BR execstack(8),
+.BR execstack (8),
 .BR ld.so (8),
 .BR readelf (1)
