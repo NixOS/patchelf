@@ -843,13 +843,16 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
     dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
     Elf_Dyn *dynRPath = 0, *dynRunPath = 0;
     char *rpath = 0;
+    string RPathType = "";
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_RPATH) {
+            RPathType = "DT_RPATH";
             dynRPath = dyn;
             /* Only use DT_RPATH if there is no DT_RUNPATH. */
             if (!dynRunPath)
                 rpath = strTab + rdi(dyn->d_un.d_val);
         } else if (rdi(dyn->d_tag) == DT_RUNPATH) {
+            RPathType = "DT_RUNPATH";
             dynRunPath = dyn;
             rpath = strTab + rdi(dyn->d_un.d_val);
         } else if (rdi(dyn->d_tag) == DT_NEEDED)
@@ -872,22 +875,11 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
 
 
     if (op == rpType) {
-        bool foundRPath = false;
-
-        Elf_Dyn *dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
-        Elf_Dyn *last = dyn;
-
         if (debugModeFull) debug("RPATH type: ");
-        for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
-            if (rdi(dyn->d_tag) == DT_RPATH) {
-                printf("DT_RPATH\n");
-                foundRPath = true;
-            } else if (rdi(dyn->d_tag) == DT_RUNPATH) {
-                printf("DT_RUNPATH\n");
-                foundRPath = true;
-            }
-        }
-        if (!foundRPath) debug("no RPATH found\n");
+        if (rpath)
+            printf("%s\n", RPathType.c_str());
+        else
+            debug("no RPATH found\n");
         return;
     }
 
