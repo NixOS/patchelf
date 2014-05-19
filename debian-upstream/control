@@ -12,9 +12,9 @@ Package: patchelfmod
 Architecture: any
 Depends: ${shlibs:Depends},
          ${misc:Depends}
-Suggests: binutils
-Description: utility for patching ELF binaries
- Simple utility to modify header data of ELF executables and libraries.
+Suggests: binutils, execstack
+Description: modify properties of ELF binaries
+ Simple utility for modifing existing ELF executables and libraries.
  It can change the dynamic loader ("ELF interpreter") of executables,
  change existing DT_SONAME entries of shared libraries and manipulate
  the RPATH and DT_NEEDED entries of executables and libraries.
@@ -24,8 +24,8 @@ Section: debug
 Architecture: any
 Depends: ${misc:Depends},
          patchelfmod (= ${binary:Version})
-Description: utility for patching ELF binaries - debug symbols
- Simple utility to modify header data of ELF executables and libraries.
+Description: debug symbols for PatchELFmod
+ Simple utility for modifing existing ELF executables and libraries.
  It can change the dynamic loader ("ELF interpreter") of executables,
  change existing DT_SONAME entries of shared libraries and manipulate
  the RPATH and DT_NEEDED entries of executables and libraries.

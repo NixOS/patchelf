@@ -1,15 +1,12 @@
-.\" The 'options' section of this manpage was
-.\" generated with help2man 1.43.3.
-.\"
 .TH PATCHELFMOD "1" "APRIL 2014" "@PACKAGE_VERSION@"
 .SH NAME
-PatchELFmod - Modify ELF files
+PatchELFmod - modify properties of ELF binaries
 
 .SH SYNOPSIS
 .B patchelfmod \fR[options] <elffile>
 
 .SH DESCRIPTION
-PatchELFmod is a simple utility to modify header data of ELF executables
+PatchELFmod is a simple utility for modifing existing ELF executables
 and libraries. It can change the dynamic loader ("ELF interpreter")
 of executables, change existing DT_SONAME entries of shared libraries
 and manipulate the RPATH and DT_NEEDED entries of executables and libraries.
