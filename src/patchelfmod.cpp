@@ -1314,7 +1314,7 @@ void usage(const string &progName)
     "  -a --add-needed <library>[,<library>...]\n"
     "  -r --remove-needed <library>[,<library>...]\n"
     "  -n --replace-needed <library>,<new-library>\n"
-    "  -N --print-needed\n"
+    "  -N --print-needed\n\n"
 
     "  -S --set-soname <soname>\n"
     "     --soname <soname>\n"
