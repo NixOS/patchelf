@@ -1120,8 +1120,6 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(string &libs)
 
     Elf_Dyn *dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
 
-    unsigned int dynStrAddedBytes = 0;
-
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_NEEDED) {
             char *name = strTab + rdi(dyn->d_un.d_val);
@@ -1178,7 +1176,6 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const string &sonam
     Elf_Dyn *dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
 
     bool foundSoname = false;
-    unsigned int dynStrAddedBytes = 0;
 
     if (debugModeFull) debug("SONAME: ");
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
@@ -1306,17 +1303,18 @@ void usage(const string &progName)
     "  -R --set-rpath <rpath>\n"
     "     --rpath <rpath>\n"
     "  -D --delete-rpath\n"
+    "  -s --shrink-rpath\n"
     "  -p --print-rpath\n"
     "  -t --print-rpath-type\n"
     "     --type\n"
-    "  -s --shrink-rpath\n"
     "  -f --force-rpath\n"
     "  -c --convert-rpath\n"
     "     --convert\n\n"
 
     "  -a --add-needed <library>[,<library>...]\n"
     "  -r --remove-needed <library>[,<library>...]\n"
-    "  -n --replace-needed <library>,<new-library>\n\n"
+    "  -n --replace-needed <library>,<new-library>\n"
+    "  -N --print-needed\n"
 
     "  -S --set-soname <soname>\n"
     "     --soname <soname>\n"
@@ -1325,6 +1323,7 @@ void usage(const string &progName)
     "  -b --backup\n"
     "  -d --debug\n"
     "  -F --full-debug\n"
+    "  -A --print-all\n"
     "  -w --with-gold-support\n\n"
 
     "  -h --help\n"

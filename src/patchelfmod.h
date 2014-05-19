@@ -80,6 +80,8 @@ static string fileName;
 off_t fileSize, maxSize;
 unsigned char *contents = 0;
 
+unsigned int dynStrAddedBytes = 0;
+
 
 #define ElfFileParams class Elf_Ehdr, class Elf_Phdr, class Elf_Shdr, class Elf_Addr, class Elf_Off, class Elf_Dyn, class Elf_Sym
 #define ElfFileParamNames Elf_Ehdr, Elf_Phdr, Elf_Shdr, Elf_Addr, Elf_Off, Elf_Dyn, Elf_Sym

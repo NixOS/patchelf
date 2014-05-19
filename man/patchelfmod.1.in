@@ -20,8 +20,7 @@ Display usage information.
 .TP
 \fB\-V\fR, \fB\-\-version\fR
 Display program version number.
-.PP
-Dynamic loader options:
+.SS Dynamic loader options
 .TP
 \fB\-i\fR, \fB\-\-set\-interpreter\fR <interpreter>
 Change the dynamic loader ("ELF interpreter")
@@ -32,8 +31,7 @@ An alias for '\-\-set\-interpreter'.
 .TP
 \fB\-I\fR, \fB\-\-print\-interpreter\fR
 Print the ELF interpreter of an executable.
-.PP
-RPATH options:
+.SS RPATH options
 .TP
 \fB\-R\fR, \fB\-\-set\-rpath\fR <rpath>
 Change the RPATH of an executable or library to <rpath>.
@@ -50,7 +48,7 @@ a library referenced by DT_NEEDED fields of the executable
 or library.
 For instance, if an executable references one library
 libfoo.so, and has an RPATH "/lib:/usr/lib:/foo/lib",
-and libfoo.so can only be found in \fI/foo/lib\fP, then the
+and libfoo.so can only be found in /foo/lib, then the
 new RPATH will be "/foo/lib".
 .TP
 \fB\-p\fR, \fB\-\-print\-rpath\fR
@@ -70,8 +68,7 @@ By default DT_RPATH is converted to DT_RUNPATH.
 .TP
 \fB\-c\fR, \fB\-\-convert\-rpath\fR
 Convert an existing DT_RPATH to DT_RUNPATH.
-.PP
-DT_NEEDED options:
+.SS DT_NEEDED options
 .TP
 These options can be given multiple times.
 .TP
@@ -90,8 +87,7 @@ Arguments must be separated by comma.
 .TP
 \fB\-N\fR, \fB\-\-print\-needed\fR
 Prints all DT_NEEDED entries.
-.PP
-DT_SONAME options:
+.SS DT_SONAME options
 .TP
 \fB\-S\fR, \fB\-\-set\-soname\fR <soname>
 Change the DT_SONAME entry of a library to <soname>.
@@ -101,8 +97,7 @@ An alias for '\-\-replace\-soname'.
 .TP
 \fB\-P\fR, \fB\-\-print\-soname\fR
 Print the soname of a library.
-.PP
-Other options:
+.SS Other options
 .TP
 \fB\-b\fR, \fB\-\-backup\fR
 Save a backup of the unmodified file with the
@@ -150,7 +145,7 @@ This program is free software; you may redistribute it under the terms of
 the GNU General Public License version 3 or (at your option) any later version.
 This program has absolutely no warranty.
 .PP
-This manpage was written by djcj <\fIdjcj@gmx.de\fR>.
+This manpage was written by djcj <djcj@gmx.de>.
 
 .SH "SEE ALSO"
 .BR elf (5),
