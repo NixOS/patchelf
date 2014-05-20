@@ -1104,10 +1104,8 @@ void ElfFile<ElfFileParamNames>::addRemoveNeeded(neededOp op, set<string> libs)
 
 
 template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::replaceNeeded(string &libs)
+void ElfFile<ElfFileParamNames>::replaceNeeded(const string &libs)
 {
-    if (libs.empty()) return;
-
     split(libs, ',', v);
     if (v[0] == "" || v[1] == "")
         fprintf(stderr, "warning: empty argument in `%s'\n", libs.c_str());
@@ -1330,7 +1328,7 @@ void usage(const string &progName)
     "  -V --version\n\n"
 
     "Run '%s --help' for more information.\n", progName.c_str(), progName.c_str());
-    std::exit(0);
+    std::exit(1);
 }
 
 
@@ -1451,7 +1449,7 @@ void showHelp(const string &progName)
     "                              to the executable (potentially a lot of padding, if\n"
     "                              the executable has a large uninitialised data segment).\n"
     "\n", progName.c_str());
-    std::exit(1);
+    std::exit(0);
 }
 
 
@@ -1465,7 +1463,7 @@ void version()
            PACKAGE_BUGREPORT "\n\n"
            LICENSE
            );
-    std::exit(1);
+    std::exit(0);
 }
 
 

@@ -141,7 +141,7 @@ public:
 
     typedef enum { addNeeded, removeNeeded } neededOp;
     void addRemoveNeeded(neededOp op, set<string> libs);
-    void replaceNeeded(string &libs);
+    void replaceNeeded(const string &libs);
     void printNeededLibs();
 
     typedef enum { printSoname, replaceSoname } sonameMode;

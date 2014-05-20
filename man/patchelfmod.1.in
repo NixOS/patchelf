@@ -1,4 +1,4 @@
-.TH PATCHELFMOD "1" "APRIL 2014" "@PACKAGE_VERSION@"
+.TH PATCHELFMOD "1" "MAY 2014" "@PACKAGE_VERSION@"
 .SH NAME
 PatchELFmod - modify properties of ELF binaries
 
