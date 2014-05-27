@@ -3,5 +3,5 @@
 echo "Running autoreconf..."
 autoreconf -ivf "$@"
 
-echo "Now run './configure' and then 'make' to build PatchELFmod"
+echo "Now run './configure' and then 'make' to build PatchELF"
 

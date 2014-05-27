@@ -6,7 +6,7 @@ mkdir -p ${SCRATCH}
 
 cp main ${SCRATCH}/
 
-../src/patchelfmod -d --set-rpath /set/RPath ${SCRATCH}/main
+../src/patchelf -d --set-rpath /set/RPath ${SCRATCH}/main
 if test $(which md5sum) != ""; then
     original=$(md5sum --binary ${SCRATCH}/main | cut -d ' ' -f1)
 elif test $(which md5) != ""; then
@@ -16,7 +16,7 @@ else
     exit 0
 fi
 
-../src/patchelfmod -d --backup --set-rpath /set/new/RPath ${SCRATCH}/main
+../src/patchelf -d --backup --set-rpath /set/new/RPath ${SCRATCH}/main
 if test $(which md5sum) != ""; then
     backup=$(md5sum --binary ${SCRATCH}/main~orig | cut -d ' ' -f1)
 elif test $(which md5) != ""; then

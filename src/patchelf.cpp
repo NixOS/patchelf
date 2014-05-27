@@ -1,5 +1,5 @@
 /*
- *  PatchELFmod is a simple utility for modifing existing ELF executables
+ *  PatchELF is a simple utility for modifing existing ELF executables
  *  and libraries.
  *
  *  Copyright (c) 2004-2014  Eelco Dolstra <eelco.dolstra@logicblox.com>
@@ -23,7 +23,7 @@
 
 using namespace std;
 
-#include "patchelfmod.h"
+#include "patchelf.h"
 
 /* !!! G++ creates broken code if this function is inlined, don't know
    why... */
@@ -246,7 +246,7 @@ template < ElfFileParams > void ElfFile < ElfFileParamNames >::sortShdrs()
 
 static void writeFile(string fileName, mode_t fileMode)
 {
-	string fileName2 = fileName + "_patchelfmod_tmp";
+	string fileName2 = fileName + "_patchelf_tmp";
 
 	int fd = open(fileName2.c_str(),
 		      O_CREAT | O_TRUNC | O_WRONLY, 0700);
@@ -1305,7 +1305,7 @@ template < ElfFileParams >
 }
 
 template < class ElfFile >
-    static void patchElfmod2(ElfFile & elfFile, mode_t fileMode)
+    static void patchElf2(ElfFile & elfFile, mode_t fileMode)
 {
 	elfFile.parse();
 
@@ -1358,7 +1358,7 @@ template < class ElfFile >
 	}
 }
 
-static void patchElfmod()
+static void patchElf()
 {
 	if (!printInterpreter &&
 	    !printRPath && !printRPathType && !printSoname && !printNeeded)
@@ -1379,12 +1379,12 @@ static void patchElfmod()
 	    contents[EI_VERSION] == EV_CURRENT) {
 		ElfFile < Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr,
 		    Elf32_Off, Elf32_Dyn, Elf32_Sym > elfFile;
-		patchElfmod2(elfFile, fileMode);
+		patchElf2(elfFile, fileMode);
 	} else if (contents[EI_CLASS] == ELFCLASS64 &&
 		   contents[EI_VERSION] == EV_CURRENT) {
 		ElfFile < Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr,
 		    Elf64_Off, Elf64_Dyn, Elf64_Sym > elfFile;
-		patchElfmod2(elfFile, fileMode);
+		patchElf2(elfFile, fileMode);
 	} else
 		error
 		    ("ELF executable is not 32/64-bit, little/big-endian, version 1");
@@ -1557,7 +1557,7 @@ void version()
 {
 	printf(PACKAGE_STRING "\n\n"
 	       /* 
-	          Copyright and license text is defined in patchelfmod.h */
+	          Copyright and license text is defined in patchelf.h */
 	       COPYRIGHT PACKAGE_BUGREPORT "\n\n" LICENSE);
 	std::exit(0);
 }
@@ -1691,7 +1691,7 @@ int main(int argc, char **argv)
 	for (; optind < argc; ++optind) {
 		char *file = argv[optind];
 		fileName = string(file);
-		patchElfmod();
+		patchElf();
 		return 0;
 	}
 }

@@ -1,5 +1,5 @@
 /*
- *  PatchELFmod is a simple utility for modifing existing ELF executables
+ *  PatchELF is a simple utility for modifing existing ELF executables
  *  and libraries.
  *
  *  Copyright (c) 2004-2014  Eelco Dolstra <eelco.dolstra@logicblox.com>

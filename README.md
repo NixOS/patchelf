@@ -1,11 +1,11 @@
-PatchELFmod
+PatchELF
 ===============
-**PatchELFmod** is a simple utility to modify header data of ELF executables
+**PatchELF** is a simple utility to modify header data of ELF executables
 and libraries. It can change the dynamic loader ("ELF interpreter")
 of executables, change existing DT_SONAME entries of shared libraries
 and manipulate the RPATH and DT_NEEDED entries of executables and libraries.
 
-Run `patchelfmod --help` or see the manpage (`man patchelfmod`) for more information.
+Run `patchelf --help` or see the manpage (`man patchelf`) for more information.
 
 
 **Installation:**<br>
@@ -17,7 +17,7 @@ make install
 ```
 
 
-**Homepage:** https://github.com/darealshinji/patchelfmod<br>
+**Homepage:** http://nixos.org/patchelf.html<br>
 
 
 **License:**<br>

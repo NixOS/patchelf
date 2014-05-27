@@ -1,26 +1,28 @@
-0.13 (May 15, 2014):
+master branch:
+
+(May 15, 2014)
 * parse arguments with getopt
 * '--replace-needed' now requires comma-separated arguments
 * enable parallel use of print options
 * additional full-debug messages
 * add '--print-needed' and '--print-all'
 
-0.12.1 (April 23, 2014):
+(April 23, 2014)
 * add changelog file
 
-0.12 (April 23, 2014):
+(April 23, 2014)
 * '--add-needed' and '--remove-needed' can now handle comma
   separated lists
 
-0.11 (April 19, 2014):
-* remove environment variable PATCHELFMOD_DEBUG
+(April 19, 2014)
+* remove environment variable PATCHELF_DEBUG
 * fix some debug messages
 * Add '--full-debug', which is the same as '--debug', but
   including information about rewriting symbols, which can
   be quite a lot
 * code optimization
 
-0.10 (April 10, 2014):
+(April 10, 2014)
 * '--backup' saves a backup before modifying a file.
 * '--delete-rpath' deletes RPATHs and RUNPATHs.
 * '--print-rpath-type' tells whether it's RPATH or RUNPATH.
@@ -30,8 +32,7 @@
 * Put soname functions into single void.
 * Move some code to header file.
 
-0.9 (April 06, 2014):
-* Fork "PatchELF" and rename project to "PatchELFmod".
+(April 06, 2014)
 * Add the following new options:
   --add-needed & --replace-needed (contributed by rgcjonas),
   --add-needed-list, --remove-needed-list,
@@ -44,6 +45,7 @@
 * Rewrite manpage from scratch.
 * Mentioning of ALL known authors.
 * Other changes.
+
 
 0.8 (January 15, 2014):
 * Fix a segfault caused by certain illegal entries in symbol tables.

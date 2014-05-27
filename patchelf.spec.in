@@ -1,18 +1,18 @@
 Summary: A utility for patching ELF binaries
 
-Name: patchelfmod
+Name: patchelf
 Version: @PACKAGE_VERSION@
 Release: 1
 License: GPL
 Group: Development/Tools
-URL: https://github.com/darealshinji/patchelfmod
+URL: http://nixos.org/patchelf.html
 Source0: %{name}-@PACKAGE_VERSION@.tar.bz2
 BuildRoot: %{_tmppath}/%{name}-%{PACKAGE_VERSION}-buildroot
 Prefix: /usr
 
 %description
 
-PatchELFmod is a simple utility for modifing existing ELF executables
+PatchELF is a simple utility for modifing existing ELF executables
 and libraries. It can change the dynamic loader ("ELF interpreter")
 of executables, change existing DT_SONAME entries of shared libraries
 and manipulate the RPATH and DT_NEEDED entries of executables and libraries.
@@ -34,6 +34,6 @@ strip $RPM_BUILD_ROOT/%{_prefix}/bin/* || true
 rm -rf $RPM_BUILD_ROOT
 
 %files
-/usr/bin/patchelfmod
-/usr/share/doc/patchelfmod/README
-/usr/share/man/man1/patchelfmod.1.gz
+/usr/bin/patchelf
+/usr/share/doc/patchelf/README
+/usr/share/man/man1/patchelf.1.gz
