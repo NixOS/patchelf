@@ -1,6 +1,6 @@
 AC_INIT([PatchELF],
         m4_esyscmd([echo -n $(cat ./version)]),
-        [https://github.com/darealshinji/patchelf])
+        [https://github.com/NixOS/patchelf])
 
 AC_CONFIG_SRCDIR([src/patchelf.cpp])
 
