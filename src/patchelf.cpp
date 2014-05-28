@@ -1345,7 +1345,7 @@ template < class ElfFile >
 	else if (!neededLibsToRemove.empty())
 		elfFile.addRemoveNeeded(elfFile.removeNeeded,
 					neededLibsToRemove);
-	else if (!neededLibsToReplace.empty())
+	else if (neededLibsToReplace != "")
 		elfFile.replaceNeeded(neededLibsToReplace);
 	else if (sonameToReplace != "")
 		elfFile.modifySoname(elfFile.replaceSoname, sonameToReplace);
