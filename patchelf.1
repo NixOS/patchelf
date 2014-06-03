@@ -47,6 +47,14 @@ Prints the RPATH for an executable or library.
 Forces the use of the obsolete DT_RPATH in the file instead of
 DT_RUNPATH. By default DT_RPATH is converted to DT_RUNPATH.
 
+.IP "--add-needed LIBRARY"
+Adds a declared dependency on a dynamic library (DT_NEEDED).
+This option can be give multiple times.
+
+.IP "--replace-needed LIB_ORIG LIB_NEW"
+Replaces a declared dependency on a dynamic library with another one (DT_NEEDED).
+This option can be give multiple times.
+
 .IP "--remove-needed LIBRARY"
 Removes a declared depency on LIBRARY (DT_NEEDED entry). This
 option can be given multiple times.
