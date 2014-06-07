@@ -1,8 +1,11 @@
 Source: patchelf
 Priority: extra
 Maintainer: Eelco Dolstra <eelco.dolstra@logicblox.com>
-Build-Depends: debhelper (>= 9~),
-               dh-autoreconf
+Build-Depends:
+ debhelper (>= 9~),
+ dh-autoreconf,
+ libacl1-dev,
+ libattr1-dev
 Standards-Version: 3.9.4
 Section: utils
 Homepage: http://nixos.org/patchelf.html
@@ -10,8 +13,9 @@ Vcs-Git: https://github.com/NixOS/patchelf.git
 
 Package: patchelf
 Architecture: any
-Depends: ${shlibs:Depends},
-         ${misc:Depends}
+Depends:
+ ${shlibs:Depends},
+ ${misc:Depends}
 Suggests: binutils, execstack
 Description: modify properties of ELF binaries
  Simple utility for modifing existing ELF executables and libraries.
@@ -22,8 +26,9 @@ Description: modify properties of ELF binaries
 Package: patchelf-dbg
 Section: debug
 Architecture: any
-Depends: ${misc:Depends},
-         patchelf (= ${binary:Version})
+Depends:
+ ${misc:Depends},
+ patchelf (= ${binary:Version})
 Description: debug symbols for PatchELF
  Simple utility for modifing existing ELF executables and libraries.
  It can change the dynamic loader ("ELF interpreter") of executables,

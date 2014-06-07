@@ -4,5 +4,8 @@
 /configure
 /build-aux/
 
+config.h.in
 Makefile.in
 *~orig
+*~
+*.log

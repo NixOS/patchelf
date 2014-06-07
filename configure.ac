@@ -2,6 +2,7 @@ AC_INIT([PatchELF],
         m4_esyscmd([echo -n $(cat ./version)]),
         [https://github.com/NixOS/patchelf])
 
+AM_CONFIG_HEADER(config.h)
 AC_CONFIG_SRCDIR([src/patchelf.cpp])
 
 AC_CONFIG_AUX_DIR([build-aux])
@@ -19,6 +20,15 @@ AC_PROG_MAKE_SET
 # Checks for header files.
 AC_HEADER_STDC
 AC_CHECK_HEADERS([elf.h fcntl.h getopt.h limits.h stdlib.h string.h unistd.h], [], [exit 1], [])
+
+# Checks for libraries.
+AC_CHECK_HEADERS([attr/libattr.h attr/error_context.h])
+AC_SEARCH_LIBS(attr_copy_file, attr)
+AC_CHECK_FUNCS([attr_copy_file])
+
+AC_CHECK_HEADERS([sys/acl.h acl/libacl.h])
+AC_SEARCH_LIBS(perm_copy_file, acl)
+AC_CHECK_FUNCS([perm_copy_file])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_HEADER_STDBOOL

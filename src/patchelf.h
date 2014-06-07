@@ -5,7 +5,7 @@
  *  Copyright (c) 2004-2014  Eelco Dolstra <eelco.dolstra@logicblox.com>
  *                2014       djcj <djcj@gmx.de>
  *
- *  Contributors: Zack Weinberg, rgcjonas
+ *  Contributors: Zack Weinberg, rgcjonas, Jeremy Sanders
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -25,11 +25,13 @@
 "Copyright (c) 2004-2014  Eelco Dolstra <eelco.dolstra@logicblox.com>\n\
               2014       djcj <djcj@gmx.de>\n\
 \
-Contributors: Zack Weinberg, rgcjonas\n"
+Contributors: Zack Weinberg, rgcjonas, Jeremy Sanders\n"
 
 #define LICENSE "This program is free software; you may redistribute it under the terms of\n\
 the GNU General Public License version 3 or (at your option) any later version.\n\
 This program has absolutely no warranty.\n"
+
+#include "config.h"
 
 #include <assert.h>
 #include <algorithm>
@@ -54,6 +56,17 @@ This program has absolutely no warranty.\n"
 #include <sys/types.h>
 #include <unistd.h>
 #include <vector>
+
+#ifdef HAVE_ATTR_LIBATTR_H
+
+# include <attr/libattr.h>
+#endif
+#ifdef HAVE_SYS_ACL_H
+# include <sys/acl.h>
+#endif
+#ifdef HAVE_ACL_LIBACL_H
+# include <acl/libacl.h>
+#endif
 
 /* Ugly: used to erase DT_RUNPATH when using --force-rpath. */
 #define DT_IGNORE       0x00726e67

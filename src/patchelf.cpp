@@ -5,7 +5,7 @@
  *  Copyright (c) 2004-2014  Eelco Dolstra <eelco.dolstra@logicblox.com>
  *                2014       djcj <djcj@gmx.de>
  *
- *  Contributors: Zack Weinberg, rgcjonas
+ *  Contributors: Zack Weinberg, rgcjonas, Jeremy Sanders
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -259,8 +259,17 @@ static void writeFile(string fileName, mode_t fileMode)
 	if (close(fd) != 0)
 		error("close");
 
+#if defined(HAVE_ATTR_COPY_FILE)
+	if (attr_copy_file(fileName.c_str(), fileName2.c_str(), 0, 0) != 0)
+		error("attr_copy_file");
+#endif
+#if defined(HAVE_PERM_COPY_FILE)
+	if (perm_copy_file(fileName.c_str(), fileName2.c_str(), 0) != 0)
+		error("perm_copy_file");
+#else
 	if (chmod(fileName2.c_str(), fileMode) != 0)
 		error("chmod");
+#endif
 
 	if (rename(fileName2.c_str(), fileName.c_str()) != 0)
 		error("rename");
@@ -292,8 +301,17 @@ static void writeFileBackup(string fileName, mode_t fileMode)
 	input.close();
 	output.close();
 
+#if defined(HAVE_ATTR_COPY_FILE)
+	if (attr_copy_file(fileName.c_str(), fileName2.c_str(), 0, 0) != 0)
+		error("attr_copy_file");
+#endif
+#if defined(HAVE_PERM_COPY_FILE)
+	if (perm_copy_file(fileName.c_str(), fileName2.c_str(), 0) != 0)
+		error("perm_copy_file");
+#else
 	if (chmod(fileName2.c_str(), fileMode) != 0)
 		error("chmod");
+#endif
 }
 
 static unsigned int roundUp(unsigned int n, unsigned int m)

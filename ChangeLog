@@ -1,5 +1,8 @@
 master branch:
 
+(June 07, 2014)
+* Use libattr and libacl to copy permissions if available
+
 (May 15, 2014)
 * parse arguments with getopt
 * '--replace-needed' now requires comma-separated arguments
