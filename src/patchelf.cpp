@@ -1262,6 +1262,11 @@ template < ElfFileParams >
 						     const string &
 						     newSoname)
 {
+	if (rdi(hdr->e_type) != ET_DYN) {
+		debug("this is not a dynamic library\n");
+		return;
+	}
+
 	Elf_Shdr & shdrDynamic = findSection(".dynamic");
 
 	/* !!! We assume that the virtual address in the DT_STRTAB entry of
