@@ -32,6 +32,7 @@ Print the ELF interpreter of an executable.
 .TP
 \fB\-R\fR, \fB\-\-set\-rpath\fR <rpath>
 Change the RPATH of an executable or library to <rpath>.
+Creates a new entry of type DT_RUNPATH if none exists.
 .TP
 \fB    \-\-rpath\fR <rpath>
 An alias for '\-\-set\-rpath'.
@@ -88,9 +89,10 @@ Prints all DT_NEEDED entries.
 .TP
 \fB\-S\fR, \fB\-\-set\-soname\fR <soname>
 Change the DT_SONAME entry of a library to <soname>.
+Creates a new entry if none exists.
 .TP
 \fB    \-\-soname\fR <soname>
-An alias for '\-\-replace\-soname'.
+An alias for '\-\-set\-soname'.
 .TP
 \fB\-P\fR, \fB\-\-print\-soname\fR
 Print the soname of a library.

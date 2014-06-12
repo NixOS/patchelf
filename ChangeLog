@@ -1,7 +1,9 @@
-master branch:
+(June 12, 2014)
+* create a new DT_SONAME entry if none exists
 
 (June 07, 2014)
 * Use libattr and libacl to copy permissions if available
+  (contributed by Jeremy Sanders)
 
 (May 15, 2014)
 * parse arguments with getopt

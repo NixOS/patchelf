@@ -1260,66 +1260,105 @@ template < ElfFileParams > void ElfFile < ElfFileParamNames >::printNeededLibs()
 template < ElfFileParams >
     void ElfFile < ElfFileParamNames >::modifySoname(sonameMode op,
 						     const string &
-						     sonameToReplace)
+						     newSoname)
 {
 	Elf_Shdr & shdrDynamic = findSection(".dynamic");
+
+	/* !!! We assume that the virtual address in the DT_STRTAB entry of
+	   the dynamic section corresponds to the .dynstr section. */
 	Elf_Shdr & shdrDynStr = findSection(".dynstr");
 	char *strTab = (char *)contents + rdi(shdrDynStr.sh_offset);
 
+	/* Find the DT_STRTAB entry in the dynamic section. */
 	Elf_Dyn *dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+	Elf_Addr strTabAddr = 0;
+	for (; rdi(dyn->d_tag) != DT_NULL; dyn++)
+		if (rdi(dyn->d_tag) == DT_STRTAB)
+			strTabAddr = rdi(dyn->d_un.d_ptr);
+	if (!strTabAddr)
+		error("strange: no string table");
 
-	bool foundSoname = false;
+	assert(strTabAddr == rdi(shdrDynStr.sh_addr));
 
-	if (debugModeFull)
-		debug("SONAME: ");
+	/* Walk through the dynamic section, look for the DT_SONAME entry. */
+	static vector < string > neededLibs;
+	dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+	Elf_Dyn *dynSoname = 0;
+	char *soname = 0;
 	for (; rdi(dyn->d_tag) != DT_NULL; dyn++) {
 		if (rdi(dyn->d_tag) == DT_SONAME) {
-			char *name = strTab + rdi(dyn->d_un.d_val);
-			if (op == printSoname) {
-				printf("%s\n", name);
-				foundSoname = true;
-				break;
-			} else if (op == replaceSoname) {
-				if (name != sonameToReplace) {
-					debug
-					    ("replacing DT_SONAME entry `%s' with `%s'\n",
-					     name, sonameToReplace.c_str());
-
-					/* technically, the string referred by
-					   d_val could be used otherwise, too
-					   (although unlikely) we'll therefore
-					   add a new string */
-					debug("resizing .dynstr ...");
-
-					string & newDynStr =
-					    replaceSection(".dynstr",
-							   rdi(shdrDynStr.
-							       sh_size) +
-							   sonameToReplace.
-							   size() + 1 +
-							   dynStrAddedBytes);
-					setSubstr(newDynStr,
-						  rdi(shdrDynStr.sh_size) +
-						  dynStrAddedBytes,
-						  sonameToReplace + '\0');
-
-					dyn->d_un.d_val =
-					    shdrDynStr.sh_size +
-					    dynStrAddedBytes;
-
-					dynStrAddedBytes +=
-					    sonameToReplace.size() + 1;
-
-					changed = true;
-				} else
-					debug("keeping DT_SONAME entry `%s'\n",
-					      name);
-			}
-		}
+			dynSoname = dyn;
+			soname = strTab + rdi(dyn->d_un.d_val);
+		} else if (rdi(dyn->d_tag) == DT_INIT)
+			neededLibs.
+			    push_back(string(strTab + rdi(dyn->d_un.d_val)));
 	}
 
-	if (op == printSoname && !foundSoname)
-		debug("no DT_SONAME entry found\n");
+	if (op == printSoname) {
+		if (debugModeFull)
+			debug("SONAME: ");
+		if (soname) {
+			if (string(soname ? soname : "") == "")
+				debug("DT_SONAME is empty\n");
+			else
+				printf("%s\n", soname);
+		} else
+			debug("no DT_SONAME found\n");
+		return;
+	}
+
+	if (string(soname ? soname : "") == newSoname) {
+		debug("current and proposed new SONAMEs are equal\n"
+			  "keeping DT_SONAME entry\n");
+		return;
+	}
+
+	/* Zero out the previous SONAME */
+	unsigned int sonameSize = 0;
+	if (soname) {
+		sonameSize = strlen(soname);
+		memset(soname, 'X', sonameSize);
+	}
+
+	debug("new SONAME is `%s'\n", newSoname.c_str());
+
+	/* Grow the .dynstr section to make room for the new SONAME. */
+	debug("SONAME is too long, resizing...\n");
+
+	string & newDynStr =
+	    replaceSection(".dynstr",
+			   rdi(shdrDynStr.sh_size) + newSoname.size() + 1);
+	setSubstr(newDynStr, rdi(shdrDynStr.sh_size), newSoname + '\0');
+
+	/* Update the DT_SONAME entry. */
+	if (dynSoname)
+		dynSoname->d_un.d_val = shdrDynStr.sh_size;
+	else {
+		/* There is no DT_SONAME entry in the .dynamic section, so we
+		   have to grow the .dynamic section. */
+		string & newDynamic = replaceSection(".dynamic",
+						     rdi(shdrDynamic.sh_size) +
+						     sizeof(Elf_Dyn));
+
+		unsigned int idx = 0;
+		for (;
+		     rdi(((Elf_Dyn *) newDynamic.c_str())[idx].d_tag) !=
+		     DT_NULL; idx++) ;
+		debug("DT_NULL index is %d\n", idx);
+
+		/* Shift all entries down by one. */
+		setSubstr(newDynamic, sizeof(Elf_Dyn),
+			  string(newDynamic, 0, sizeof(Elf_Dyn) * (idx + 1)));
+
+		/* Add the DT_SONAME entry at the top. */
+		Elf_Dyn newDyn;
+		wri(newDyn.d_tag, DT_SONAME);
+		newDyn.d_un.d_val = shdrDynStr.sh_size;
+		setSubstr(newDynamic, 0,
+			  string((char *)&newDyn, sizeof(Elf_Dyn)));
+	}
+
+	changed = true;
 }
 
 template < class ElfFile >
@@ -1365,8 +1404,8 @@ template < class ElfFile >
 					neededLibsToRemove);
 	else if (neededLibsToReplace != "")
 		elfFile.replaceNeeded(neededLibsToReplace);
-	else if (sonameToReplace != "")
-		elfFile.modifySoname(elfFile.replaceSoname, sonameToReplace);
+	else if (newSoname != "")
+		elfFile.modifySoname(elfFile.replaceSoname, newSoname);
 
 	if (elfFile.isChanged()) {
 		if (saveBackup)
@@ -1506,6 +1545,7 @@ void showHelp(const string & progName)
 	       "RPATH options:\n"
 	       "\n"
 	       "  -R, --set-rpath <rpath>     Change the RPATH of an executable or library to <rpath>.\n"
+	       "                              Creates a new entry of type DT_RUNPATH if none exists."
 	       "      --rpath <rpath>         An alias for '--set-rpath'.\n"
 	       "  -D, --delete-rpath          Remove an existing RPATH.\n"
 	       "  -s, --shrink-rpath          Remove all directories from RPATH that do not contain\n"
@@ -1545,7 +1585,8 @@ void showHelp(const string & progName)
 	       "DT_SONAME options:\n"
 	       "\n"
 	       "  -S, --set-soname <soname>   Change the DT_SONAME entry of a library to <soname>.\n"
-	       "      --soname <soname>       An alias for '--replace-soname'.\n"
+	       "                              Creates a new entry if none exists."
+	       "      --soname <soname>       An alias for '--set-soname'.\n"
 	       "  -P, --print-soname          Print the soname of a library.\n"
 	       "\n"
 	       "\n"
@@ -1691,7 +1732,7 @@ int main(int argc, char **argv)
 			printNeeded = true;
 			break;
 		case 'S':
-			sonameToReplace = optarg;
+			newSoname = optarg;
 			break;
 		case 'P':
 			printSoname = true;

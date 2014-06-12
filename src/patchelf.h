@@ -149,7 +149,7 @@ template < ElfFileParams > class ElfFile {
 	void printNeededLibs();
 
 	typedef enum { printSoname, replaceSoname } sonameMode;
-	void modifySoname(sonameMode op, const string & sonameToReplace);
+	void modifySoname(sonameMode op, const string & newSoname);
 
  private:
 
@@ -233,7 +233,7 @@ static set < string > neededLibsToAdd;
 static string neededLibsToReplace;
 static bool printNeeded = false;
 
-static string sonameToReplace;
+static string newSoname;
 static bool printSoname = false;
 
 static bool printAll = false;
