@@ -6,7 +6,7 @@ Build-Depends:
  dh-autoreconf,
  libacl1-dev,
  libattr1-dev
-Standards-Version: 3.9.4
+Standards-Version: 3.9.5
 Section: utils
 Homepage: http://nixos.org/patchelf.html
 Vcs-Git: https://github.com/NixOS/patchelf.git
@@ -20,7 +20,7 @@ Suggests: binutils, execstack
 Description: modify properties of ELF binaries
  Simple utility for modifing existing ELF executables and libraries.
  It can change the dynamic loader ("ELF interpreter") of executables,
- change existing DT_SONAME entries of shared libraries and manipulate
+ modify DT_SONAME entries of shared libraries and manipulate
  the RPATH and DT_NEEDED entries of executables and libraries.
 
 Package: patchelf-dbg
@@ -32,7 +32,7 @@ Depends:
 Description: debug symbols for PatchELF
  Simple utility for modifing existing ELF executables and libraries.
  It can change the dynamic loader ("ELF interpreter") of executables,
- change existing DT_SONAME entries of shared libraries and manipulate
+ modify DT_SONAME entries of shared libraries and manipulate
  the RPATH and DT_NEEDED entries of executables and libraries.
  .
  This package contains the debug symbols for PatchELF.

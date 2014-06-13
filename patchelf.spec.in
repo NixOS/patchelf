@@ -1,7 +1,7 @@
 Name:           patchelf
 Version:        @PACKAGE_VERSION@
 Release:        1%{?dist}
-Summary:        A utility for patching ELF binaries
+Summary:        modify properties of ELF binaries
 
 Group:          Development/Tools
 License:        GPLv3+
@@ -18,8 +18,8 @@ BuildRoot:      %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 %description
 PatchELF is a simple utility for modifing existing ELF executables
 and libraries. It can change the dynamic loader ("ELF interpreter")
-of executables, change existing DT_SONAME entries of shared libraries
-and manipulate the RPATH and DT_NEEDED entries of executables and libraries.
+of executables, modify DT_SONAME entries of shared libraries and
+manipulate the RPATH and DT_NEEDED entries of executables and libraries.
 
 %prep
 %setup -q
