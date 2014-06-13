@@ -24,7 +24,7 @@ make install
 Copyright (c) 2004-2014 Eelco Dolstra <eelco.dolstra@logicblox.com>,
               2014      djcj <djcj@gmx.de>
 
-Contributors: Zack Weinberg, vdanjean, rgcjonas
+Contributors: Zack Weinberg, vdanjean, rgcjonas, Jeremy Sanders
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
