@@ -1,2 +1,3 @@
 version=3
-https://github.com/NixOS/patchelf/releases archive/(.+)\.tar\.(?:xz|bz2|gz)
+https://github.com/NixOS/patchelf/releases \
+    (?:.*/)?archive/(.+)\.tar\.(?:xz|bz2|gz)
