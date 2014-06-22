@@ -72,11 +72,11 @@ These options can be given multiple times.
 .TP
 \fB\-a\fR, \fB\-\-add\-needed\fR <library>[,<library>...]
 Add a dependency <library> on a dynamic library.
-Can be a single library or a comma seperated list.
+Can be a single library or a comma separated list.
 .TP
 \fB\-r\fR, \fB\-\-remove\-needed\fR <library>[,<library>...]
 Remove a dependency <library> from a dynamic library.
-Can be a single library or a comma seperated list.
+Can be a single library or a comma separated list.
 .TP
 \fB\-n\fR, \fB\-\-replace\-needed\fR <library>,<new\-library>
 Replace a dependency <library> on a dynamic library with
