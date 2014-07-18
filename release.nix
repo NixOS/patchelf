@@ -99,6 +99,8 @@ let
     deb_ubuntu1304x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu1304x86_64) 85;
     deb_ubuntu1310i386 = makeDeb_i686 (diskImages: diskImages.ubuntu1310i386) 90;
     deb_ubuntu1310x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu1310x86_64) 90;
+    deb_ubuntu1404i386 = makeDeb_i686 (diskImages: diskImages.ubuntu1404i386) 90;
+    deb_ubuntu1404x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu1404x86_64) 90;
 
 
     release = pkgs.releaseTools.aggregate
@@ -114,8 +116,8 @@ let
             rpm_fedora19x86_64
             deb_debian7i386
             deb_debian7x86_64
-            deb_ubuntu1310i386
-            deb_ubuntu1310x86_64
+            deb_ubuntu1404i386
+            deb_ubuntu1404x86_64
           ];
         meta.description = "Release-critical builds";
       };
