@@ -1,10 +1,12 @@
 #! /bin/sh -e
+set -x
 ARCH="$1"
-SCRATCH=scratch/no-rpath-$ARCH
 
 if [ -z "$ARCH" ]; then
   ARCH=$(basename $0 .sh | sed -e 's/.*-//')
 fi
+
+SCRATCH=scratch/no-rpath-$ARCH
 
 if [ -z "$ARCH" ] || [ $ARCH = prebuild ] ; then
   echo "Architecture required"
@@ -33,9 +35,4 @@ newRPath=$(../src/patchelf --print-rpath ${SCRATCH}/no-rpath)
 if ! echo "$newRPath" | grep -q '/foo:/bar'; then
     echo "incomplete RPATH"
     exit 1
-fi
-
-if [ "$(../src/patchelf --print-interpreter $no_rpath_bin)" \
-     = "$(../src/patchelf --print-interpreter ../src/patchelf)" ]; then
-    cd ${SCRATCH} && ./no-rpath
 fi
