@@ -19,9 +19,22 @@ no_rpath_arch_TESTS = \
 XFAIL_TESTS = no-rpath-ia64.sh
 
 src_TESTS = \
-  plain-fail.sh plain-run.sh shrink-rpath.sh set-interpreter-short.sh \
-  set-interpreter-long.sh set-rpath.sh no-rpath.sh big-dynstr.sh \
-  set-rpath-library.sh soname.sh
+  plain-fail.sh \
+  plain-run.sh \
+  shrink-rpath.sh \
+  set-interpreter-short.sh \
+  set-interpreter-long.sh \
+  set-rpath.sh \
+  no-rpath.sh \
+  big-dynstr.sh \
+  set-rpath-library.sh \
+  delete-rpath.sh \
+  convert-rpath.sh \
+  backup.sh \
+  add-needed.sh \
+  remove-needed.sh \
+  replace-needed.sh \
+  set-soname.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)
