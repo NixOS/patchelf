@@ -110,6 +110,7 @@ class ElfFile
     bool isExecutable;
 
     typedef string SectionName;
+
     typedef map<SectionName, string> ReplacedSections;
 
     ReplacedSections replacedSections;
@@ -137,7 +138,24 @@ public:
 
     void parse();
 
-private:
+    void rewriteSections();
+
+    string getInterpreter();
+    void printInterpreter();
+    void setInterpreter(const string & newInterpreter);
+
+    typedef enum { rpPrint, rpType, rpShrink, rpSet, rpDelete, rpConvert } RPathOp;
+    void modifyRPath(RPathOp op, string newRPath);
+
+    typedef enum { addNeeded, removeNeeded } neededOp;
+    void addRemoveNeeded(neededOp op, set < string > libs);
+    void replaceNeeded(const string & libs);
+    void printNeededLibs();
+
+    typedef enum { printSoname, replaceSoname } sonameMode;
+    void modifySoname(sonameMode op, const string & newSoname);
+
+ private:
 
     struct CompPhdr
     {
@@ -189,30 +207,6 @@ private:
 
     void rewriteSectionsExecutable();
 
-public:
-
-    void rewriteSections();
-
-    string getInterpreter();
-
-    void printInterpreter();
-
-    void modifySoname(sonameMode op, const string & newSoname);
-
-    void setInterpreter(const string & newInterpreter);
-
-    typedef enum { rpPrint, rpShrink, rpSet } RPathOp;
-
-    void modifyRPath(RPathOp op, string newRPath);
-
-    void addNeeded(set<string> libs);
-
-    void removeNeeded(set<string> libs);
-    
-    void replaceNeeded(map<string, string>& libs);
-
-private:
-
     /* Convert an integer in big or little endian representation (as
        specified by the ELF header) to this platform's integer
        representation. */
@@ -227,6 +221,8 @@ private:
         return i;
     }
 };
+
+vector <string> v;
 
 
 /* !!! G++ creates broken code if this function is inlined, don't know
@@ -1172,6 +1168,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
     dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
     Elf_Dyn * dynRPath = 0, * dynRunPath = 0;
     char * rpath = 0;
+    string RPathType = "";
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_RPATH) {
             RPathType = "DT_RPATH";
@@ -1623,8 +1620,7 @@ void usage(const string & progName)
         "\n"
         "  -a --add-needed <library>[,<library>...]\n"
         "  -r --remove-needed <library>[,<library>...]\n"
-        "  -n --replace-needed <library> <new-library>\n"
-      //"  -n --replace-needed <library>,<new-library>\n"
+        "  -n --replace-needed <library>,<new-library>\n"
         "  -N --print-needed\n"
         "\n"
         "  -S --set-soname <soname>\n"
@@ -1661,7 +1657,7 @@ static struct option long_options[] = {
     {"convert", no_argument, 0, 'c'},
     {"add-needed", required_argument, 0, 'a'},
     {"remove-needed", required_argument, 0, 'r'},
-  //{"replace-needed", required_argument, 0, 'n'},
+    {"replace-needed", required_argument, 0, 'n'},
     {"print-needed", no_argument, 0, 'N'},
     {"set-soname", required_argument, 0, 'S'},
     {"soname", required_argument, 0, 'S'},
@@ -1729,12 +1725,9 @@ void showHelp(const string & progName)
            "  -r, --remove-needed <library>[,<library>...]\n"
            "                              Remove a dependency <library> from a dynamic library.\n"
            "                              Can be a single library or a comma separated list.\n"
-         //"  -n, --replace-needed <library>,<new-library>\n"
            "  -n, --replace-needed <library> <new-library>\n"
            "                              Replace a dependency <library> on a dynamic library with\n"
            "                              a new dependency <new-library>."
-        /* "                              a new dependency <new-library>. Arguments must be\n"
-           "                              separated by comma.\n" */
            "                              This option can be given multiple times.\n"
            "  -N, --print-needed          Prints all DT_NEEDED entries.\n"
            "\n"
@@ -1783,19 +1776,8 @@ int main(int argc, char * * argv)
         usage(argv[0]);
     }
 
-    /* Don't change the API for "--replace-needed" */
-    int i;
-    for (i = 1; i < argc; ++i) {
-        if (arg == "--replace-needed" || arg == "-n") {
-            if (i+2 >= argc) error("missing argument(s)");
-            neededLibsToReplace[ argv[i+1] ] = argv[i+2];
-            i += 2;
-        }
-    }
-
     int ch;
-//  while ((ch = getopt_long(argc, argv, ":wbdfi:IR:Dptsca:r:n:NS:PAFhVv", long_options, NULL)) != -1) {
-    while ((ch = getopt_long(argc, argv, ":wbdfi:IR:Dptsca:r:NS:PAFhVv", long_options, NULL)) != -1) {
+    while ((ch = getopt_long(argc, argv, ":wbdfi:IR:Dptsca:r:n:NS:PAFhVv", long_options, NULL)) != -1) {
         switch (ch) {
         case 'w':
             goldSupport = true;
