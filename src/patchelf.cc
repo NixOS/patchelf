@@ -1727,7 +1727,8 @@ void showHelp(const string & progName)
            "                              Can be a single library or a comma separated list.\n"
            "  -n, --replace-needed <library> <new-library>\n"
            "                              Replace a dependency <library> on a dynamic library with\n"
-           "                              a new dependency <new-library>."
+           "                              a new dependency <new-library>. Arguments must be\n"
+           "                              separated by comma.\n" */
            "                              This option can be given multiple times.\n"
            "  -N, --print-needed          Prints all DT_NEEDED entries.\n"
            "\n"
