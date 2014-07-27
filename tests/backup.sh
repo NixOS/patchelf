@@ -20,7 +20,7 @@ fi
 if test $(which md5sum) != ""; then
     backup=$(md5sum --binary ${SCRATCH}/main~orig | cut -d ' ' -f1)
 elif test $(which md5) != ""; then
-    original=$(md5 -q ${SCRATCH}/main~orig)
+    backup=$(md5 -q ${SCRATCH}/main~orig)
 fi
 
 echo "md5 original: $original"
