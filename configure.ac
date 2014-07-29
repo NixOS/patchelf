@@ -2,7 +2,7 @@ AC_INIT([PatchELF],
         m4_esyscmd([echo -n $(cat ./version)]),
         [https://github.com/NixOS/patchelf])
 
-AC_CONFIG_HEADERS(config.h)
+#AC_CONFIG_HEADERS(config.h)
 AC_CONFIG_SRCDIR([src/patchelf.cc])
 
 AC_CONFIG_AUX_DIR([build-aux])

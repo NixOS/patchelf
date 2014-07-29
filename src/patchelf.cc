@@ -30,12 +30,15 @@ the GNU General Public License version 3 or (at your option) any later version.\
 This program has absolutely no warranty.\n"
 
 
-#include "config.h"
+#ifdef HAVE_ELF_H
+# include <elf.h>
+#else
+# include "elf.h"
+#endif
 
 #include <assert.h>
 #include <algorithm>
 #include <errno.h>
-#include <elf.h>
 #include <fcntl.h>
 
 #include <getopt.h>
@@ -81,7 +84,7 @@ const unsigned int pageSize = 4096;
 static bool debugMode = false;
 static bool debugModeFull = false;
 static bool forceRPath = false;
-static bool goldSupport = false;
+static bool goldSupport = true;
 
 static string fileName;
 
@@ -1597,7 +1600,7 @@ static void patchElf()
 }
 
 
-void usage(const string & progName)
+void showHelp(const string & progName)
 {
     fprintf(stderr,
         "Syntax: %s [options] <elffile>\n"
@@ -1631,12 +1634,11 @@ void usage(const string & progName)
         "  -d --debug\n"
         "  -F --full-debug\n"
         "  -A --print-all\n"
-        "  -w --with-gold-support\n"
+        "  -g --disable-gold-support"
         "\n"
-        "  -h --help\n"
         "  -V --version\n"
         "\n"
-        "Run '%s --help' for more information.\n", progName.c_str(),
+        "Run 'man %s' for more information.\n", progName.c_str(),
         progName.c_str());
     std::exit(1);
 }
@@ -1666,102 +1668,11 @@ static struct option long_options[] = {
     {"backup", no_argument, 0, 'b'},
     {"debug", no_argument, 0, 'd'},
     {"full-debug", no_argument, 0, 'F'},
-    {"with-gold-support", no_argument, 0, 'w'},
-    {"help", no_argument, 0, 'h'},
+    {"disable-gold-support", no_argument, 0, 'g'},
     {"version", no_argument, 0, 'V'},
     {"version", no_argument, 0, 'v'},
     {0, 0, 0, 0}
 };
-
-
-void showHelp(const string & progName)
-{
-    printf("Syntax: %s [options] <elffile>\n"
-           "\n"
-           "Options:\n"
-           "\n"
-           "  -h, --help                  Show this usage information.\n"
-           "  -V, --version               Display program version number.\n"
-           "\n"
-           "\n"
-           "Dynamic loader options:\n"
-           "\n"
-           "  -i, --set-interpreter <interpreter>\n"
-           "                              Change the dynamic loader (\"ELF interpreter\")\n"
-           "                              of an executable to <interpreter>.\n"
-           "      --interpreter           An alias for '--set-interpreter'.\n"
-           "  -I, --print-interpreter     Print the ELF interpreter of an executable.\n"
-           "\n"
-           "\n"
-           "RPATH options:\n"
-           "\n"
-           "  -R, --set-rpath <rpath>     Change the RPATH of an executable or library to <rpath>.\n"
-           "                              Creates a new entry of type DT_RUNPATH if none exists."
-           "      --rpath <rpath>         An alias for '--set-rpath'.\n"
-           "  -D, --delete-rpath          Remove an existing RPATH.\n"
-           "  -s, --shrink-rpath          Remove all directories from RPATH that do not contain\n"
-           "                              a library referenced by DT_NEEDED fields of the executable\n"
-           "                              or library.\n"
-           "                              For instance, if an executable references one library\n"
-           "                              libfoo.so, and has an RPATH \"/lib:/usr/lib:/foo/lib\",\n"
-           "                              and libfoo.so can only be found in /foo/lib, then the\n"
-           "                              new RPATH will be \"/foo/lib\".\n"
-           "  -p, --print-rpath           Print the RPATH of an executable or library.\n"
-           "  -t, --print-rpath-type      Print the type of the RPATH, whether it's DT_RPATH\n"
-           "                              or DT_RUNPATH.\n"
-           "      --rpath-type            An alias for '--print-rpath-type'.\n"
-           "  -f, --force-rpath           Force the use of the obsolete DT_RPATH instead of\n"
-           "                              DT_RUNPATH.\n"
-           "                              By default DT_RPATH is converted to DT_RUNPATH.\n"
-           "  -c, --convert-rpath         Convert an existing DT_RPATH to DT_RUNPATH.\n"
-           "      --convert               An alias for '--convert-rpath'.\n"
-           "\n"
-           "\n"
-           "DT_NEEDED options:\n"
-           "\n"
-           "  -a, --add-needed <library>[,<library>...]\n"
-           "                              Add a dependency <library> on a dynamic library.\n"
-           "                              Can be a single library or a comma separated list.\n"
-           "  -r, --remove-needed <library>[,<library>...]\n"
-           "                              Remove a dependency <library> from a dynamic library.\n"
-           "                              Can be a single library or a comma separated list.\n"
-           "  -n, --replace-needed <library> <new-library>\n"
-           "                              Replace a dependency <library> on a dynamic library with\n"
-           "                              a new dependency <new-library>. Arguments must be\n"
-           "                              separated by comma.\n" */
-           "                              This option can be given multiple times.\n"
-           "  -N, --print-needed          Prints all DT_NEEDED entries.\n"
-           "\n"
-           "\n"
-           "DT_SONAME options:\n"
-           "\n"
-           "  -S, --set-soname <soname>   Change the DT_SONAME entry of a library to <soname>.\n"
-           "                              Creates a new entry if none exists."
-           "      --soname <soname>       An alias for '--set-soname'.\n"
-           "  -P, --print-soname          Print the soname of a library.\n"
-           "\n"
-           "\n"
-           "Other options:\n"
-           "\n"
-           "  -b, --backup                Save a backup of the unmodified file with the\n"
-           "                              suffix '~orig'.\n"
-           "  -d, --debug                 Print details of the changes made to the input file.\n"
-           "  -F, --full-debug            Same as '--debug', but including information about\n"
-           "                              rewriting symbols, which can be quite a lot.\n"
-           "  -A, --print-all             Runs all print options at once. This equals '-FIptPN'.\n"
-           "  -w, --with-gold-support     Support executables created by the Gold linker.\n"
-           "\n"
-           "                              These are marked as ET_DYN (not ET_EXEC) and have a\n"
-           "                              starting virtual address of 0 so they cannot grow\n"
-           "                              downwards. In order not to run into a Linux kernel bug,\n"
-           "                              the virtual address and the offset of the new PT_LOAD\n"
-           "                              segment have to be equal; otherwise ld-linux segfaults.\n"
-           "                              To ensure this, it may be necessary to add some padding\n"
-           "                              to the executable (potentially a lot of padding, if\n"
-           "                              the executable has a large uninitialised data segment).\n"
-           "\n", progName.c_str());
-    std::exit(0);
-}
 
 void version()
 {
@@ -1774,14 +1685,14 @@ void version()
 int main(int argc, char * * argv)
 {
     if (argc <= 1) {
-        usage(argv[0]);
+        showHelp(argv[0]);
     }
 
     int ch;
-    while ((ch = getopt_long(argc, argv, ":wbdfi:IR:Dptsca:r:n:NS:PAFhVv", long_options, NULL)) != -1) {
+    while ((ch = getopt_long(argc, argv, ":gbdfi:IR:Dptsca:r:n:NS:PAFVv", long_options, NULL)) != -1) {
         switch (ch) {
-        case 'w':
-            goldSupport = true;
+        case 'g':
+            goldSupport = false;
             /*
                I don't know if this bug in the Linux kernel still
                appears, so I made this workaround optional. Here's
@@ -1813,9 +1724,6 @@ int main(int argc, char * * argv)
         case 'F':
             debugMode = true;
             debugModeFull = true;
-            break;
-        case 'h':
-            showHelp(argv[0]);
             break;
         case 'V':
             version();
@@ -1890,7 +1798,7 @@ int main(int argc, char * * argv)
             break;
         default:
             fprintf(stderr, "missing or wrong argument(s)\n\n");
-            usage(argv[0]);
+            showHelp(argv[0]);
             break;
         }
     }
