@@ -40,6 +40,7 @@ let
         name = "patchelf";
         src = tarball;
         doCheck = !stdenv.isDarwin && system != "i686-cygwin" && system != "i686-solaris";
+        buildInputs = lib.optionals stdenv.isLinux [ acl attr ];
       });
 
 
