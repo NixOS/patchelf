@@ -25,3 +25,9 @@ config.h*
 /tests/no-rpath
 /tests/no-rpath-*.sh
 /tests/*.so
+/tests/big-dynstr
+/tests/big-dynstr.c
+/tests/main
+/tests/main-scoped
+/tests/scratch/
+/tests/simple
