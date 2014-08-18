@@ -1,3 +1,5 @@
+LIBS =
+
 check_PROGRAMS = simple main main-scoped big-dynstr no-rpath
 
 no_rpath_arch_TESTS = \
