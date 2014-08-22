@@ -440,7 +440,7 @@ void ElfFile<ElfFileParamNames>::sortShdrs()
 
 static void writeFile(string fileName)
 {
-	int fd = open(fileName.c_str(), O_TRUNC | O_WRONLY, 0700);
+	int fd = open(fileName.c_str(), O_TRUNC | O_WRONLY);
 	if (fd == -1)
 		error("open");
 
