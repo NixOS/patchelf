@@ -719,7 +719,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
         } else {
             size_t hole = startPage - startOffset;
             /* Print a warning, because the hole could be very big. */
-            fprintf(stderr, "warning: working around a Linux kernel bug by creating a hole of %zu bytes in â%sâ\n", hole, fileName.c_str());
+            fprintf(stderr, "warning: working around a Linux kernel bug by creating a hole of %zu bytes in ‘%s’\n", hole, fileName.c_str());
             assert(hole % pageSize == 0);
             /* !!! We could create an actual hole in the file here,
                but it's probably not worth the effort. */
