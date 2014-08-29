@@ -1,5 +1,5 @@
 AC_INIT([PatchELF],
-        m4_esyscmd([echo -n $(cat ./version)]),
+        m4_esyscmd([printf $(cat ./version)]),
         [https://github.com/NixOS/patchelf])
 
 #AC_CONFIG_HEADERS(config.h)
