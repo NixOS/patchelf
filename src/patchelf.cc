@@ -1,21 +1,66 @@
-#include <string>
-#include <vector>
-#include <set>
-#include <map>
-#include <algorithm>
+/*
+ *  PatchELF is a simple utility for modifing existing ELF executables
+ *  and libraries.
+ *
+ *  Copyright (c) 2004-2014  Eelco Dolstra <eelco.dolstra@logicblox.com>
+ *
+ *  Contributors: Zack Weinberg, rgcjonas, Jeremy Sanders, djcj
+ *
+ *  This program is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 3 of the License, or (at
+ *  your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful, but
+ *  WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *  General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdarg.h>
+#define COPYRIGHT \
+"Copyright (c) 2004-2014  Eelco Dolstra <eelco.dolstra@logicblox.com>\n\
+\
+Contributors: Zack Weinberg, rgcjonas, Jeremy Sanders, djcj\n"
+
+#define LICENSE "This program is free software; you may redistribute it under the terms of\n\
+the GNU General Public License version 3 or (at your option) any later version.\n\
+This program has absolutely no warranty.\n"
+
+
+#ifdef HAVE_ELF_H
+# include <elf.h>
+#else
+# include "elf.h"
+#endif
+
 #include <assert.h>
-#include <string.h>
+#include <algorithm>
 #include <errno.h>
-
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include <fcntl.h>
+
+#include <getopt.h>
+#include <fstream>
+#include <functional>
+#include <iostream>
 #include <limits.h>
+
+#include <map>
+#include <set>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <vector>
+
+using namespace std;
+
 
 #ifdef HAVE_ATTR_LIBATTR_H
 # include <attr/libattr.h>
@@ -27,10 +72,6 @@
 # include <acl/libacl.h>
 #endif
 
-#include "elf.h"
-
-using namespace std;
-
 
 #ifdef MIPSEL
 /* The lemote fuloong 2f kernel defconfig sets a page size of 16KB */
@@ -41,14 +82,17 @@ const unsigned int pageSize = 4096;
 
 
 static bool debugMode = false;
-
+static bool debugModeFull = false;
 static bool forceRPath = false;
+static bool goldSupport = true;
 
 static string fileName;
 
 
 off_t fileSize, maxSize;
 unsigned char * contents = 0;
+
+unsigned int dynStrAddedBytes = 0;
 
 
 #define ElfFileParams class Elf_Ehdr, class Elf_Phdr, class Elf_Shdr, class Elf_Addr, class Elf_Off, class Elf_Dyn, class Elf_Sym
@@ -69,6 +113,7 @@ class ElfFile
     bool isExecutable;
 
     typedef string SectionName;
+
     typedef map<SectionName, string> ReplacedSections;
 
     ReplacedSections replacedSections;
@@ -96,7 +141,24 @@ public:
 
     void parse();
 
-private:
+    void rewriteSections();
+
+    string getInterpreter();
+    void printInterpreter();
+    void setInterpreter(const string & newInterpreter);
+
+    typedef enum { rpPrint, rpType, rpShrink, rpSet, rpDelete, rpConvert } RPathOp;
+    void modifyRPath(RPathOp op, string newRPath);
+
+    typedef enum { addNeeded, removeNeeded } neededOp;
+    void addRemoveNeeded(neededOp op, set < string > libs);
+    void replaceNeeded(const string & libs);
+    void printNeededLibs();
+
+    typedef enum { printSoname, replaceSoname } sonameMode;
+    void modifySoname(sonameMode op, const string & newSoname);
+
+ private:
 
     struct CompPhdr
     {
@@ -148,30 +210,6 @@ private:
 
     void rewriteSectionsExecutable();
 
-public:
-
-    void rewriteSections();
-
-    string getInterpreter();
-
-    string getSoname();
-
-    void setSoname(const string & newSoname);
-
-    void setInterpreter(const string & newInterpreter);
-
-    typedef enum { rpPrint, rpShrink, rpSet } RPathOp;
-
-    void modifyRPath(RPathOp op, string newRPath);
-
-    void addNeeded(set<string> libs);
-
-    void removeNeeded(set<string> libs);
-    
-    void replaceNeeded(map<string, string>& libs);
-
-private:
-
     /* Convert an integer in big or little endian representation (as
        specified by the ELF header) to this platform's integer
        representation. */
@@ -186,6 +224,8 @@ private:
         return i;
     }
 };
+
+vector <string> v;
 
 
 /* !!! G++ creates broken code if this function is inlined, don't know
@@ -205,6 +245,28 @@ I ElfFile<ElfFileParamNames>::rdi(I i)
         }
     }
     return r;
+}
+
+
+void split(const string & s, char c, vector<string> & v)
+{
+    string::size_type i = 0;
+    string::size_type j = s.find(c);
+
+    /* check if string s even contains char c */
+    if (s.find(c) != string::npos) {
+
+        /* split the string */
+        while (j != string::npos) {
+            v.push_back(s.substr(i, j - i));
+            i = ++j;
+            j = s.find(c, j);
+
+            if (j == string::npos)
+                v.push_back(s.substr(i, s.length()));
+        }
+    } else
+        v.push_back(s);
 }
 
 
@@ -389,15 +451,57 @@ static void writeFile(string fileName, mode_t fileMode)
     if (close(fd) != 0) error("close");
 
 #if defined(HAVE_ATTR_COPY_FILE)
-    if (attr_copy_file(fileName.c_str(), fileName2.c_str(), 0, 0) != 0) error("attr_copy_file");
+    if (attr_copy_file(fileName.c_str(), fileName2.c_str(), 0, 0) != 0)
+        error("attr_copy_file");
 #endif
 #if defined(HAVE_PERM_COPY_FILE)
-    if (perm_copy_file(fileName.c_str(), fileName2.c_str(), 0) != 0) error("perm_copy_file");
+    if (perm_copy_file(fileName.c_str(), fileName2.c_str(), 0) != 0)
+        error("perm_copy_file");
 #else
     if (chmod(fileName2.c_str(), fileMode) != 0) error("chmod");
 #endif
 
     if (rename(fileName2.c_str(), fileName.c_str()) != 0) error("rename");
+}
+
+
+static void writeFileBackup(string fileName, mode_t fileMode)
+{
+    /* Don't use the method in writeFile() to back up files because it will
+       screw up the file's integrity. */
+
+    string fileName2 = fileName + "~orig";
+
+    char buffer[1];
+
+    ifstream input(fileName.c_str(), ios::in);
+    if (input.fail())
+    error("Error opening input file");
+
+    ofstream output(fileName2.c_str(), ios::out);
+    if (output.fail())
+        error("Error opening output file");
+
+    do {
+        input.read(buffer, sizeof(buffer));
+            if (input.good())
+            output.write(buffer, sizeof(buffer));
+    } while (!input.eof());
+
+    input.close();
+    output.close();
+
+#if defined(HAVE_ATTR_COPY_FILE)
+    if (attr_copy_file(fileName.c_str(), fileName2.c_str(), 0, 0) != 0)
+        error("attr_copy_file");
+#endif
+#if defined(HAVE_PERM_COPY_FILE)
+    if (perm_copy_file(fileName.c_str(), fileName2.c_str(), 0) != 0)
+        error("perm_copy_file");
+#else
+    if (chmod(fileName2.c_str(), fileMode) != 0)
+        error("chmod");
+#endif
 }
 
 
@@ -609,7 +713,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
        to its offset; otherwise we hit the kernel bug.  This may
        require creating a hole in the executable.  The bigger the size
        of the uninitialised data segment, the bigger the hole. */
-    if (isExecutable) {
+    if (isExecutable && goldSupport) {
         if (startOffset >= startPage) {
             debug("shifting new PT_LOAD segment by %d bytes to work around a Linux kernel bug\n", startOffset - startPage);
         } else {
@@ -869,7 +973,8 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                 string section = sectionsByOldIndex.at(shndx);
                 assert(!section.empty());
                 unsigned int newIndex = findSection3(section); // inefficient
-                //debug("rewriting symbol %d: index = %d (%s) -> %d\n", entry, shndx, section.c_str(), newIndex);
+                if (debugModeFull)
+                    debug("rewriting symbol %d: index = %d (%s) -> %d\n", entry, shndx, section.c_str(), newIndex);
                 wri(sym->st_shndx, newIndex);
                 /* Rewrite st_value.  FIXME: we should do this for all
                    types, but most don't actually change. */
@@ -896,88 +1001,122 @@ string ElfFile<ElfFileParamNames>::getInterpreter()
     return string((char *) contents + rdi(shdr.sh_offset), rdi(shdr.sh_size));
 }
 
-template<ElfFileParams>
-string ElfFile<ElfFileParamNames>::getSoname()
+
+template < ElfFileParams >
+    void ElfFile < ElfFileParamNames >::printInterpreter()
 {
-    Elf_Shdr & shdrDynamic = findSection(".dynamic");
-    Elf_Shdr & shdrDynStr = findSection(".dynstr");
-    char * strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
-
-    /* Find the DT_STRTAB entry in the dynamic section. */
-    Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
-    Elf_Addr strTabAddr = 0;
-    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++)
-        if (rdi(dyn->d_tag) == DT_STRTAB) strTabAddr = rdi(dyn->d_un.d_ptr);
-    if (!strTabAddr) error("strange: no string table");
-
-    /* We assume that the virtual address in the DT_STRTAB entry
-       of the dynamic section corresponds to the .dynstr section. */
-    assert(strTabAddr == rdi(shdrDynStr.sh_addr));
-
-    Elf_Dyn * dynSoname = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
-    char * soname = 0;
-    for ( ; rdi(dynSoname->d_tag) != DT_NULL; dynSoname++) {
-        if (rdi(dynSoname->d_tag) == DT_SONAME) {
-            soname = strTab + rdi(dynSoname->d_un.d_val);
-            break;
-        }
-    }
-    if (rdi(dynSoname->d_tag) == DT_NULL) {
-        error("Specified ELF file does not contain any DT_SONAME entry in .dynamic section!");
-    }
-    else {
-        return soname;
-    }
+    if (debugModeFull) debug("Interpreter: ");
+    if (findSection2(".interp"))
+        printf("%s\n", getInterpreter().c_str());
+    else
+        debug("cannot find section .interp\n");
 }
 
+
 template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::setSoname(const string & newSoname)
+void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const string & newSoname)
 {
+    if (rdi(hdr->e_type) != ET_DYN) {
+        debug("this is not a dynamic library\n");
+        return;
+    }
+
     Elf_Shdr & shdrDynamic = findSection(".dynamic");
+
+    /* !!! We assume that the virtual address in the DT_STRTAB entry of
+       the dynamic section corresponds to the .dynstr section. */
     Elf_Shdr & shdrDynStr = findSection(".dynstr");
-    char * strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
+    char * strTab = (char *)contents + rdi(shdrDynStr.sh_offset);
 
     /* Find the DT_STRTAB entry in the dynamic section. */
     Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
     Elf_Addr strTabAddr = 0;
-    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++)
-        if (rdi(dyn->d_tag) == DT_STRTAB) strTabAddr = rdi(dyn->d_un.d_ptr);
-    if (!strTabAddr) error("strange: no string table");
+    for (; rdi(dyn->d_tag) != DT_NULL; dyn++)
+        if (rdi(dyn->d_tag) == DT_STRTAB)
+            strTabAddr = rdi(dyn->d_un.d_ptr);
+    if (!strTabAddr)
+        error("strange: no string table");
 
-    /* We assume that the virtual address in the DT_STRTAB entry
-       of the dynamic section corresponds to the .dynstr section. */
     assert(strTabAddr == rdi(shdrDynStr.sh_addr));
 
-    Elf_Dyn * dynSoname = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+    /* Walk through the dynamic section, look for the DT_SONAME entry. */
+    static vector < string > neededLibs;
+    dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+    Elf_Dyn * dynSoname = 0;
     char * soname = 0;
-    for ( ; rdi(dynSoname->d_tag) != DT_NULL; dynSoname++) {
-        if (rdi(dynSoname->d_tag) == DT_SONAME) {
-            soname = strTab + rdi(dynSoname->d_un.d_val);
-            break;
+    for (; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+        if (rdi(dyn->d_tag) == DT_SONAME) {
+            dynSoname = dyn;
+            soname = strTab + rdi(dyn->d_un.d_val);
+        } else if (rdi(dyn->d_tag) == DT_INIT)
+            neededLibs.push_back(string(strTab + rdi(dyn->d_un.d_val)));
         }
-    }
-    if (rdi(dynSoname->d_tag) == DT_NULL)
-        error("Specified ELF file does not contain any DT_SONAME entry in .dynamic section!");
 
-    if (newSoname.size() <= strlen(soname)) {
-        debug("old soname: `%s', new soname: `%s'\n", soname, newSoname.c_str());
-        strcpy(soname, newSoname.c_str());
-        changed = true;
+    if (op == printSoname) {
+        if (debugModeFull)
+            debug("SONAME: ");
+        if (soname) {
+            if (string(soname ? soname : "") == "")
+                debug("DT_SONAME is empty\n");
+            else
+                printf("%s\n", soname);
+        } else
+            debug("no DT_SONAME found\n");
+        return;
     }
+
+    if (string(soname ? soname : "") == newSoname) {
+        debug("current and proposed new SONAMEs are equal\n"
+              "keeping DT_SONAME entry\n");
+        return;
+    }
+
+    /* Zero out the previous SONAME */
+    unsigned int sonameSize = 0;
+    if (soname) {
+        sonameSize = strlen(soname);
+        memset(soname, 'X', sonameSize);
+    }
+
+    debug("new SONAME is `%s'\n", newSoname.c_str());
+
+    /* Grow the .dynstr section to make room for the new SONAME. */
+    debug("SONAME is too long, resizing...\n");
+
+    string & newDynStr =
+        replaceSection(".dynstr",
+               rdi(shdrDynStr.sh_size) + newSoname.size() + 1);
+    setSubstr(newDynStr, rdi(shdrDynStr.sh_size), newSoname + '\0');
+
+    /* Update the DT_SONAME entry. */
+    if (dynSoname)
+        dynSoname->d_un.d_val = shdrDynStr.sh_size;
     else {
-        /* Grow the .dynstr section to make room for the new DT_SONAME */
-        debug("new soname is too long, resizing .dynstr section...\n");
+        /* There is no DT_SONAME entry in the .dynamic section, so we
+           have to grow the .dynamic section. */
+        string & newDynamic = replaceSection(".dynamic",
+                             rdi(shdrDynamic.sh_size) +
+                             sizeof(Elf_Dyn));
 
-        string & newDynStr = replaceSection(".dynstr",
-            rdi(shdrDynStr.sh_size) + newSoname.size() + 1);
-        setSubstr(newDynStr, rdi(shdrDynStr.sh_size), newSoname + '\0');
-        /* Update the DT_SONAME entry, if any */
-        if (dynSoname) {
-            debug("old soname: `%s', new soname: `%s'\n", soname, newSoname.c_str());
-            dynSoname->d_un.d_val = shdrDynStr.sh_size;
-            changed = true;
-        }
+        unsigned int idx = 0;
+        for (;
+             rdi(((Elf_Dyn *) newDynamic.c_str())[idx].d_tag) !=
+             DT_NULL; idx++) ;
+        debug("DT_NULL index is %d\n", idx);
+
+        /* Shift all entries down by one. */
+        setSubstr(newDynamic, sizeof(Elf_Dyn),
+              string(newDynamic, 0, sizeof(Elf_Dyn) * (idx + 1)));
+
+        /* Add the DT_SONAME entry at the top. */
+        Elf_Dyn newDyn;
+        wri(newDyn.d_tag, DT_SONAME);
+        newDyn.d_un.d_val = shdrDynStr.sh_size;
+        setSubstr(newDynamic, 0,
+              string((char *)&newDyn, sizeof(Elf_Dyn)));
     }
+
+    changed = true;
 }
 
 template<ElfFileParams>
@@ -1032,14 +1171,17 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
     dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
     Elf_Dyn * dynRPath = 0, * dynRunPath = 0;
     char * rpath = 0;
+    string RPathType = "";
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_RPATH) {
+            RPathType = "DT_RPATH";
             dynRPath = dyn;
             /* Only use DT_RPATH if there is no DT_RUNPATH. */
             if (!dynRunPath)
                 rpath = strTab + rdi(dyn->d_un.d_val);
         }
         else if (rdi(dyn->d_tag) == DT_RUNPATH) {
+            RPathType = "DT_RUNPATH";
             dynRunPath = dyn;
             rpath = strTab + rdi(dyn->d_un.d_val);
         }
@@ -1048,19 +1190,35 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
     }
 
     if (op == rpPrint) {
-        printf("%s\n", rpath ? rpath : "");
+        if (debugModeFull) debug("RPATH: ");
+        if (rpath) {
+            if (string(rpath ? rpath : "") == "")
+                debug("RPATH is empty\n");
+            else
+                printf("%s\n", rpath);
+            } else
+                debug("no RPATH found\n");
+            return;
+    }
+
+    if (op == rpType) {
+        if (debugModeFull) debug("RPATH type: ");
+        if (rpath)
+            printf("%s\n", RPathType.c_str());
+        else
+            debug("no RPATH found\n");
         return;
     }
 
-    if (op == rpShrink && !rpath) {
-        debug("no RPATH to shrink\n");
-        return;
-    }
 
-
-    /* For each directory in the RPATH, check if it contains any
-       needed library. */
     if (op == rpShrink) {
+        if (!rpath) {
+                debug("no RPATH to shrink\n");
+                return;
+        }
+
+        /* For each directory in the RPATH, check if it contains any
+           needed library. */
         static vector<bool> neededLibFound(neededLibs.size(), false);
 
         newRPath = "";
@@ -1102,8 +1260,40 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
         }
     }
 
+    if (op == rpDelete) {
+        if (!rpath) {
+            debug("no RPATH to delete\n");
+            return;
+        }
+
+        Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+        Elf_Dyn * last = dyn;
+        for (; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+            if (rdi(dyn->d_tag) == DT_RPATH) {
+                debug("removing DT_RPATH entry\n");
+                changed = true;
+            } else if (rdi(dyn->d_tag) == DT_RUNPATH) {
+                debug("removing DT_RUNPATH entry\n");
+                changed = true;
+            } else {
+                *last++ = *dyn;
+            }
+        }
+        memset(last, 0, sizeof(Elf_Dyn) * (dyn - last));
+        return;
+    }
+
+    /* Check if a DT_RPATH that could be converted to DT_RUNPATH exists. */
+    if (op == rpConvert && !rpath) {
+        debug("no RPATH to convert\n");
+        return;
+    }
 
     if (string(rpath ? rpath : "") == newRPath) return;
+
+    /* convert existing DT_RPATH to DT_RUNPATH */
+    if (op == rpConvert && rpath)
+        newRPath = string(rpath ? rpath : "");
 
     changed = true;
 
@@ -1169,179 +1359,216 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
 
 
 template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::removeNeeded(set<string> libs)
+void ElfFile<ElfFileParamNames>::replaceNeeded(const string & libs)
 {
-    if (libs.empty()) return;
+    split(libs, ',', v);
+    if (v[0] == "" || v[1] == "")
+        fprintf(stderr, "warning: empty argument in `%s'\n", libs.c_str());
+    const string & oldlib = v[0];
+    const string & replacement = v[1];
 
     Elf_Shdr & shdrDynamic = findSection(".dynamic");
     Elf_Shdr & shdrDynStr = findSection(".dynstr");
-    char * strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
+    char * strTab = (char *)contents + rdi(shdrDynStr.sh_offset);
 
     Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
-    Elf_Dyn * last = dyn;
-    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+
+    for (; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_NEEDED) {
             char * name = strTab + rdi(dyn->d_un.d_val);
-            if (libs.find(name) != libs.end()) {
-                debug("removing DT_NEEDED entry `%s'\n", name);
-                changed = true;
-            } else {
-                debug("keeping DT_NEEDED entry `%s'\n", name);
-                *last++ = *dyn;
-            }
-        } else
-            *last++ = *dyn;
-    }
-
-    memset(last, 0, sizeof(Elf_Dyn) * (dyn - last));
-}
-
-template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::replaceNeeded(map<string, string>& libs)
-{
-    if (libs.empty()) return;
-    
-    Elf_Shdr & shdrDynamic = findSection(".dynamic");
-    Elf_Shdr & shdrDynStr = findSection(".dynstr");
-    char * strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
-
-    Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
-    
-    unsigned int dynStrAddedBytes = 0;
-    
-    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
-        if (rdi(dyn->d_tag) == DT_NEEDED) {
-            char * name = strTab + rdi(dyn->d_un.d_val);
-            if (libs.find(name) != libs.end()) {
-                const string & replacement = libs[name];
-                
+            if (name == oldlib) {
                 debug("replacing DT_NEEDED entry `%s' with `%s'\n", name, replacement.c_str());
-                
-                // technically, the string referred by d_val could be used otherwise, too (although unlikely)
-                // we'll therefore add a new string
+
+                /* technically, the string referred by d_val
+                   could be used otherwise, too (although
+                   unlikely) we'll therefore add a new string */
                 debug("resizing .dynstr ...");
-                
+
                 string & newDynStr = replaceSection(".dynstr",
-                    rdi(shdrDynStr.sh_size) + replacement.size() + 1 + dynStrAddedBytes);
+                                         rdi(shdrDynStr.sh_size) + replacement.size() + 1 + dynStrAddedBytes);
+
                 setSubstr(newDynStr, rdi(shdrDynStr.sh_size) + dynStrAddedBytes, replacement + '\0');
-                
+
                 dyn->d_un.d_val = shdrDynStr.sh_size + dynStrAddedBytes;
-                
+
                 dynStrAddedBytes += replacement.size() + 1;
-                
+
                 changed = true;
-            } else {
+            } else
                 debug("keeping DT_NEEDED entry `%s'\n", name);
-            }
         }
     }
 }
 
 template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::addNeeded(set<string> libs)
+void ElfFile<ElfFileParamNames>::addRemoveNeeded(neededOp op, set<string> libs)
 {
     if (libs.empty()) return;
 
     Elf_Shdr & shdrDynamic = findSection(".dynamic");
     Elf_Shdr & shdrDynStr = findSection(".dynstr");
-    char * strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
+    char * strTab = (char * )contents + rdi(shdrDynStr.sh_offset);
 
     Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
-    
+
+    if (op == removeNeeded) {
+        Elf_Dyn * last = dyn;
+        for (; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+            if (rdi(dyn->d_tag) == DT_NEEDED) {
+                char * name = strTab + rdi(dyn->d_un.d_val);
+                if (libs.find(name) != libs.end()) {
+                    debug("removing DT_NEEDED entry `%s'\n", name);
+                    changed = true;
+                } else {
+                    debug("keeping DT_NEEDED entry `%s'\n", name);
+                    *last++ = *dyn;
+                }
+            } else
+                *last++ = *dyn;
+        }
+        memset(last, 0, sizeof(Elf_Dyn) * (dyn - last));
+        return;
+    }
+
     /* add all new libs to the dynstr string table */
     unsigned int length = 0;
-    for (set<string>::iterator it = libs.begin(); it != libs.end(); it++) {
+    for (set<string>::iterator it = libs.begin(); it != libs.end(); it++)
         length += it->size() + 1;
-    }
-    
-    string & newDynStr = replaceSection(".dynstr",
-        rdi(shdrDynStr.sh_size) + length + 1);
+
+    string & newDynStr = replaceSection(".dynstr", rdi(shdrDynStr.sh_size) + length + 1);
     set<Elf64_Xword> libStrings;
+
     unsigned int pos = 0;
     for (set<string>::iterator it = libs.begin(); it != libs.end(); it++) {
         setSubstr(newDynStr, rdi(shdrDynStr.sh_size) + pos, *it + '\0');
         libStrings.insert(rdi(shdrDynStr.sh_size) + pos);
         pos += it->size() + 1;
     }
-    
+
     /* add all new needed entries to the dynamic section */
-    string & newDynamic = replaceSection(".dynamic",
-        rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn) * libs.size());
+    string & newDynamic =
+        replaceSection(".dynamic", rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn) * libs.size());
 
     unsigned int idx = 0;
-    for ( ; rdi(((Elf_Dyn *) newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
+    for (; rdi(((Elf_Dyn *) newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
     debug("DT_NULL index is %d\n", idx);
 
     /* Shift all entries down by the number of new entries. */
     setSubstr(newDynamic, sizeof(Elf_Dyn) * libs.size(),
-        string(newDynamic, 0, sizeof(Elf_Dyn) * (idx + 1)));
+                string(newDynamic, 0, sizeof(Elf_Dyn) * (idx + 1)));
 
     /* Add the DT_NEEDED entries at the top. */
     unsigned int i = 0;
-    for (set<Elf64_Xword>::iterator it = libStrings.begin(); it != libStrings.end(); it++, i++) {
+    for (set < Elf64_Xword >::iterator it = libStrings.begin();
+         it != libStrings.end(); it++, i++) {
         Elf_Dyn newDyn;
         wri(newDyn.d_tag, DT_NEEDED);
         wri(newDyn.d_un.d_val, *it);
-        setSubstr(newDynamic, i * sizeof(Elf_Dyn), string((char *) &newDyn, sizeof(Elf_Dyn)));
+        setSubstr(newDynamic, i * sizeof(Elf_Dyn), string((char *)&newDyn, sizeof(Elf_Dyn)));
     }
-    
+
     changed = true;
 }
 
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::printNeededLibs()
+{
+    Elf_Shdr & shdrDynamic = findSection(".dynamic");
+    Elf_Shdr & shdrDynStr = findSection(".dynstr");
+    char * strTab = (char *)contents + rdi(shdrDynStr.sh_offset);
+
+    Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+
+    debug("DT_NEEDED entries:\n");
+    Elf_Dyn * last = dyn;
+    for (; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+        if (rdi(dyn->d_tag) == DT_NEEDED) {
+            char * name = strTab + rdi(dyn->d_un.d_val);
+            printf("%s\n", name);
+        }
+    }
+}
+
+
+static bool saveBackup = false;
 
 static bool printInterpreter = false;
-static bool printSoname = false;
-static bool setSoname = false;
-static string newSoname;
 static string newInterpreter;
 
 static bool shrinkRPath = false;
 static bool setRPath = false;
 static bool printRPath = false;
+static bool printRPathType = false;
 static string newRPath;
-static set<string> neededLibsToRemove;
-static map<string, string> neededLibsToReplace;
-static set<string> neededLibsToAdd;
+static bool deleteRPath = false;
+static bool convertRPath = false;
+
+static set <string> neededLibsToRemove;
+static set <string> neededLibsToAdd;
+static string neededLibsToReplace;
+static bool printNeeded = false;
+
+static string newSoname;
+static bool printSoname = false;
+
+static bool printAll = false;
 
 template<class ElfFile>
 static void patchElf2(ElfFile & elfFile, mode_t fileMode)
 {
     elfFile.parse();
 
+    if (printAll) {
+        debugMode = true;
+        debugModeFull = true;
+        printInterpreter = true;
+        printRPath = true;
+        printRPathType = true;
+        printSoname = true;
+        printNeeded = true;
+    }
+
     if (printInterpreter)
-        printf("%s\n", elfFile.getInterpreter().c_str());
-
+        elfFile.printInterpreter();
+    if (printRPath)
+        elfFile.modifyRPath(elfFile.rpPrint, "");
+    if (printRPathType)
+        elfFile.modifyRPath(elfFile.rpType, "");
     if (printSoname)
-        printf("%s\n", elfFile.getSoname().c_str());
-
-    if (setSoname)
-        elfFile.setSoname(newSoname);
+        elfFile.modifySoname(elfFile.printSoname, "");
+    if (printNeeded)
+        elfFile.printNeededLibs();
 
     if (newInterpreter != "")
         elfFile.setInterpreter(newInterpreter);
-
-    if (printRPath)
-        elfFile.modifyRPath(elfFile.rpPrint, "");
-
-    if (shrinkRPath)
+    else if (shrinkRPath)
         elfFile.modifyRPath(elfFile.rpShrink, "");
     else if (setRPath)
         elfFile.modifyRPath(elfFile.rpSet, newRPath);
+    else if (deleteRPath)
+        elfFile.modifyRPath(elfFile.rpDelete, "");
+    else if (convertRPath)
+        elfFile.modifyRPath(elfFile.rpConvert, "");
+    else if (!neededLibsToAdd.empty())
+        elfFile.addRemoveNeeded(elfFile.addNeeded, neededLibsToAdd);
+    else if (!neededLibsToRemove.empty())
+        elfFile.addRemoveNeeded(elfFile.removeNeeded, neededLibsToRemove);
+    else if (neededLibsToReplace != "")
+        elfFile.replaceNeeded(neededLibsToReplace);
+    else if (newSoname != "")
+        elfFile.modifySoname(elfFile.replaceSoname, newSoname);
 
-    elfFile.removeNeeded(neededLibsToRemove);
-    elfFile.replaceNeeded(neededLibsToReplace);
-    elfFile.addNeeded(neededLibsToAdd);
-
-    if (elfFile.isChanged()){
+    if (elfFile.isChanged()) {
+        if (saveBackup) writeFileBackup(fileName, fileMode);
         elfFile.rewriteSections();
-        writeFile(fileName, fileMode);
+        writeFile(fileName);
     }
 }
 
 
 static void patchElf()
 {
-    if (!printInterpreter && !printRPath && !printSoname)
+    if (!printInterpreter && !printRPath && !printRPathType && !printSoname && !printNeeded)
         debug("patching ELF file `%s'\n", fileName.c_str());
 
     mode_t fileMode;
@@ -1375,107 +1602,211 @@ static void patchElf()
 
 void showHelp(const string & progName)
 {
-        fprintf(stderr, "syntax: %s\n\
-  [--set-interpreter FILENAME]\n\
-  [--print-interpreter]\n\
-  [--print-soname]\t\tPrints 'DT_SONAME' entry of .dynamic section. Raises an error if DT_SONAME doesn't exist\n\
-  [--set-soname SONAME]\t\tSets 'DT_SONAME' entry to SONAME. Raises an error if DT_SONAME doesn't exist\n\
-  [--set-rpath RPATH]\n\
-  [--shrink-rpath]\n\
-  [--print-rpath]\n\
-  [--force-rpath]\n\
-  [--add-needed LIBRARY]\n\
-  [--remove-needed LIBRARY]\n\
-  [--replace-needed LIBRARY NEW_LIBRARY]\n\
-  [--debug]\n\
-  [--version]\n\
-  FILENAME\n", progName.c_str());
+    fprintf(stderr,
+        "Syntax: %s [options] <elffile>\n"
+        "\n"
+        "Options:\n"
+        "  -i --set-interpreter <interpreter>\n"
+        "     --interpreter <interpreter>\n"
+        "  -I --print-interpreter\n"
+        "\n"
+        "  -R --set-rpath <rpath>\n"
+        "     --rpath <rpath>\n"
+        "  -D --delete-rpath\n"
+        "  -s --shrink-rpath\n"
+        "  -p --print-rpath\n"
+        "  -t --print-rpath-type\n"
+        "     --type\n"
+        "  -f --force-rpath\n"
+        "  -c --convert-rpath\n"
+        "     --convert\n"
+        "\n"
+        "  -a --add-needed <library>[,<library>...]\n"
+        "  -r --remove-needed <library>[,<library>...]\n"
+        "  -n --replace-needed <library>,<new-library>\n"
+        "  -N --print-needed\n"
+        "\n"
+        "  -S --set-soname <soname>\n"
+        "     --soname <soname>\n"
+        "  -P --print-soname\n"
+        "\n"
+        "  -b --backup\n"
+        "  -d --debug\n"
+        "  -F --full-debug\n"
+        "  -A --print-all\n"
+        "  -g --disable-gold-support"
+        "\n"
+        "  -V --version\n"
+        "\n"
+        "Run 'man %s' for more information.\n", progName.c_str(),
+        progName.c_str());
+    std::exit(1);
 }
 
+static struct option long_options[] = {
+    {"set-interpreter", required_argument, 0, 'i'},
+    {"interpreter", required_argument, 0, 'i'},
+    {"print-interpreter", no_argument, 0, 'I'},
+    {"set-rpath", required_argument, 0, 'R'},
+    {"rpath", required_argument, 0, 'R'},
+    {"delete-rpath", no_argument, 0, 'D'},
+    {"print-rpath", no_argument, 0, 'p'},
+    {"print-rpath-type", no_argument, 0, 't'},
+    {"type", no_argument, 0, 't'},
+    {"shrink-rpath", no_argument, 0, 's'},
+    {"force-rpath", no_argument, 0, 'f'},
+    {"convert-rpath", no_argument, 0, 'c'},
+    {"convert", no_argument, 0, 'c'},
+    {"add-needed", required_argument, 0, 'a'},
+    {"remove-needed", required_argument, 0, 'r'},
+    {"replace-needed", required_argument, 0, 'n'},
+    {"print-needed", no_argument, 0, 'N'},
+    {"set-soname", required_argument, 0, 'S'},
+    {"soname", required_argument, 0, 'S'},
+    {"print-soname", no_argument, 0, 'P'},
+    {"print-all", no_argument, 0, 'A'},
+    {"backup", no_argument, 0, 'b'},
+    {"debug", no_argument, 0, 'd'},
+    {"full-debug", no_argument, 0, 'F'},
+    {"disable-gold-support", no_argument, 0, 'g'},
+    {"version", no_argument, 0, 'V'},
+    {"version", no_argument, 0, 'v'},
+    {0, 0, 0, 0}
+};
+
+void version()
+{
+    printf(PACKAGE_STRING "\n\n"
+           COPYRIGHT PACKAGE_BUGREPORT "\n\n"
+           LICENSE);
+    std::exit(0);
+}
 
 int main(int argc, char * * argv)
 {
     if (argc <= 1) {
         showHelp(argv[0]);
-        return 1;
     }
 
-    if (getenv("PATCHELF_DEBUG") != 0) debugMode = true;
+    int ch;
+    while ((ch = getopt_long(argc, argv, ":gbdfi:IR:Dptsca:r:n:NS:PAFVv", long_options, NULL)) != -1) {
+        switch (ch) {
+        case 'g':
+            goldSupport = false;
+            /*
+               I don't know if this bug in the Linux kernel still
+               appears, so I made this workaround optional. Here's
+               some information about it from a commentary in
+               "rewriteSectionsLibrary()":
 
-    int i;
-    for (i = 1; i < argc; ++i) {
-        string arg(argv[i]);
-        if (arg == "--set-interpreter" || arg == "--interpreter") {
-            if (++i == argc) error("missing argument");
-            newInterpreter = argv[i];
-        }
-        else if (arg == "--print-interpreter") {
-            printInterpreter = true;
-        }
-        else if (arg == "--print-soname") {
-            printSoname = true;
-        }
-        else if (arg == "--set-soname") {
-            if (++i == argc) error("missing argument");
-            setSoname = true;
-            newSoname = argv[i];
-        }
-        else if (arg == "--shrink-rpath") {
-            shrinkRPath = true;
-        }
-        else if (arg == "--set-rpath") {
-            if (++i == argc) error("missing argument");
-            setRPath = true;
-            newRPath = argv[i];
-        }
-        else if (arg == "--print-rpath") {
-            printRPath = true;
-        }
-        else if (arg == "--force-rpath") {
-            /* Generally we prefer to emit DT_RUNPATH instead of
-               DT_RPATH, as the latter is obsolete.  However, there is
-               a slight semantic difference: DT_RUNPATH is "scoped",
-               it only affects the executable or library in question,
-               not its recursive imports.  So maybe you really want to
-               force the use of DT_RPATH.  That's what this option
-               does.  Without it, DT_RPATH (if encountered) is
-               converted to DT_RUNPATH, and if neither is present, a
-               DT_RUNPATH is added.  With it, DT_RPATH isn't converted
-               to DT_RUNPATH, and if neither is present, a DT_RPATH is
-               added. */
-            forceRPath = true;
-        }
-        else if (arg == "--add-needed") {
-            if (++i == argc) error("missing argument");
-            neededLibsToAdd.insert(argv[i]);
-        }
-        else if (arg == "--remove-needed") {
-            if (++i == argc) error("missing argument");
-            neededLibsToRemove.insert(argv[i]);
-        }
-        else if (arg == "--replace-needed") {
-            if (i+2 >= argc) error("missing argument(s)");
-            neededLibsToReplace[ argv[i+1] ] = argv[i+2];
-            i += 2;
-        }
-        else if (arg == "--debug") {
+               Even though this file is of type ET_DYN, it could
+               actually be an executable.  For instance, Gold
+               produces executables marked ET_DYN.  In that case we
+               can still hit the kernel bug that necessitated
+               rewriteSectionsExecutable().  However, such
+               executables also tend to start at virtual address 0,
+               so rewriteSectionsExecutable() won't work because it
+               doesn't have any virtual address space to grow
+               downwards into.  As a workaround, make sure that the
+               virtual address of our new PT_LOAD segment relative
+               to the first PT_LOAD segment is equal to its offset;
+               otherwise we hit the kernel bug.  This may require
+               creating a hole in the executable.  The bigger the
+               size of the uninitialised data segment, the bigger
+               the hole. */
+            break;
+        case 'b':
+            saveBackup = true;
+            break;
+        case 'd':
             debugMode = true;
-        }
-        else if (arg == "--help" || arg == "-h" ) {
+            break;
+        case 'F':
+            debugMode = true;
+            debugModeFull = true;
+            break;
+        case 'V':
+            version();
+            break;
+        case 'v':
+            version();
+            break;
+        case 'I':
+            printInterpreter = true;
+            break;
+        case 'i':
+            newInterpreter = optarg;
+            break;
+        case 'R':
+            setRPath = true;
+            newRPath = optarg;
+            break;
+        case 'D':
+            deleteRPath = true;
+            break;
+        case 'p':
+            printRPath = true;
+            break;
+        case 't':
+            printRPathType = true;
+            break;
+        case 'c':
+            convertRPath = true;
+            break;
+        case 's':
+            shrinkRPath = true;
+            break;
+        case 'f':
+            forceRPath = true;
+            /*
+               Generally we prefer to emit DT_RUNPATH instead of
+               DT_RPATH, as the latter is obsolete.  However, there
+               is a slight semantic difference: DT_RUNPATH is
+               "scoped", it only affects the executable or library
+               in question, not its recursive imports.  So maybe
+               you really want to force the use of DT_RPATH.
+               That's what this option does.  Without it, DT_RPATH
+               (if encountered) is converted to DT_RUNPATH, and if
+               neither is present, a DT_RUNPATH is added.  With it,
+               DT_RPATH isn't converted to DT_RUNPATH, and if
+               neither is present, a DT_RPATH is added. */
+            break;
+        case 'a':
+            split(optarg, ',', v);
+            for (int i = 0; i < v.size(); ++i)
+                if (v[i] != "") neededLibsToAdd.insert(v[i]);
+            break;
+        case 'r':
+            split(optarg, ',', v);
+            for (int i = 0; i < v.size(); ++i)
+                neededLibsToRemove.insert(v[i]);
+            break;
+        case 'n':
+            neededLibsToReplace = optarg;
+            break;
+        case 'N':
+            printNeeded = true;
+            break;
+        case 'S':
+            newSoname = optarg;
+            break;
+        case 'P':
+            printSoname = true;
+            break;
+        case 'A':
+            printAll = true;
+            break;
+        default:
+            fprintf(stderr, "missing or wrong argument(s)\n\n");
             showHelp(argv[0]);
-            return 0;
+            break;
         }
-        else if (arg == "--version") {
-            printf(PACKAGE_STRING "\n");
-            return 0;
-        }
-        else break;
     }
 
-    if (i == argc) error("missing filename");
-    fileName = argv[i];
-
-    patchElf();
-
-    return 0;
+    for ( ; optind < argc; ++optind) {
+        char * file = argv[optind];
+        fileName = string(file);
+        patchElf();
+        return 0;
+    }
 }

@@ -1,67 +1,153 @@
 .\" Process this file with
 .\" groff -man -Tascii foo.1
 .\"
-.TH PATCHELF 1 "JUNE 2010" PATCHELF "User Manuals"
+.TH PATCHELF "1" "August 2014"
 .SH NAME
-patchelf - Modify ELF files
+PatchELF - modify properties of ELF binaries
 
 .SH SYNOPSIS
-.B patchelf
-.I OPTION
-.B
-.I FILE
-.B
+.B patchelf \fR[options] <elffile>
 
 .SH DESCRIPTION
-
-PatchELF is a simple utility for modifying existing ELF executables
-and libraries.  It can change the dynamic loader ("ELF interpreter")
-of executables and change the RPATH of executables and libraries.
+PatchELF is a simple utility for modifing existing ELF executables
+and libraries. It can change the dynamic loader ("ELF interpreter")
+of executables, change existing DT_SONAME entries of shared libraries
+and manipulate the RPATH and DT_NEEDED entries of executables and libraries.
 
 .SH OPTIONS
+\fB\-h\fR, \fB\-\-help\fR
+Display usage information.
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+Display program version number.
+.SS Dynamic loader options
+.TP
+\fB\-i\fR, \fB\-\-set\-interpreter\fR <interpreter>
+Change the dynamic loader ("ELF interpreter")
+of an executable to <interpreter>.
+.TP
+\fB    \-\-interpreter\fR
+An alias for '\-\-set\-interpreter'.
+.TP
+\fB\-I\fR, \fB\-\-print\-interpreter\fR
+Print the ELF interpreter of an executable.
+.SS RPATH options
+.TP
+\fB\-R\fR, \fB\-\-set\-rpath\fR <rpath>
+Change the RPATH of an executable or library to <rpath>.
+Creates a new entry of type DT_RUNPATH if none exists.
+.TP
+\fB    \-\-rpath\fR <rpath>
+An alias for '\-\-set\-rpath'.
+.TP
+\fB\-D\fR, \fB\-\-delete\-rpath\fR
+Remove an existing RPATH.
+.TP
+\fB\-s\fR, \fB\-\-shrink\-rpath\fR
+Remove all directories from RPATH that do not contain
+a library referenced by DT_NEEDED fields of the executable
+or library.
+For instance, if an executable references one library
+libfoo.so, and has an RPATH "/lib:/usr/lib:/foo/lib",
+and libfoo.so can only be found in /foo/lib, then the
+new RPATH will be "/foo/lib".
+.TP
+\fB\-p\fR, \fB\-\-print\-rpath\fR
+Print the RPATH of an executable or library.
+.TP
+\fB\-t\fR, \fB\-\-print\-rpath\-type\fR
+Print the type of the RPATH, whether it's DT_RPATH
+or DT_RUNPATH.
+.TP
+\fB    \-\-rpath\-type\fR
+An alias for '\-\-print\-rpath\-type'.
+.TP
+\fB\-f\fR, \fB\-\-force\-rpath\fR
+Force the use of the obsolete DT_RPATH instead of
+DT_RUNPATH.
+By default DT_RPATH is converted to DT_RUNPATH.
+.TP
+\fB\-c\fR, \fB\-\-convert\-rpath\fR
+Convert an existing DT_RPATH to DT_RUNPATH.
+.SS DT_NEEDED options
+.TP
+These options can be given multiple times.
+.TP
+\fB\-a\fR, \fB\-\-add\-needed\fR <library>[,<library>...]
+Add a dependency <library> on a dynamic library.
+Can be a single library or a comma separated list.
+.TP
+\fB\-r\fR, \fB\-\-remove\-needed\fR <library>[,<library>...]
+Remove a dependency <library> from a dynamic library.
+Can be a single library or a comma separated list.
+.TP
+\fB\-n\fR, \fB\-\-replace\-needed\fR <library>,<new\-library>
+Replace a dependency <library> on a dynamic library with
+a new dependency <new\-library>.
+Arguments must be separated by comma.
+.TP
+\fB\-N\fR, \fB\-\-print\-needed\fR
+Prints all DT_NEEDED entries.
+.SS DT_SONAME options
+.TP
+\fB\-S\fR, \fB\-\-set\-soname\fR <soname>
+Change the DT_SONAME entry of a library to <soname>.
+Creates a new entry if none exists.
+.TP
+\fB    \-\-soname\fR <soname>
+An alias for '\-\-set\-soname'.
+.TP
+\fB\-P\fR, \fB\-\-print\-soname\fR
+Print the soname of a library.
+.SS Other options
+.TP
+\fB\-b\fR, \fB\-\-backup\fR
+Save a backup of the unmodified file with the
+suffix '~orig'.
+.TP
+\fB\-d\fR, \fB\-\-debug\fR
+Print details of the changes made to the input file.
+.TP
+\fB\-F\fR, \fB\-\-full\-debug\fR
+Same as '\-\-debug', but including information about
+rewriting symbols, which can be quite a lot.
+.TP
+\fB\-A\fR, \fB\-\-print\-all\fR
+Runs all print options at once. This equals '\-FIptPN'.
+.TP
+\fB\-g\fR, \fB\-\-disable\-gold\-support\fR
+Disable support for executables created by the Gold linker.
+.IP
+These are marked as ET_DYN (not ET_EXEC) and have a
+starting virtual address of 0 so they cannot grow
+downwards. In order not to run into a Linux kernel bug,
+the virtual address and the offset of the new PT_LOAD
+segment have to be equal; otherwise ld\-linux segfaults.
+To ensure this, it may be necessary to add some padding
+to the executable (potentially a lot of padding, if
+the executable has a large uninitialised data segment).
 
-The single option given operates on a given FILE, editing in place.
+.SH BUGS
+Deleting and adding a new RPATH again and again will make the file
+grow a few KiB each time. This also happens if the RPATH was deleted
+with \fBchrpath\fR(1).
+.PP
+The \fBstrip\fR(1) command from binutils generates broken executables when
+applied to the output of patchelf (if '\-\-set-rpath' or '\-\-set-interpreter'
+with a larger path than the original is used).
+This appears to be a bug in binutils.
 
-.IP "--set-interpreter INTERPRETER"
-Change the dynamic loader ("ELF interpreter") of executable given to
-INTERPRETER.
-
-.IP --print-interpreter
-Prints the ELF interpreter of the executable.
-
-.IP "--set-rpath RPATH"
-Change the RPATH of the executable or library to RPATH.
-
-.IP --shrink-rpath
-Remove from the RPATH all directories that do not contain a
-library referenced by DT_NEEDED fields of the executable or library.
-
-For instance, if an executable references one library libfoo.so, has
-an RPATH "/lib:/usr/lib:/foo/lib", and libfoo.so can only be found
-in /foo/lib, then the new RPATH will be "/foo/lib".
-
-.IP --print-rpath
-Prints the RPATH for an executable or library.
-
-.IP --force-rpath
-Forces the use of the obsolete DT_RPATH in the file instead of
-DT_RUNPATH. By default DT_RPATH is converted to DT_RUNPATH.
-
-.IP "--remove-needed LIBRARY"
-Removes a declared depency on LIBRARY (DT_NEEDED entry). This
-option can be given multiple times.
-
-.IP --debug
-Prints details of the changes made to the input file.
-
-.IP --version
-Shows the version of patchelf.
-
-.SH AUTHOR
-Eelco Dolstra <e.dolstra@tudelft.nl>
+.SH COPYRIGHT
+Copyright \(co  2004\-2014 Eelco Dolstra <eelco.dolstra@logicblox.com>
+.PP
+Contributors: Zack Weinberg, vdanjean, rgcjonas, Jeremy Sanders, djcj
+.PP
+This program is free software; you may redistribute it under the terms of
+the GNU General Public License version 3 or (at your option) any later version.
+This program has absolutely no warranty.
 
 .SH "SEE ALSO"
 .BR elf (5),
-.BR ld.so (8)
-
-
+.BR execstack (8),
+.BR ld.so (8),
+.BR readelf (1)
