@@ -170,6 +170,8 @@ public:
     
     void replaceNeeded(map<string, string>& libs);
 
+    void noDefaultLib();
+
 private:
 
     /* Convert an integer in big or little endian representation (as
@@ -1289,6 +1291,46 @@ void ElfFile<ElfFileParamNames>::addNeeded(set<string> libs)
 }
 
 
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::noDefaultLib()
+{
+    Elf_Shdr & shdrDynamic = findSection(".dynamic");
+
+    Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+    Elf_Dyn * dynFlags1 = 0;
+    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+        if (rdi(dyn->d_tag) == DT_FLAGS_1) {
+            dynFlags1 = dyn;
+            break;
+        }
+    }
+    if (dynFlags1) {
+        if (dynFlags1->d_un.d_val & DF_1_NODEFLIB)
+            return;
+        dynFlags1->d_un.d_val |= DF_1_NODEFLIB;
+    } else {
+        string & newDynamic = replaceSection(".dynamic",
+                rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn));
+
+        unsigned int idx = 0;
+        for ( ; rdi(((Elf_Dyn *) newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
+        debug("DT_NULL index is %d\n", idx);
+
+        /* Shift all entries down by one. */
+        setSubstr(newDynamic, sizeof(Elf_Dyn),
+                string(newDynamic, 0, sizeof(Elf_Dyn) * (idx + 1)));
+
+        /* Add the DT_FLAGS_1 entry at the top. */
+        Elf_Dyn newDyn;
+        wri(newDyn.d_tag, DT_FLAGS_1);
+        newDyn.d_un.d_val = DF_1_NODEFLIB;
+        setSubstr(newDynamic, 0, string((char *) &newDyn, sizeof(Elf_Dyn)));
+    }
+
+    changed = true;
+}
+
+
 static bool printInterpreter = false;
 static bool printSoname = false;
 static bool setSoname = false;
@@ -1302,6 +1344,7 @@ static string newRPath;
 static set<string> neededLibsToRemove;
 static map<string, string> neededLibsToReplace;
 static set<string> neededLibsToAdd;
+static bool noDefaultLib = false;
 
 template<class ElfFile>
 static void patchElf2(ElfFile & elfFile, mode_t fileMode)
@@ -1331,6 +1374,9 @@ static void patchElf2(ElfFile & elfFile, mode_t fileMode)
     elfFile.removeNeeded(neededLibsToRemove);
     elfFile.replaceNeeded(neededLibsToReplace);
     elfFile.addNeeded(neededLibsToAdd);
+
+    if (noDefaultLib)
+        elfFile.noDefaultLib();
 
     if (elfFile.isChanged()){
         elfFile.rewriteSections();
@@ -1387,6 +1433,7 @@ void showHelp(const string & progName)
   [--add-needed LIBRARY]\n\
   [--remove-needed LIBRARY]\n\
   [--replace-needed LIBRARY NEW_LIBRARY]\n\
+  [--no-default-lib]\n\
   [--debug]\n\
   [--version]\n\
   FILENAME\n", progName.c_str());
@@ -1460,6 +1507,9 @@ int main(int argc, char * * argv)
         }
         else if (arg == "--debug") {
             debugMode = true;
+        }
+        else if (arg == "--no-default-lib") {
+            noDefaultLib = true;
         }
         else if (arg == "--help" || arg == "-h" ) {
             showHelp(argv[0]);

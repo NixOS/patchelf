@@ -51,6 +51,10 @@ DT_RUNPATH. By default DT_RPATH is converted to DT_RUNPATH.
 Removes a declared depency on LIBRARY (DT_NEEDED entry). This
 option can be given multiple times.
 
+.IP "--no-default-lib"
+Marks the object that the search for dependencies of this object will ignore any
+default library search paths.
+
 .IP --debug
 Prints details of the changes made to the input file.
 
