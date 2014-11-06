@@ -225,7 +225,7 @@ static void debug(const char * format, ...)
 }
 
 
-static void error(string msg)
+__attribute__((noreturn)) static void error(string msg)
 {
     if (errno) perror(msg.c_str()); else fprintf(stderr, "%s\n", msg.c_str());
     exit(1);
@@ -924,12 +924,11 @@ string ElfFile<ElfFileParamNames>::getSoname()
             break;
         }
     }
-    if (rdi(dynSoname->d_tag) == DT_NULL) {
+
+    if (rdi(dynSoname->d_tag) == DT_NULL)
         error("Specified ELF file does not contain any DT_SONAME entry in .dynamic section!");
-    }
-    else {
-        return soname;
-    }
+
+    return soname;
 }
 
 template<ElfFileParams>
@@ -1246,10 +1245,7 @@ void ElfFile<ElfFileParamNames>::addNeeded(set<string> libs)
 
     Elf_Shdr & shdrDynamic = findSection(".dynamic");
     Elf_Shdr & shdrDynStr = findSection(".dynstr");
-    char * strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
 
-    Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
-    
     /* add all new libs to the dynstr string table */
     unsigned int length = 0;
     for (set<string>::iterator it = libs.begin(); it != libs.end(); it++) {
