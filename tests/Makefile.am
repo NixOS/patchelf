@@ -94,7 +94,7 @@ libbar_scoped_so_SOURCES = bar.c
 libbar_scoped_so_LDFLAGS = $(LDFLAGS_sharedlib)
 
 libsimple_so_SOURCES = simple.c
-libsimple_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-soname,libsimple.so.1.0
+libsimple_so_LDFLAGS = $(LDFLAGS_sharedlib)
 
 no_rpath_SOURCES = no-rpath.c
 # no -fpic for no-rpath.o
