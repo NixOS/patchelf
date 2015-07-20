@@ -32,12 +32,6 @@
 using namespace std;
 
 
-#ifdef MIPSEL
-/* The lemote fuloong 2f kernel defconfig sets a page size of 16KB */
-const unsigned int pageSize = 4096*4;
-#else
-const unsigned int pageSize = 4096;
-#endif
 
 
 static bool debugMode = false;
@@ -53,6 +47,16 @@ unsigned char * contents = 0;
 
 #define ElfFileParams class Elf_Ehdr, class Elf_Phdr, class Elf_Shdr, class Elf_Addr, class Elf_Off, class Elf_Dyn, class Elf_Sym
 #define ElfFileParamNames Elf_Ehdr, Elf_Phdr, Elf_Shdr, Elf_Addr, Elf_Off, Elf_Dyn, Elf_Sym
+
+
+static unsigned int getPageSize(){
+#if (defined HAVE_SYSCONF)
+    // if present, use sysconf to get kernel page size
+    return sysconf(_SC_PAGESIZE);
+#else
+    return 4096;
+#endif
+}
 
 
 template<ElfFileParams>
@@ -415,9 +419,9 @@ void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, Elf_Addr sta
     /* Move the entire contents of the file `extraPages' pages
        further. */
     unsigned int oldSize = fileSize;
-    unsigned int shift = extraPages * pageSize;
-    growFile(fileSize + extraPages * pageSize);
-    memmove(contents + extraPages * pageSize, contents, oldSize);
+    unsigned int shift = extraPages * getPageSize();
+    growFile(fileSize + extraPages * getPageSize());
+    memmove(contents + extraPages * getPageSize(), contents, oldSize);
     memset(contents + sizeof(Elf_Ehdr), 0, shift - sizeof(Elf_Ehdr));
 
     /* Adjust the ELF header. */
@@ -434,8 +438,8 @@ void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, Elf_Addr sta
         if (rdi(phdrs[i].p_align) != 0 &&
             (rdi(phdrs[i].p_vaddr) - rdi(phdrs[i].p_offset)) % rdi(phdrs[i].p_align) != 0) {
             debug("changing alignment of program header %d from %d to %d\n", i,
-                rdi(phdrs[i].p_align), pageSize);
-            wri(phdrs[i].p_align, pageSize);
+                rdi(phdrs[i].p_align), getPageSize());
+            wri(phdrs[i].p_align, getPageSize());
         }
     }
 
@@ -449,7 +453,7 @@ void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, Elf_Addr sta
     wri(phdr.p_vaddr, wri(phdr.p_paddr, startPage));
     wri(phdr.p_filesz, wri(phdr.p_memsz, shift));
     wri(phdr.p_flags, PF_R | PF_W);
-    wri(phdr.p_align, pageSize);
+    wri(phdr.p_align, getPageSize());
 }
 
 
@@ -578,7 +582,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
        page of other segments. */
     Elf_Addr startPage = 0;
     for (unsigned int i = 0; i < phdrs.size(); ++i) {
-        Elf_Addr thisPage = roundUp(rdi(phdrs[i].p_vaddr) + rdi(phdrs[i].p_memsz), pageSize);
+        Elf_Addr thisPage = roundUp(rdi(phdrs[i].p_vaddr) + rdi(phdrs[i].p_memsz), getPageSize());
         if (thisPage > startPage) startPage = thisPage;
     }
 
@@ -594,7 +598,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
     debug("needed space is %d\n", neededSpace);
 
 
-    size_t startOffset = roundUp(fileSize, pageSize);
+    size_t startOffset = roundUp(fileSize, getPageSize());
 
     growFile(startOffset + neededSpace);
 
@@ -618,7 +622,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
             size_t hole = startPage - startOffset;
             /* Print a warning, because the hole could be very big. */
             fprintf(stderr, "warning: working around a Linux kernel bug by creating a hole of %zu bytes in ‘%s’\n", hole, fileName.c_str());
-            assert(hole % pageSize == 0);
+            assert(hole % getPageSize() == 0);
             /* !!! We could create an actual hole in the file here,
                but it's probably not worth the effort. */
             growFile(fileSize + hole);
@@ -638,7 +642,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
     wri(phdr.p_vaddr, wri(phdr.p_paddr, startPage));
     wri(phdr.p_filesz, wri(phdr.p_memsz, neededSpace));
     wri(phdr.p_flags, PF_R | PF_W);
-    wri(phdr.p_align, pageSize);
+    wri(phdr.p_align, getPageSize());
 
 
     /* Write out the replaced sections. */
@@ -709,7 +713,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
     debug("first reserved offset/addr is 0x%x/0x%llx\n",
         startOffset, (unsigned long long) startAddr);
 
-    assert(startAddr % pageSize == startOffset % pageSize);
+    assert(startAddr % getPageSize() == startOffset % getPageSize());
     Elf_Addr firstPage = startAddr - startOffset;
     debug("first page is 0x%llx\n", (unsigned long long) firstPage);
 
@@ -738,13 +742,13 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
         neededSpace += sizeof(Elf_Phdr);
         debug("needed space is %d\n", neededSpace);
 
-        unsigned int neededPages = roundUp(neededSpace - startOffset, pageSize) / pageSize;
+        unsigned int neededPages = roundUp(neededSpace - startOffset, getPageSize()) / getPageSize();
         debug("needed pages is %d\n", neededPages);
-        if (neededPages * pageSize > firstPage)
+        if (neededPages * getPageSize() > firstPage)
             error("virtual address space underrun!");
 
-        firstPage -= neededPages * pageSize;
-        startOffset += neededPages * pageSize;
+        firstPage -= neededPages * getPageSize();
+        startOffset += neededPages * getPageSize();
 
         shiftFile(neededPages, firstPage);
     }
@@ -1385,6 +1389,8 @@ static void patchElf()
 {
     if (!printInterpreter && !printRPath && !printSoname)
         debug("patching ELF file `%s'\n", fileName.c_str());
+
+    debug("Kernel page size is %u bytes\n", getPageSize());
 
     mode_t fileMode;
 

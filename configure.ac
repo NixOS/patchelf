@@ -14,5 +14,7 @@ AC_CHECK_HEADERS([sys/acl.h acl/libacl.h])
 AC_SEARCH_LIBS(perm_copy_file, acl)
 AC_CHECK_FUNCS([perm_copy_file])
 
+AC_CHECK_FUNCS([sysconf])
+
 AC_CONFIG_FILES([Makefile src/Makefile tests/Makefile patchelf.spec])
 AC_OUTPUT
