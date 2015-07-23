@@ -1042,6 +1042,13 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
             neededLibs.push_back(string(strTab + rdi(dyn->d_un.d_val)));
     }
 
+    if (op == rpRemove) {
+        if (dynRunPath) dynRunPath->d_tag = DT_IGNORE;
+        if (dynRPath) dynRPath->d_tag = DT_IGNORE;
+        if (dynRunPath || dynRPath) changed = true;
+        return;
+    }
+
     if (op == rpPrint) {
         printf("%s\n", rpath ? rpath : "");
         return;
