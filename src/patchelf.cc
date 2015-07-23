@@ -154,7 +154,7 @@ public:
 
     void setInterpreter(const string & newInterpreter);
 
-    typedef enum { rpPrint, rpShrink, rpSet } RPathOp;
+    typedef enum { rpPrint, rpShrink, rpSet, rpRemove } RPathOp;
 
     void modifyRPath(RPathOp op, string newRPath);
 
@@ -1097,6 +1097,29 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
         }
     }
 
+    if (op == rpRemove) {
+        if (!rpath) {
+            debug("no RPATH to delete\n");
+            return;
+        }
+
+        Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+        Elf_Dyn * last = dyn;
+        for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+            if (rdi(dyn->d_tag) == DT_RPATH) {
+                debug("removing DT_RPATH entry\n");
+                changed = true;
+            } else if (rdi(dyn->d_tag) == DT_RUNPATH) {
+                debug("removing DT_RUNPATH entry\n");
+                changed = true;
+            } else {
+                *last++ = *dyn;
+            }
+        }
+        memset(last, 0, sizeof(Elf_Dyn) * (dyn - last));
+        return;
+    }
+
 
     if (string(rpath ? rpath : "") == newRPath) return;
 
@@ -1328,6 +1351,7 @@ static string newSoname;
 static string newInterpreter;
 
 static bool shrinkRPath = false;
+static bool removeRPath = false;
 static bool setRPath = false;
 static bool printRPath = false;
 static string newRPath;
@@ -1358,6 +1382,8 @@ static void patchElf2(ElfFile & elfFile, mode_t fileMode)
 
     if (shrinkRPath)
         elfFile.modifyRPath(elfFile.rpShrink, "");
+    else if (removeRPath)
+        elfFile.modifyRPath(elfFile.rpRemove, "");
     else if (setRPath)
         elfFile.modifyRPath(elfFile.rpSet, newRPath);
 
@@ -1419,6 +1445,7 @@ void showHelp(const string & progName)
   [--print-soname]\t\tPrints 'DT_SONAME' entry of .dynamic section. Raises an error if DT_SONAME doesn't exist\n\
   [--set-soname SONAME]\t\tSets 'DT_SONAME' entry to SONAME. Raises an error if DT_SONAME doesn't exist\n\
   [--set-rpath RPATH]\n\
+  [--remove-rpath]\n\
   [--shrink-rpath]\n\
   [--print-rpath]\n\
   [--force-rpath]\n\
@@ -1458,6 +1485,9 @@ int main(int argc, char * * argv)
             if (++i == argc) error("missing argument");
             setSoname = true;
             newSoname = argv[i];
+        }
+        else if (arg == "--remove-rpath") {
+            removeRPath = true;
         }
         else if (arg == "--shrink-rpath") {
             shrinkRPath = true;
