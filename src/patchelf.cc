@@ -696,11 +696,22 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
     Elf_Addr firstPage = startAddr - startOffset;
     debug("first page is 0x%llx\n", (unsigned long long) firstPage);
 
-    /* Right now we assume that the section headers are somewhere near
-       the end, which appears to be the case most of the time.
-       Therefore they're not accidentally overwritten by the replaced
-       sections. !!!  Fix this. */
-    assert((off_t) rdi(hdr->e_shoff) >= startOffset);
+    if ((off_t) rdi(hdr->e_shoff) < startOffset) {
+        /* The section headers occur too early in the file and would be
+           overwritten by the replaced sections. Move them to the end of the file
+           before proceeding. */
+        off_t shoffNew = fileSize;
+        off_t shSize = rdi(hdr->e_shoff) + rdi(hdr->e_shnum) * rdi(hdr->e_shentsize);
+        growFile (fileSize + shSize);
+        wri(hdr->e_shoff, shoffNew);
+
+        /* Rewrite the section header table.  For neatness, keep the
+           sections sorted. */
+        assert(rdi(hdr->e_shnum) == shdrs.size());
+        sortShdrs();
+        for (unsigned int i = 1; i < rdi(hdr->e_shnum); ++i)
+            * ((Elf_Shdr *) (contents + rdi(hdr->e_shoff)) + i) = shdrs[i];
+    }
 
 
     /* Compute the total space needed for the replaced sections, the
