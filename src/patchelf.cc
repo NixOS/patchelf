@@ -17,16 +17,6 @@
 #include <fcntl.h>
 #include <limits.h>
 
-#ifdef HAVE_ATTR_LIBATTR_H
-# include <attr/libattr.h>
-#endif
-#ifdef HAVE_SYS_ACL_H
-# include <sys/acl.h>
-#endif
-#ifdef HAVE_ACL_LIBACL_H
-# include <acl/libacl.h>
-#endif
-
 #include "elf.h"
 
 using namespace std;
@@ -382,28 +372,17 @@ void ElfFile<ElfFileParamNames>::sortShdrs()
 }
 
 
-static void writeFile(string fileName, mode_t fileMode)
+static void writeFile(string fileName)
 {
-    string fileName2 = fileName + "_patchelf_tmp";
+    int fd = open(fileName.c_str(), O_TRUNC | O_WRONLY);
+    if (fd == -1)
+        error("open");
 
-    int fd = open(fileName2.c_str(),
-        O_CREAT | O_TRUNC | O_WRONLY, 0700);
-    if (fd == -1) error("open");
+    if (write(fd, contents, fileSize) != fileSize)
+        error("write");
 
-    if (write(fd, contents, fileSize) != fileSize) error("write");
-
-    if (close(fd) != 0) error("close");
-
-#if defined(HAVE_ATTR_COPY_FILE)
-    if (attr_copy_file(fileName.c_str(), fileName2.c_str(), 0, 0) != 0) error("attr_copy_file");
-#endif
-#if defined(HAVE_PERM_COPY_FILE)
-    if (perm_copy_file(fileName.c_str(), fileName2.c_str(), 0) != 0) error("perm_copy_file");
-#else
-    if (chmod(fileName2.c_str(), fileMode) != 0) error("chmod");
-#endif
-
-    if (rename(fileName2.c_str(), fileName.c_str()) != 0) error("rename");
+    if (close(fd) != 0)
+        error("close");
 }
 
 
@@ -1380,7 +1359,7 @@ static void patchElf2(ElfFile & elfFile, mode_t fileMode)
 
     if (elfFile.isChanged()){
         elfFile.rewriteSections();
-        writeFile(fileName, fileMode);
+        writeFile(fileName);
     }
 }
 
