@@ -8,5 +8,7 @@ AC_PROG_CXX
 
 AC_CHECK_FUNCS([sysconf])
 
+AC_CHECK_FUNCS([sysconf])
+
 AC_CONFIG_FILES([Makefile src/Makefile tests/Makefile patchelf.spec])
 AC_OUTPUT
