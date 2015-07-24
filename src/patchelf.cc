@@ -1461,7 +1461,7 @@ void showHelp(const string & progName)
   [--set-interpreter FILENAME]\n\
   [--print-interpreter]\n\
   [--print-soname]\t\tPrints 'DT_SONAME' entry of .dynamic section. Raises an error if DT_SONAME doesn't exist\n\
-  [--set-soname SONAME]\t\tSets 'DT_SONAME' entry to SONAME. Raises an error if DT_SONAME doesn't exist\n\
+  [--set-soname SONAME]\t\tSets 'DT_SONAME' entry to SONAME.\n\
   [--set-rpath RPATH]\n\
   [--remove-rpath]\n\
   [--shrink-rpath]\n\
