@@ -164,6 +164,8 @@ public:
     
     void replaceNeeded(map<string, string>& libs);
 
+    void printNeededLibs();
+
     void noDefaultLib();
 
 private:
@@ -1321,6 +1323,23 @@ void ElfFile<ElfFileParamNames>::addNeeded(set<string> libs)
     changed = true;
 }
 
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::printNeededLibs()
+{
+    Elf_Shdr & shdrDynamic = findSection(".dynamic");
+    Elf_Shdr & shdrDynStr = findSection(".dynstr");
+    char *strTab = (char *)contents + rdi(shdrDynStr.sh_offset);
+
+    Elf_Dyn *dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+
+    for (; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+        if (rdi(dyn->d_tag) == DT_NEEDED) {
+            char *name = strTab + rdi(dyn->d_un.d_val);
+            printf("%s\n", name);
+        }
+    }
+}
+
 
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::noDefaultLib()
@@ -1367,7 +1386,6 @@ static bool printSoname = false;
 static bool setSoname = false;
 static string newSoname;
 static string newInterpreter;
-
 static bool shrinkRPath = false;
 static bool removeRPath = false;
 static bool setRPath = false;
@@ -1376,6 +1394,7 @@ static string newRPath;
 static set<string> neededLibsToRemove;
 static map<string, string> neededLibsToReplace;
 static set<string> neededLibsToAdd;
+static bool printNeeded = false;
 static bool noDefaultLib = false;
 
 template<class ElfFile>
@@ -1405,6 +1424,8 @@ static void patchElf2(ElfFile & elfFile, mode_t fileMode)
     else if (setRPath)
         elfFile.modifyRPath(elfFile.rpSet, newRPath);
 
+    if (printNeeded) elfFile.printNeededLibs();
+
     elfFile.removeNeeded(neededLibsToRemove);
     elfFile.replaceNeeded(neededLibsToReplace);
     elfFile.addNeeded(neededLibsToAdd);
@@ -1421,7 +1442,7 @@ static void patchElf2(ElfFile & elfFile, mode_t fileMode)
 
 static void patchElf()
 {
-    if (!printInterpreter && !printRPath && !printSoname)
+    if (!printInterpreter && !printRPath && !printSoname && !printNeeded)
         debug("patching ELF file `%s'\n", fileName.c_str());
 
     debug("Kernel page size is %u bytes\n", getPageSize());
@@ -1470,6 +1491,7 @@ void showHelp(const string & progName)
   [--add-needed LIBRARY]\n\
   [--remove-needed LIBRARY]\n\
   [--replace-needed LIBRARY NEW_LIBRARY]\n\
+  [--print-needed]\n\
   [--no-default-lib]\n\
   [--debug]\n\
   [--version]\n\
@@ -1531,6 +1553,9 @@ int main(int argc, char * * argv)
                to DT_RUNPATH, and if neither is present, a DT_RPATH is
                added. */
             forceRPath = true;
+        }
+        else if (arg == "--print-needed") {
+            printNeeded = true;
         }
         else if (arg == "--add-needed") {
             if (++i == argc) error("missing argument");
