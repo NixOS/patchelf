@@ -236,12 +236,11 @@ static void growFile(off_t newSize)
 }
 
 
-static void readFile(string fileName, mode_t * fileMode)
+static void readFile(string fileName)
 {
     struct stat st;
     if (stat(fileName.c_str(), &st) != 0) error("stat");
     fileSize = st.st_size;
-    *fileMode = st.st_mode;
     maxSize = fileSize + 32 * 1024 * 1024;
 
     contents = (unsigned char *) malloc(fileSize + maxSize);
@@ -1379,7 +1378,7 @@ static set<string> neededLibsToAdd;
 static bool noDefaultLib = false;
 
 template<class ElfFile>
-static void patchElf2(ElfFile & elfFile, mode_t fileMode)
+static void patchElf2(ElfFile & elfFile)
 {
     elfFile.parse();
 
@@ -1426,9 +1425,7 @@ static void patchElf()
 
     debug("Kernel page size is %u bytes\n", getPageSize());
 
-    mode_t fileMode;
-
-    readFile(fileName, &fileMode);
+    readFile(fileName);
 
 
     /* Check the ELF header for basic validity. */
@@ -1441,13 +1438,13 @@ static void patchElf()
         contents[EI_VERSION] == EV_CURRENT)
     {
         ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym> elfFile;
-        patchElf2(elfFile, fileMode);
+        patchElf2(elfFile);
     }
     else if (contents[EI_CLASS] == ELFCLASS64 &&
         contents[EI_VERSION] == EV_CURRENT)
     {
         ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym> elfFile;
-        patchElf2(elfFile, fileMode);
+        patchElf2(elfFile);
     }
     else {
         error("ELF executable is not 32/64-bit, little/big-endian, version 1");
