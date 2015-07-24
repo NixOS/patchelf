@@ -154,7 +154,7 @@ public:
 
     void setInterpreter(const string & newInterpreter);
 
-    typedef enum { rpPrint, rpShrink, rpSet, rpRemove } RPathOp;
+    typedef enum { rpPrint, rpShrink, rpSet, rpRemove, rpConvert } RPathOp;
 
     void modifyRPath(RPathOp op, string newRPath);
 
@@ -1138,8 +1138,16 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
         return;
     }
 
+    /* Check if a DT_RPATH that could be converted to DT_RUNPATH exists. */
+    if (op == rpConvert && !rpath) {
+        debug("no RPATH to convert\n");
+        return;
+    }
 
     if (string(rpath ? rpath : "") == newRPath) return;
+
+    /* convert DT_RPATH to DT_RUNPATH */
+    if (op == rpConvert && rpath) newRPath = string(rpath ? rpath : "");
 
     changed = true;
 
@@ -1372,6 +1380,7 @@ static bool shrinkRPath = false;
 static bool removeRPath = false;
 static bool setRPath = false;
 static bool printRPath = false;
+static bool convertRPath = false;
 static string newRPath;
 static set<string> neededLibsToRemove;
 static map<string, string> neededLibsToReplace;
@@ -1402,6 +1411,8 @@ static void patchElf2(ElfFile & elfFile, mode_t fileMode)
         elfFile.modifyRPath(elfFile.rpShrink, "");
     else if (removeRPath)
         elfFile.modifyRPath(elfFile.rpRemove, "");
+    else if (convertRPath)
+        elfFile.modifyRPath(elfFile.rpConvert, "");
     else if (setRPath)
         elfFile.modifyRPath(elfFile.rpSet, newRPath);
 
@@ -1467,6 +1478,7 @@ void showHelp(const string & progName)
   [--shrink-rpath]\n\
   [--print-rpath]\n\
   [--force-rpath]\n\
+  [--convert-rpath]\n\
   [--add-needed LIBRARY]\n\
   [--remove-needed LIBRARY]\n\
   [--replace-needed LIBRARY NEW_LIBRARY]\n\
@@ -1531,6 +1543,9 @@ int main(int argc, char * * argv)
                to DT_RUNPATH, and if neither is present, a DT_RPATH is
                added. */
             forceRPath = true;
+        }
+        else if (arg == "--convert-rpath") {
+            convertRPath = true;
         }
         else if (arg == "--add-needed") {
             if (++i == argc) error("missing argument");
