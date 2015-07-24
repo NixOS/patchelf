@@ -1159,8 +1159,10 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
         dynRPath = 0;
     }
 
-    if (forceRPath && dynRPath && dynRunPath) { /* convert DT_RUNPATH to DT_RPATH */
-        dynRunPath->d_tag = DT_IGNORE;
+    if (forceRPath && !dynRPath && dynRunPath) { /* convert DT_RUNPATH to DT_RPATH */
+        dynRunPath->d_tag = DT_RPATH;
+        dynRPath = dynRunPath;
+        dynRunPath = 0;
     }
 
     if (newRPath.size() <= rpathSize) {
