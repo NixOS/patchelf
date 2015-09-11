@@ -6,8 +6,8 @@ Release: 1
 License: GPL
 Group: Development/Tools
 URL: http://nixos.org/patchelf.html
-Source0: %{name}-@PACKAGE_VERSION@.tar.bz2
-BuildRoot: %{_tmppath}/%{name}-%{PACKAGE_VERSION}-buildroot
+Source0: %{name}-%{version}.tar.bz2
+BuildRoot: %{_tmppath}/%{name}-%{version}-buildroot
 Prefix: /usr
 
 %description
@@ -27,7 +27,7 @@ make check
 %install
 rm -rf $RPM_BUILD_ROOT
 make DESTDIR=$RPM_BUILD_ROOT install
-# rpmbuild automatically strips... strip $RPM_BUILD_ROOT/%{_bindir}/* || true
+# rpmbuild automatically strips... strip $RPM_BUILD_ROOT/%%{_bindir}/* || true
 
 %clean
 rm -rf $RPM_BUILD_ROOT
