@@ -1566,6 +1566,7 @@ int main(int argc, char * * argv)
     fileName = argv[i];
 
     patchElf();
+    if (contents) free(contents);
 
     return 0;
 }
