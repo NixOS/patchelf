@@ -160,7 +160,7 @@ public:
 
     void addNeeded(set<string> libs);
 
-    void removeNeeded(set<string> libs);
+    void removeNeeded(set<string> libs, const bool show = false);
     
     void replaceNeeded(map<string, string>& libs);
 
@@ -1205,9 +1205,9 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
 
 
 template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::removeNeeded(set<string> libs)
+void ElfFile<ElfFileParamNames>::removeNeeded(set<string> libs, const bool show)
 {
-    if (libs.empty()) return;
+    if (libs.empty() and not show) return;
 
     Elf_Shdr & shdrDynamic = findSection(".dynamic");
     Elf_Shdr & shdrDynStr = findSection(".dynstr");
@@ -1218,12 +1218,16 @@ void ElfFile<ElfFileParamNames>::removeNeeded(set<string> libs)
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_NEEDED) {
             char * name = strTab + rdi(dyn->d_un.d_val);
-            if (libs.find(name) != libs.end()) {
-                debug("removing DT_NEEDED entry `%s'\n", name);
-                changed = true;
-            } else {
-                debug("keeping DT_NEEDED entry `%s'\n", name);
-                *last++ = *dyn;
+            if (show)
+                printf("%s\n", name);
+            else {
+                if (libs.find(name) != libs.end()) {
+                    debug("removing DT_NEEDED entry `%s'\n", name);
+                    changed = true;
+                } else {
+                    debug("keeping DT_NEEDED entry `%s'\n", name);
+                    *last++ = *dyn;
+                }
             }
         } else
             *last++ = *dyn;
@@ -1372,6 +1376,7 @@ static bool shrinkRPath = false;
 static bool removeRPath = false;
 static bool setRPath = false;
 static bool printRPath = false;
+static bool showNeededPaths = false;
 static string newRPath;
 static set<string> neededLibsToRemove;
 static map<string, string> neededLibsToReplace;
@@ -1397,6 +1402,9 @@ static void patchElf2(ElfFile & elfFile, mode_t fileMode)
 
     if (printRPath)
         elfFile.modifyRPath(elfFile.rpPrint, "");
+
+    if (showNeededPaths)
+        elfFile.removeNeeded(/* unused */ neededLibsToRemove, true);
 
     if (shrinkRPath)
         elfFile.modifyRPath(elfFile.rpShrink, "");
@@ -1468,6 +1476,7 @@ void showHelp(const string & progName)
   [--print-rpath]\n\
   [--force-rpath]\n\
   [--add-needed LIBRARY]\n\
+  [--show-needed]\n\
   [--remove-needed LIBRARY]\n\
   [--replace-needed LIBRARY NEW_LIBRARY]\n\
   [--no-default-lib]\n\
@@ -1544,6 +1553,9 @@ int main(int argc, char * * argv)
             if (i+2 >= argc) error("missing argument(s)");
             neededLibsToReplace[ argv[i+1] ] = argv[i+2];
             i += 2;
+        }
+        else if (arg == "--show-needed") {
+            showNeededPaths = true;
         }
         else if (arg == "--debug") {
             debugMode = true;
