@@ -63,6 +63,10 @@ let
     rpm_fedora19x86_64 = makeRPM_x86_64 (diskImages: diskImages.fedora19x86_64);
     rpm_fedora20i386 = makeRPM_i686 (diskImages: diskImages.fedora20i386);
     rpm_fedora20x86_64 = makeRPM_x86_64 (diskImages: diskImages.fedora20x86_64);
+    rpm_fedora21i386 = makeRPM_i686 (diskImages: diskImages.fedora21i386);
+    rpm_fedora21x86_64 = makeRPM_x86_64 (diskImages: diskImages.fedora21x86_64);
+    rpm_fedora23i386 = makeRPM_i686 (diskImages: diskImages.fedora23i386);
+    rpm_fedora23x86_64 = makeRPM_x86_64 (diskImages: diskImages.fedora23x86_64);
 
     rpm_opensuse103i386 = makeRPM_i686 (diskImages: diskImages.opensuse103i386);
     #rpm_opensuse110i386 = makeRPM_i686 (diskImages: diskImages.opensuse110i386);
@@ -106,6 +110,10 @@ let
     deb_ubuntu1404x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu1404x86_64);
     deb_ubuntu1410i386 = makeDeb_i686 (diskImages: diskImages.ubuntu1410i386);
     deb_ubuntu1410x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu1410x86_64);
+    deb_ubuntu1504i386 = makeDeb_i686 (diskImages: diskImages.ubuntu1504i386);
+    deb_ubuntu1504x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu1504x86_64);
+    deb_ubuntu1510i386 = makeDeb_i686 (diskImages: diskImages.ubuntu1510i386);
+    deb_ubuntu1510x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu1510x86_64);
 
 
     release = pkgs.releaseTools.aggregate
