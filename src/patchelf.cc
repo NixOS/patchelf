@@ -627,7 +627,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
     /* Write out the replaced sections. */
     Elf_Off curOff = startOffset + phdrs.size() * sizeof(Elf_Phdr);
     writeReplacedSections(curOff, startPage, startOffset);
-    assert((off_t) curOff == startOffset + neededSpace);
+    assert(curOff == startOffset + neededSpace);
 
 
     /* Move the program header to the start of the new area. */
@@ -696,7 +696,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
     Elf_Addr firstPage = startAddr - startOffset;
     debug("first page is 0x%llx\n", (unsigned long long) firstPage);
 
-    if ((off_t) rdi(hdr->e_shoff) < startOffset) {
+    if (rdi(hdr->e_shoff) < startOffset) {
         /* The section headers occur too early in the file and would be
            overwritten by the replaced sections. Move them to the end of the file
            before proceeding. */
@@ -752,7 +752,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
 
     /* Write out the replaced sections. */
     writeReplacedSections(curOff, firstPage, 0);
-    assert((off_t) curOff == neededSpace);
+    assert(curOff == neededSpace);
 
 
     rewriteHeaders(firstPage + rdi(hdr->e_phoff));
