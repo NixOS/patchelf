@@ -17,7 +17,11 @@
 #include <fcntl.h>
 #include <limits.h>
 
-#include "elf.h"
+#if (defined HAVE_ELF_H)
+    #include <elf.h>
+#else
+    #include "../inc/elf.h"
+#endif
 
 using namespace std;
 
