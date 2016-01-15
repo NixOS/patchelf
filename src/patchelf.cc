@@ -40,13 +40,7 @@ unsigned char * contents = 0;
 
 
 static unsigned int getPageSize(){
-#ifdef MIPSEL
-    /* The lemote fuloong 2f kernel defconfig sets a page size of
-       16KB. */
-    return 4096 * 4;
-#else
-    return 4096;
-#endif
+    return PAGESIZE;
 }
 
 
