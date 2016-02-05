@@ -799,11 +799,14 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
     /* Rewrite the program header table. */
 
     /* If there is a segment for the program header table, update it.
-       (According to the ELF spec, it must be the first entry.) */
-    if (rdi(phdrs[0].p_type) == PT_PHDR) {
-        phdrs[0].p_offset = hdr->e_phoff;
-        wri(phdrs[0].p_vaddr, wri(phdrs[0].p_paddr, phdrAddress));
-        wri(phdrs[0].p_filesz, wri(phdrs[0].p_memsz, phdrs.size() * sizeof(Elf_Phdr)));
+       (According to the ELF spec, there can only be one.) */
+    for (unsigned int i = 0; i < phdrs.size(); ++i) {
+        if (rdi(phdrs[i].p_type) == PT_PHDR) {
+            phdrs[i].p_offset = hdr->e_phoff;
+            wri(phdrs[i].p_vaddr, wri(phdrs[i].p_paddr, phdrAddress));
+            wri(phdrs[i].p_filesz, wri(phdrs[i].p_memsz, phdrs.size() * sizeof(Elf_Phdr)));
+            break;
+        }
     }
 
     sortPhdrs();
