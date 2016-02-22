@@ -47,7 +47,7 @@ static bool debugMode = false;
 static bool forceRPath = false;
 
 static string fileName;
-
+static int pageSize = PAGESIZE;
 
 off_t fileSize, maxSize;
 unsigned char * contents = 0;
@@ -58,13 +58,7 @@ unsigned char * contents = 0;
 
 
 static unsigned int getPageSize(){
-#ifdef MIPSEL
-    /* The lemote fuloong 2f kernel defconfig sets a page size of
-       16KB. */
-    return 4096 * 4;
-#else
-    return 4096;
-#endif
+    return pageSize;
 }
 
 
@@ -1496,6 +1490,7 @@ void showHelp(const string & progName)
 {
         fprintf(stderr, "syntax: %s\n\
   [--set-interpreter FILENAME]\n\
+  [--page-size SIZE]\n\
   [--print-interpreter]\n\
   [--print-soname]\t\tPrints 'DT_SONAME' entry of .dynamic section. Raises an error if DT_SONAME doesn't exist\n\
   [--set-soname SONAME]\t\tSets 'DT_SONAME' entry to SONAME.\n\
@@ -1531,6 +1526,11 @@ int main(int argc, char * * argv)
             if (++i == argc) error("missing argument");
             newInterpreter = argv[i];
         }
+        else if (arg == "--page-size") {
+            if (++i == argc) error("missing argument");
+            pageSize = atoi(argv[i]);
+            if (pageSize <= 0) error("invalid argument to --page-size");
+	}
         else if (arg == "--print-interpreter") {
             printInterpreter = true;
         }
