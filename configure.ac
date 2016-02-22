@@ -8,18 +8,18 @@ AC_PROG_CXX
 
 PAGESIZE=auto
 AC_ARG_WITH([page-size],
-	    AS_HELP_STRING([--with-page-size=SIZE], [Specify default pagesize (default auto)]),
-	    PAGESIZE=$withval
-	    )
-
-AS_IF([test "x$PAGESIZE" = xauto],
-	AS_IF([which getconf &>/dev/null], [
-	       PAGESIZE=`getconf PAGESIZE &>/dev/null || getconf PAGE_SIZE &>/dev/null`
-	])
-	AS_IF([test "x$PAGESIZE" = x], [
-	       PAGESIZE=4096
-	])
+   AS_HELP_STRING([--with-page-size=SIZE], [Specify default pagesize (default auto)]),
+   PAGESIZE=$withval
 )
+
+if test "$PAGESIZE" = auto; then
+    if type -p getconf &>/dev/null; then
+        PAGESIZE=$(getconf PAGESIZE || getconf PAGE_SIZE)
+    fi
+    if test "$PAGESIZE" = auto -o -z "$PAGESIZE"; then
+        PAGESIZE=4096
+    fi
+fi
 
 AC_DEFINE_UNQUOTED(PAGESIZE, ${PAGESIZE})
 AC_MSG_RESULT([Setting page size to ${PAGESIZE}])
