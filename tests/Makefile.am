@@ -4,6 +4,7 @@ check_PROGRAMS = simple main main-scoped big-dynstr no-rpath
 
 no_rpath_arch_TESTS = \
   no-rpath-amd64.sh \
+  no-rpath-aarch64.sh \
   no-rpath-armel.sh \
   no-rpath-armhf.sh \
   no-rpath-hurd-i386.sh \
