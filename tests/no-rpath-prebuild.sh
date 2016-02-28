@@ -1,4 +1,4 @@
-#! /bin/sh -e
+#! /bin/bash -e
 set -x
 ARCH="$1"
 

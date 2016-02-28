@@ -1,4 +1,4 @@
-#! /bin/sh -e
+#! /bin/bash -e
 SCRATCH=scratch/$(basename $0 .sh)
 
 rm -rf ${SCRATCH}
