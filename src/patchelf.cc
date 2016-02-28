@@ -45,7 +45,7 @@ static unsigned int getPageSize(){
        16KB. */
     return 4096 * 4;
 #else
-    return 4096;
+    return sysconf(_SC_PAGESIZE);
 #endif
 }
 
