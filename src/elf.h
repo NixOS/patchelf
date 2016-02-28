@@ -127,6 +127,7 @@ typedef struct
 #define ELFCLASSNUM	3
 
 #define EI_DATA		5		/* Data encoding byte index */
+#define EI_MACHINE		0x12		/* Machine byte index; machine is two bytes, subject to endianness */
 #define ELFDATANONE	0		/* Invalid data encoding */
 #define ELFDATA2LSB	1		/* 2's complement, little endian */
 #define ELFDATA2MSB	2		/* 2's complement, big endian */

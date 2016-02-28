@@ -39,15 +39,6 @@ unsigned char * contents = 0;
 #define ElfFileParamNames Elf_Ehdr, Elf_Phdr, Elf_Shdr, Elf_Addr, Elf_Off, Elf_Dyn, Elf_Sym
 
 
-static unsigned int getPageSize(){
-#ifdef MIPSEL
-    /* The lemote fuloong 2f kernel defconfig sets a page size of
-       16KB. */
-    return 4096 * 4;
-#else
-    return sysconf(_SC_PAGESIZE);
-#endif
-}
 
 
 template<ElfFileParams>
@@ -57,6 +48,7 @@ class ElfFile
     vector<Elf_Phdr> phdrs;
     vector<Elf_Shdr> shdrs;
 
+    uint8_t machine;
     bool littleEndian;
 
     bool changed;
@@ -169,6 +161,9 @@ public:
 
     void noDefaultLib();
 
+  unsigned int getPageSize();
+
+
 private:
 
     /* Convert an integer in big or little endian representation (as
@@ -185,6 +180,21 @@ private:
         return i;
     }
 };
+
+template<ElfFileParams>
+unsigned int
+ElfFile<ElfFileParamNames>::getPageSize() { //ElfFile<ElfFileParamNames> &ef){
+  // uint8_t machine = ef.machine;
+
+  if(machine == EM_AARCH64)
+    return 65536;
+  /* The lemote fuloong 2f kernel defconfig sets a page size of
+     16KB. */
+  if(machine == EM_MIPS_RS3_LE)
+    return 16384;
+  // default that works for some popular machines
+  return 4096;
+}
 
 
 /* !!! G++ creates broken code if this function is inlined, don't know
@@ -279,6 +289,9 @@ void ElfFile<ElfFileParamNames>::parse()
         error("not an ELF executable");
 
     littleEndian = contents[EI_DATA] == ELFDATA2LSB;
+
+    // two-bytes, subject to endianness
+    machine = contents[EI_MACHINE];
 
     if (rdi(hdr->e_type) != ET_EXEC && rdi(hdr->e_type) != ET_DYN)
         error("wrong ELF type");
@@ -417,6 +430,7 @@ void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, Elf_Addr sta
     for (int i = 0; i < rdi(hdr->e_phnum); ++i) {
         wri(phdrs[i].p_offset, rdi(phdrs[i].p_offset) + shift);
         if (rdi(phdrs[i].p_align) != 0 &&
+            rdi(phdrs[i].p_align) != 1 && // Values of zero and one mean no alignment is required -- man elf
             (rdi(phdrs[i].p_vaddr) - rdi(phdrs[i].p_offset)) % rdi(phdrs[i].p_align) != 0) {
             debug("changing alignment of program header %d from %d to %d\n", i,
                 rdi(phdrs[i].p_align), getPageSize());
@@ -1445,7 +1459,7 @@ static void patchElf()
     if (!printInterpreter && !printRPath && !printSoname && !printNeeded)
         debug("patching ELF file `%s'\n", fileName.c_str());
 
-    debug("Kernel page size is %u bytes\n", getPageSize());
+    // debug("Kernel page size is %u bytes\n", getPageSize());
 
     readFile(fileName);
 
