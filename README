@@ -42,7 +42,7 @@ libraries.  In particular, it can do the following:
 
 AUTHOR
 
-Copyright 2004-2013 Eelco Dolstra <eelco.dolstra@logicblox.com>.
+Copyright 2004-2016 Eelco Dolstra <eelco.dolstra@logicblox.com>.
 
 
 LICENSE
@@ -76,6 +76,18 @@ This appears to be a bug in binutils
 
 
 RELEASE HISTORY
+
+0.9 (February 29, 2016):
+
+* Lots of new features. Please refer to the Git commit log:
+
+    https://github.com/NixOS/patchelf/commits/master
+
+  This release has contributions from Aaron D. Marasco, Adrien
+  Devresse, Alexandre Pretyman, Changli Gao, Chingis Dugarzhapov,
+  darealshinji, David Sveningsson, Eelco Dolstra, Felipe Sateler,
+  Jeremy Sanders, Jonas Kuemmerlin, Thomas Tuegel, Tuomas Tynkkynen,
+  Vincent Danjean and Vladimír Čunát.
 
 0.8 (January 15, 2014):
 
