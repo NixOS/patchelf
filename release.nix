@@ -32,7 +32,7 @@ let
       };
 
 
-    build = pkgs.lib.genAttrs [ "x86_64-linux" "i686-linux" /* "x86_64-freebsd" "i686-freebsd" */ "x86_64-darwin" /* "i686-solaris" "i686-cygwin" */ ] (system:
+    build = pkgs.lib.genAttrs [ "x86_64-linux" "i686-linux" /* "x86_64-freebsd" "i686-freebsd"  "x86_64-darwin" "i686-solaris" "i686-cygwin" */ ] (system:
 
       with import <nixpkgs> { inherit system; };
 
@@ -74,7 +74,7 @@ let
             build.i686-linux
             #build.x86_64-freebsd
             #build.i686-freebsd
-            build.x86_64-darwin
+            #build.x86_64-darwin
             rpm_fedora23i386
             rpm_fedora23x86_64
             deb_debian8i386
