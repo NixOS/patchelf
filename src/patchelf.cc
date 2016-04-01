@@ -1274,13 +1274,13 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(map<string, string>& libs)
                 
                 // technically, the string referred by d_val could be used otherwise, too (although unlikely)
                 // we'll therefore add a new string
-                debug("resizing .dynstr ...");
+                debug("resizing .dynstr ...\n");
                 
                 string & newDynStr = replaceSection(".dynstr",
                     rdi(shdrDynStr.sh_size) + replacement.size() + 1 + dynStrAddedBytes);
                 setSubstr(newDynStr, rdi(shdrDynStr.sh_size) + dynStrAddedBytes, replacement + '\0');
                 
-                dyn->d_un.d_val = shdrDynStr.sh_size + dynStrAddedBytes;
+                wri(dyn->d_un.d_val, rdi(shdrDynStr.sh_size) + dynStrAddedBytes);
                 
                 dynStrAddedBytes += replacement.size() + 1;
                 
@@ -1299,23 +1299,46 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(map<string, string>& libs)
     // be replaced.
 
     if (verNeedNum) {
-        Elf_Shdr & shdrVersionR = findSection3(".gnu.version_r");
-        // The filename strings in the .gnu.version_r aren't necessarily in
-        // .dynstr -- we have to look at ->sh_link to find the section with
-        // the strings in it.
-        Elf_Shdr & shdrVersionRStrings = *shdrs[rdi(shdrVersionR->sh_link)];
+        Elf_Shdr & shdrVersionR = findSection(".gnu.version_r");
+        // The filename strings in the .gnu.version_r are different from the
+        // ones in .dynamic: instead of being in .dynstr, they're in some
+        // arbitrary section and we have to look in ->sh_link to figure out
+        // which one.
+        Elf_Shdr & shdrVersionRStrings = shdrs[rdi(shdrVersionR.sh_link)];
+        // this is where we find the actual filename strings
+        char * verStrTab = (char *) contents + rdi(shdrVersionRStrings.sh_offset);
+        // and we also need the name of the section containing the strings, so
+        // that we can pass it to replaceSection
+        string versionRStringsSName = getSectionName(shdrVersionRStrings);
+
+        debug("found .gnu.version_r with %i entries, strings in %s\n", verNeedNum, versionRStringsSName.c_str());
+
+        unsigned int verStrAddedBytes = 0;
 
         Elf_Verneed * need = (Elf_Verneed *) (contents + rdi(shdrVersionR.sh_offset));
         while (verNeedNum > 0) {
+            char * file = verStrTab + rdi(need->vn_file);
+            if (libs.find(file) != libs.end()) {
+                const string & replacement = libs[file];
 
-            // XX check need->vn_file, which is an offset into the
-            // shdrVersionRStrings section
-            // if if matches one of the entries in `libs`, then use
-            // replaceSection logic like that above to add the new string to
-            // this section and change vn_file
+                debug("replacing .gnu.version_r entry `%s' with `%s'\n", file, replacement.c_str());
+                debug("resizing string section %s ...\n", versionRStringsSName.c_str());
 
-            need = (Elf_Verneed *) (contents + rdi(need->vn_next));
-            verNeedNum--;
+                string & newVerDynStr = replaceSection(versionRStringsSName,
+                    rdi(shdrVersionRStrings.sh_size) + replacement.size() + 1 + verStrAddedBytes);
+                setSubstr(newVerDynStr, rdi(shdrVersionRStrings.sh_size) + verStrAddedBytes, replacement + '\0');
+
+                wri(need->vn_file, rdi(shdrVersionRStrings.sh_size) + verStrAddedBytes);
+
+                verStrAddedBytes += replacement.size() + 1;
+
+                changed = true;
+            } else {
+                debug("keeping .gnu.version_r entry `%s'\n", file);
+            }
+            // the Elf_Verneed structures form a linked list, so jump to next entry
+            need = (Elf_Verneed *) (contents + rdi(shdrVersionR.sh_offset) + rdi(need->vn_next));
+            --verNeedNum;
         }
     }
 }
