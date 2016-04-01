@@ -53,8 +53,8 @@ off_t fileSize, maxSize;
 unsigned char * contents = 0;
 
 
-#define ElfFileParams class Elf_Ehdr, class Elf_Phdr, class Elf_Shdr, class Elf_Addr, class Elf_Off, class Elf_Dyn, class Elf_Sym
-#define ElfFileParamNames Elf_Ehdr, Elf_Phdr, Elf_Shdr, Elf_Addr, Elf_Off, Elf_Dyn, Elf_Sym
+#define ElfFileParams class Elf_Ehdr, class Elf_Phdr, class Elf_Shdr, class Elf_Addr, class Elf_Off, class Elf_Dyn, class Elf_Sym, class Elf_Verneed
+#define ElfFileParamNames Elf_Ehdr, Elf_Phdr, Elf_Shdr, Elf_Addr, Elf_Off, Elf_Dyn, Elf_Sym, Elf_Verneed
 
 
 static unsigned int getPageSize(){
@@ -1260,6 +1260,8 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(map<string, string>& libs)
 
     Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
     
+    unsigned int verNeedNum = 0;
+
     unsigned int dynStrAddedBytes = 0;
     
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
@@ -1286,6 +1288,34 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(map<string, string>& libs)
             } else {
                 debug("keeping DT_NEEDED entry `%s'\n", name);
             }
+        }
+        if (rdi(dyn->d_tag) == DT_VERNEEDNUM) {
+            verNeedNum = rdi(dyn->d_un.d_val);
+        }
+    }
+
+    // If a replaced library uses symbol versions, then there will also be
+    // references to it in the "version needed" table, and these also need to
+    // be replaced.
+
+    if (verNeedNum) {
+        Elf_Shdr & shdrVersionR = findSection3(".gnu.version_r");
+        // The filename strings in the .gnu.version_r aren't necessarily in
+        // .dynstr -- we have to look at ->sh_link to find the section with
+        // the strings in it.
+        Elf_Shdr & shdrVersionRStrings = *shdrs[rdi(shdrVersionR->sh_link)];
+
+        Elf_Verneed * need = (Elf_Verneed *) (contents + rdi(shdrVersionR.sh_offset));
+        while (verNeedNum > 0) {
+
+            // XX check need->vn_file, which is an offset into the
+            // shdrVersionRStrings section
+            // if if matches one of the entries in `libs`, then use
+            // replaceSection logic like that above to add the new string to
+            // this section and change vn_file
+
+            need = (Elf_Verneed *) (contents + rdi(need->vn_next));
+            verNeedNum--;
         }
     }
 }
@@ -1474,13 +1504,13 @@ static void patchElf()
     if (contents[EI_CLASS] == ELFCLASS32 &&
         contents[EI_VERSION] == EV_CURRENT)
     {
-        ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym> elfFile;
+        ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym, Elf32_Verneed> elfFile;
         patchElf2(elfFile);
     }
     else if (contents[EI_CLASS] == ELFCLASS64 &&
         contents[EI_VERSION] == EV_CURRENT)
     {
-        ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym> elfFile;
+        ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym, Elf64_Verneed> elfFile;
         patchElf2(elfFile);
     }
     else {
