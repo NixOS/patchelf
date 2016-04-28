@@ -1337,7 +1337,7 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(map<string, string>& libs)
                 debug("keeping .gnu.version_r entry `%s'\n", file);
             }
             // the Elf_Verneed structures form a linked list, so jump to next entry
-            need = (Elf_Verneed *) (contents + rdi(shdrVersionR.sh_offset) + rdi(need->vn_next));
+            need = (Elf_Verneed *) (((char *) need) + rdi(need->vn_next));
             --verNeedNum;
         }
     }
