@@ -462,7 +462,7 @@ Elf_Shdr & ElfFile<ElfFileParamNames>::findSection(const SectionName & sectionNa
 {
     Elf_Shdr * shdr = findSection2(sectionName);
     if (!shdr)
-        error("cannot find section " + sectionName);
+        error("cannot find section '" + sectionName + "'");
     return *shdr;
 }
 
