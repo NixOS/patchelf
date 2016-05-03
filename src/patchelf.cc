@@ -774,6 +774,9 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
     for (unsigned int i = 1; i <= lastReplaced; ++i) {
         Elf_Shdr & shdr(shdrs[i]);
         std::string sectionName = getSectionName(shdr);
+        if (sectionName == "") {
+          continue;
+        }
         debug("looking at section '%s'\n", sectionName.c_str());
         /* !!! Why do we stop after a .dynstr section? I can't
            remember! */
