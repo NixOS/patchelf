@@ -19,6 +19,14 @@ libraries.  In particular, it can do the following:
   an RPATH "/lib:/usr/lib:/foo/lib", and libfoo.so can only be found
   in /foo/lib, then the new RPATH will be "/foo/lib".
 
+  In addition, the '--allowed-rpath-prefixes' option can be used for
+  further rpath tuning. For instance, if an executable has an RPATH
+  "/tmp/build-foo/.libs:/foo/lib", it is probably desirable to keep
+  the "/foo/lib" reference instead of the "/tmp" entry. To accomplish
+  that, use:
+
+  $ patchelf --shrink-rpath --allowed-rpath-prefixes /usr/lib:/foo/lib my-program
+
 * Remove declared dependencies on dynamic libraries (DT_NEEDED
   entries):
 
