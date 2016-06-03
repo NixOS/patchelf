@@ -57,6 +57,22 @@ unsigned char * contents = 0;
 #define ElfFileParamNames Elf_Ehdr, Elf_Phdr, Elf_Shdr, Elf_Addr, Elf_Off, Elf_Dyn, Elf_Sym, Elf_Verneed
 
 
+static vector<string> splitColonDelimitedString(const char * s){
+    vector<string> parts;
+    const char * pos = s;
+    while (*pos) {
+        const char * end = strchr(pos, ':');
+        if (!end) end = strchr(pos, 0);
+
+        parts.push_back(string(pos, end - pos));
+        if (*end == ':') ++end;
+        pos = end;
+    }
+
+    return parts;
+}
+
+
 static unsigned int getPageSize(){
     return pageSize;
 }
@@ -1095,15 +1111,9 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
 
         newRPath = "";
 
-        char * pos = rpath;
-        while (*pos) {
-            char * end = strchr(pos, ':');
-            if (!end) end = strchr(pos, 0);
-
-            /* Get the name of the directory. */
-            string dirName(pos, end - pos);
-            if (*end == ':') ++end;
-            pos = end;
+        vector<string> rpathDirs = splitColonDelimitedString(rpath);
+        for (vector<string>::iterator it = rpathDirs.begin(); it != rpathDirs.end(); ++it) {
+            const string & dirName = *it;
 
             /* Non-absolute entries are allowed (e.g., the special
                "$ORIGIN" hack). */
