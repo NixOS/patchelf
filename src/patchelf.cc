@@ -1092,7 +1092,13 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
        needed library. */
     if (op == rpShrink) {
         static vector<bool> neededLibFound(neededLibs.size(), false);
+        string shrinkPath;
 
+        if (newRPath != "") {
+            shrinkPath = newRPath;
+        }
+        else
+            shrinkPath = "";
         newRPath = "";
 
         char * pos = rpath;
@@ -1117,7 +1123,12 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
             bool libFound = false;
             for (unsigned int j = 0; j < neededLibs.size(); ++j)
                 if (!neededLibFound[j]) {
-                    string libName = dirName + "/" + neededLibs[j];
+                    string libName;
+                    if (shrinkPath != "") {
+                        libName = shrinkPath + "/" + dirName + "/" + neededLibs[j];
+                    }
+                    else
+                        libName = dirName + "/" + neededLibs[j];
                     struct stat st;
                     if (stat(libName.c_str(), &st) == 0) {
                         neededLibFound[j] = true;
@@ -1455,6 +1466,7 @@ static bool setSoname = false;
 static string newSoname;
 static string newInterpreter;
 static bool shrinkRPath = false;
+static string shrinkPrefix;
 static bool removeRPath = false;
 static bool setRPath = false;
 static bool printRPath = false;
@@ -1486,7 +1498,7 @@ static void patchElf2(ElfFile & elfFile)
         elfFile.modifyRPath(elfFile.rpPrint, "");
 
     if (shrinkRPath)
-        elfFile.modifyRPath(elfFile.rpShrink, "");
+        elfFile.modifyRPath(elfFile.rpShrink, shrinkPrefix);
     else if (removeRPath)
         elfFile.modifyRPath(elfFile.rpRemove, "");
     else if (setRPath)
@@ -1553,6 +1565,7 @@ void showHelp(const string & progName)
   [--set-rpath RPATH]\n\
   [--remove-rpath]\n\
   [--shrink-rpath]\n\
+  [--shrink-prefix]\n\
   [--print-rpath]\n\
   [--force-rpath]\n\
   [--add-needed LIBRARY]\n\
@@ -1603,6 +1616,10 @@ int main(int argc, char * * argv)
         }
         else if (arg == "--shrink-rpath") {
             shrinkRPath = true;
+        }
+        else if (arg == "--shrink-prefix") {
+            if (++i == argc) error("missing argument");
+            shrinkPrefix = argv[i];
         }
         else if (arg == "--set-rpath") {
             if (++i == argc) error("missing argument");
