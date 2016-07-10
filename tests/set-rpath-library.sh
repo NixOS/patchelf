@@ -26,7 +26,6 @@ exitCode=0
 
 if test "$exitCode" = 46; then
     echo "expected failure"
-    exit 1
 fi
 
 # So set an RUNPATH on libfoo as well.
