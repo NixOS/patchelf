@@ -57,6 +57,29 @@ unsigned char * contents = 0;
 #define ElfFileParamNames Elf_Ehdr, Elf_Phdr, Elf_Shdr, Elf_Addr, Elf_Off, Elf_Dyn, Elf_Sym, Elf_Verneed
 
 
+static vector<string> splitColonDelimitedString(const char * s){
+    vector<string> parts;
+    const char * pos = s;
+    while (*pos) {
+        const char * end = strchr(pos, ':');
+        if (!end) end = strchr(pos, 0);
+
+        parts.push_back(string(pos, end - pos));
+        if (*end == ':') ++end;
+        pos = end;
+    }
+
+    return parts;
+}
+
+static bool hasAllowedPrefix(const string & s, const vector<string> & allowedPrefixes){
+    for (vector<string>::const_iterator it = allowedPrefixes.begin(); it != allowedPrefixes.end(); ++it) {
+        if (!s.compare(0, it->size(), *it)) return true;
+    }
+    return false;
+}
+
+
 static unsigned int getPageSize(){
     return pageSize;
 }
@@ -169,7 +192,7 @@ public:
 
     typedef enum { rpPrint, rpShrink, rpSet, rpRemove } RPathOp;
 
-    void modifyRPath(RPathOp op, string newRPath);
+    void modifyRPath(RPathOp op, vector<string> allowedRpathPrefixes, string newRPath);
 
     void addNeeded(set<string> libs);
 
@@ -1027,7 +1050,7 @@ static void concatToRPath(string & rpath, const string & path)
 
 
 template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
+void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, vector<string> allowedRpathPrefixes, string newRPath)
 {
     Elf_Shdr & shdrDynamic = findSection(".dynamic");
 
@@ -1095,20 +1118,21 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, string newRPath)
 
         newRPath = "";
 
-        char * pos = rpath;
-        while (*pos) {
-            char * end = strchr(pos, ':');
-            if (!end) end = strchr(pos, 0);
-
-            /* Get the name of the directory. */
-            string dirName(pos, end - pos);
-            if (*end == ':') ++end;
-            pos = end;
+        vector<string> rpathDirs = splitColonDelimitedString(rpath);
+        for (vector<string>::iterator it = rpathDirs.begin(); it != rpathDirs.end(); ++it) {
+            const string & dirName = *it;
 
             /* Non-absolute entries are allowed (e.g., the special
                "$ORIGIN" hack). */
             if (dirName[0] != '/') {
                 concatToRPath(newRPath, dirName);
+                continue;
+            }
+
+            /* If --allowed-rpath-prefixes was given, reject directories
+               not starting with any of the (colon-delimited) prefixes. */
+            if (!allowedRpathPrefixes.empty() && !hasAllowedPrefix(dirName, allowedRpathPrefixes)) {
+                debug("removing directory '%s' from RPATH because of non-allowed prefix\n", dirName.c_str());
                 continue;
             }
 
@@ -1455,6 +1479,7 @@ static bool setSoname = false;
 static string newSoname;
 static string newInterpreter;
 static bool shrinkRPath = false;
+static vector<string> allowedRpathPrefixes;
 static bool removeRPath = false;
 static bool setRPath = false;
 static bool printRPath = false;
@@ -1483,14 +1508,14 @@ static void patchElf2(ElfFile & elfFile)
         elfFile.setInterpreter(newInterpreter);
 
     if (printRPath)
-        elfFile.modifyRPath(elfFile.rpPrint, "");
+        elfFile.modifyRPath(elfFile.rpPrint, vector<string>(), "");
 
     if (shrinkRPath)
-        elfFile.modifyRPath(elfFile.rpShrink, "");
+        elfFile.modifyRPath(elfFile.rpShrink, allowedRpathPrefixes, "");
     else if (removeRPath)
-        elfFile.modifyRPath(elfFile.rpRemove, "");
+        elfFile.modifyRPath(elfFile.rpRemove, vector<string>(), "");
     else if (setRPath)
-        elfFile.modifyRPath(elfFile.rpSet, newRPath);
+        elfFile.modifyRPath(elfFile.rpSet, vector<string>(), newRPath);
 
     if (printNeeded) elfFile.printNeededLibs();
 
@@ -1553,6 +1578,7 @@ void showHelp(const string & progName)
   [--set-rpath RPATH]\n\
   [--remove-rpath]\n\
   [--shrink-rpath]\n\
+  [--allowed-rpath-prefixes PREFIXES]\t\tWith '--shrink-rpath', reject rpath entries not starting with the allowed prefix\n\
   [--print-rpath]\n\
   [--force-rpath]\n\
   [--add-needed LIBRARY]\n\
@@ -1603,6 +1629,10 @@ int main(int argc, char * * argv)
         }
         else if (arg == "--shrink-rpath") {
             shrinkRPath = true;
+        }
+        else if (arg == "--allowed-rpath-prefixes") {
+            if (++i == argc) error("missing argument");
+            allowedRpathPrefixes = splitColonDelimitedString(argv[i]);
         }
         else if (arg == "--set-rpath") {
             if (++i == argc) error("missing argument");
