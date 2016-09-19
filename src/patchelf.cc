@@ -956,7 +956,6 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string &
     assert(strTabAddr == rdi(shdrDynStr.sh_addr));
 
     /* Walk through the dynamic section, look for the DT_SONAME entry. */
-    static std::vector<std::string> neededLibs;
     dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
     Elf_Dyn * dynSoname = 0;
     char * soname = 0;
@@ -964,8 +963,7 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string &
         if (rdi(dyn->d_tag) == DT_SONAME) {
             dynSoname = dyn;
             soname = strTab + rdi(dyn->d_un.d_val);
-        } else if (rdi(dyn->d_tag) == DT_INIT)
-            neededLibs.push_back(std::string(strTab + rdi(dyn->d_un.d_val)));
+        }
     }
 
     if (op == printSoname) {
@@ -1074,7 +1072,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
        unless you use its '--enable-new-dtag' option, in which case it
        generates a DT_RPATH and DT_RUNPATH pointing at the same
        string. */
-    static std::vector<std::string> neededLibs;
+    std::vector<std::string> neededLibs;
     dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
     Elf_Dyn * dynRPath = 0, * dynRunPath = 0;
     char * rpath = 0;
@@ -1107,7 +1105,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
     /* For each directory in the RPATH, check if it contains any
        needed library. */
     if (op == rpShrink) {
-        static std::vector<bool> neededLibFound(neededLibs.size(), false);
+        std::vector<bool> neededLibFound(neededLibs.size(), false);
 
         newRPath = "";
 
