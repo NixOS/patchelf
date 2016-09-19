@@ -534,29 +534,25 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
     /* Overwrite the old section contents with 'X's.  Do this
        *before* writing the new section contents (below) to prevent
        clobbering previously written new section contents. */
-    for (ReplacedSections::iterator i = replacedSections.begin();
-         i != replacedSections.end(); ++i)
-    {
-        std::string sectionName = i->first;
+    for (auto & i : replacedSections) {
+        std::string sectionName = i.first;
         Elf_Shdr & shdr = findSection(sectionName);
         memset(contents + rdi(shdr.sh_offset), 'X', rdi(shdr.sh_size));
     }
 
-    for (ReplacedSections::iterator i = replacedSections.begin();
-         i != replacedSections.end(); ++i)
-    {
-        std::string sectionName = i->first;
+    for (auto & i : replacedSections) {
+        std::string sectionName = i.first;
         Elf_Shdr & shdr = findSection(sectionName);
         debug("rewriting section '%s' from offset 0x%x (size %d) to offset 0x%x (size %d)\n",
-            sectionName.c_str(), rdi(shdr.sh_offset), rdi(shdr.sh_size), curOff, i->second.size());
+            sectionName.c_str(), rdi(shdr.sh_offset), rdi(shdr.sh_size), curOff, i.second.size());
 
-        memcpy(contents + curOff, (unsigned char *) i->second.c_str(),
-            i->second.size());
+        memcpy(contents + curOff, (unsigned char *) i.second.c_str(),
+            i.second.size());
 
         /* Update the section header for this section. */
         wri(shdr.sh_offset, curOff);
         wri(shdr.sh_addr, startAddr + (curOff - startOffset));
-        wri(shdr.sh_size, i->second.size());
+        wri(shdr.sh_size, i.second.size());
         wri(shdr.sh_addralign, sectionAlignment);
 
         /* If this is the .interp section, then the PT_INTERP segment
@@ -581,7 +577,7 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
                 }
         }
 
-        curOff += roundUp(i->second.size(), sectionAlignment);
+        curOff += roundUp(i.second.size(), sectionAlignment);
     }
 
     replacedSections.clear();
@@ -607,9 +603,8 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
     /* Compute the total space needed for the replaced sections and
        the program headers. */
     off_t neededSpace = (phdrs.size() + 1) * sizeof(Elf_Phdr);
-    for (ReplacedSections::iterator i = replacedSections.begin();
-         i != replacedSections.end(); ++i)
-        neededSpace += roundUp(i->second.size(), sectionAlignment);
+    for (auto & i : replacedSections)
+        neededSpace += roundUp(i.second.size(), sectionAlignment);
     debug("needed space is %d\n", neededSpace);
 
 
@@ -753,9 +748,8 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
     /* Compute the total space needed for the replaced sections, the
        ELF header, and the program headers. */
     size_t neededSpace = sizeof(Elf_Ehdr) + phdrs.size() * sizeof(Elf_Phdr);
-    for (ReplacedSections::iterator i = replacedSections.begin();
-         i != replacedSections.end(); ++i)
-        neededSpace += roundUp(i->second.size(), sectionAlignment);
+    for (auto & i : replacedSections)
+        neededSpace += roundUp(i.second.size(), sectionAlignment);
 
     debug("needed space is %d\n", neededSpace);
 
@@ -800,10 +794,9 @@ void ElfFile<ElfFileParamNames>::rewriteSections()
 {
     if (replacedSections.empty()) return;
 
-    for (ReplacedSections::iterator i = replacedSections.begin();
-         i != replacedSections.end(); ++i)
+    for (auto & i : replacedSections)
         debug("replacing section '%s' with size %d\n",
-            i->first.c_str(), i->second.size());
+            i.first.c_str(), i.second.size());
 
     if (rdi(hdr->e_type) == ET_DYN) {
         debug("this is a dynamic library\n");
