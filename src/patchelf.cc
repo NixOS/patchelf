@@ -1612,7 +1612,7 @@ int main(int argc, char * * argv)
             if (++i == argc) error("missing argument");
             pageSize = atoi(argv[i]);
             if (pageSize <= 0) error("invalid argument to --page-size");
-	}
+        }
         else if (arg == "--print-interpreter") {
             printInterpreter = true;
         }
