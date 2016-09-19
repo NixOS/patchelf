@@ -272,19 +272,25 @@ static void growFile(FileContents contents, size_t newSize)
 }
 
 
-static FileContents readFile(std::string fileName)
+static FileContents readFile(std::string fileName,
+    size_t cutOff = std::numeric_limits<size_t>::max())
 {
     struct stat st;
     if (stat(fileName.c_str(), &st) != 0) error("stat");
 
+    if ((uint64_t) st.st_size > (uint64_t) std::numeric_limits<size_t>::max())
+        error("cannot read file of size " + std::to_string(st.st_size) + " into memory");
+
+    size_t size = std::min(cutOff, (size_t) st.st_size);
+
     FileContents contents = std::make_shared<std::vector<unsigned char>>();
-    contents->reserve(st.st_size + 32 * 1024 * 1024);
-    contents->resize(st.st_size, 0);
+    contents->reserve(size + 32 * 1024 * 1024);
+    contents->resize(size, 0);
 
     int fd = open(fileName.c_str(), O_RDONLY);
     if (fd == -1) error("open");
 
-    if (read(fd, contents->data(), st.st_size) != st.st_size) error("read");
+    if ((size_t) read(fd, contents->data(), size) != size) error("read");
 
     close(fd);
 
@@ -317,6 +323,7 @@ ElfType getElfType(const FileContents & fileContents)
 
     bool is32Bit = contents[EI_CLASS] == ELFCLASS32;
 
+    // FIXME: endianness
     return ElfType{is32Bit, is32Bit ? ((Elf32_Ehdr *) contents)->e_machine : ((Elf64_Ehdr *) contents)->e_machine};
 }
 
@@ -1162,8 +1169,11 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
                     std::string libName = dirName + "/" + neededLibs[j];
                     struct stat st;
                     if (stat(libName.c_str(), &st) == 0) {
-                        neededLibFound[j] = true;
-                        libFound = true;
+                        if (getElfType(readFile(libName, sizeof(Elf32_Ehdr))).machine == rdi(hdr->e_machine)) {
+                            neededLibFound[j] = true;
+                            libFound = true;
+                        } else
+                            debug("ignoring library '%s' because its machine type differs\n", libName.c_str());
                     }
                 }
 
