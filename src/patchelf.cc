@@ -292,6 +292,35 @@ static FileContents readFile(std::string fileName)
 }
 
 
+struct ElfType
+{
+    bool is32Bit;
+    int machine; // one of EM_*
+};
+
+
+ElfType getElfType(const FileContents & fileContents)
+{
+    /* Check the ELF header for basic validity. */
+    if (fileContents->size() < (off_t) sizeof(Elf32_Ehdr)) error("missing ELF header");
+
+    auto contents = fileContents->data();
+
+    if (memcmp(contents, ELFMAG, SELFMAG) != 0)
+        error("not an ELF executable");
+
+    if (contents[EI_VERSION] != EV_CURRENT)
+        error("unsupported ELF version");
+
+    if (contents[EI_CLASS] != ELFCLASS32 && contents[EI_CLASS] != ELFCLASS64)
+        error("ELF executable is not 32 or 64 bit");
+
+    bool is32Bit = contents[EI_CLASS] == ELFCLASS32;
+
+    return ElfType{is32Bit, is32Bit ? ((Elf32_Ehdr *) contents)->e_machine : ((Elf64_Ehdr *) contents)->e_machine};
+}
+
+
 static void checkPointer(const FileContents & contents, void * p, unsigned int size)
 {
     unsigned char * q = (unsigned char *) p;
@@ -1480,7 +1509,7 @@ static bool printNeeded = false;
 static bool noDefaultLib = false;
 
 template<class ElfFile>
-static void patchElf2(ElfFile & elfFile)
+static void patchElf2(ElfFile && elfFile)
 {
     if (printInterpreter)
         printf("%s\n", elfFile.getInterpreter().c_str());
@@ -1529,29 +1558,10 @@ static void patchElf()
 
     auto fileContents = readFile(fileName);
 
-    /* Check the ELF header for basic validity. */
-    if (fileContents->size() < (off_t) sizeof(Elf32_Ehdr)) error("missing ELF header");
-
-    auto contents = fileContents->data();
-
-    if (memcmp(contents, ELFMAG, SELFMAG) != 0)
-        error("not an ELF executable");
-
-    if (contents[EI_CLASS] == ELFCLASS32 &&
-        contents[EI_VERSION] == EV_CURRENT)
-    {
-        ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym, Elf32_Verneed> elfFile(fileContents);
-        patchElf2(elfFile);
-    }
-    else if (contents[EI_CLASS] == ELFCLASS64 &&
-        contents[EI_VERSION] == EV_CURRENT)
-    {
-        ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym, Elf64_Verneed> elfFile(fileContents);
-        patchElf2(elfFile);
-    }
-    else {
-        error("ELF executable is not 32/64-bit, little/big-endian, version 1");
-    }
+    if (getElfType(fileContents).is32Bit)
+        patchElf2(ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym, Elf32_Verneed>(fileContents));
+    else
+        patchElf2(ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym, Elf64_Verneed>(fileContents));
 }
 
 
