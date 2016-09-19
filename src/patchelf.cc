@@ -21,6 +21,7 @@
 #include <set>
 #include <map>
 #include <algorithm>
+#include <memory>
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -49,15 +50,15 @@ static bool forceRPath = false;
 static string fileName;
 static int pageSize = PAGESIZE;
 
-off_t fileSize, maxSize;
-unsigned char * contents = 0;
+typedef std::shared_ptr<std::vector<unsigned char>> FileContents;
 
 
 #define ElfFileParams class Elf_Ehdr, class Elf_Phdr, class Elf_Shdr, class Elf_Addr, class Elf_Off, class Elf_Dyn, class Elf_Sym, class Elf_Verneed
 #define ElfFileParamNames Elf_Ehdr, Elf_Phdr, Elf_Shdr, Elf_Addr, Elf_Off, Elf_Dyn, Elf_Sym, Elf_Verneed
 
 
-static vector<string> splitColonDelimitedString(const char * s){
+static vector<string> splitColonDelimitedString(const char * s)
+{
     vector<string> parts;
     const char * pos = s;
     while (*pos) {
@@ -72,7 +73,8 @@ static vector<string> splitColonDelimitedString(const char * s){
     return parts;
 }
 
-static bool hasAllowedPrefix(const string & s, const vector<string> & allowedPrefixes){
+static bool hasAllowedPrefix(const string & s, const vector<string> & allowedPrefixes)
+{
     for (vector<string>::const_iterator it = allowedPrefixes.begin(); it != allowedPrefixes.end(); ++it) {
         if (!s.compare(0, it->size(), *it)) return true;
     }
@@ -80,7 +82,8 @@ static bool hasAllowedPrefix(const string & s, const vector<string> & allowedPre
 }
 
 
-static unsigned int getPageSize(){
+static unsigned int getPageSize()
+{
     return pageSize;
 }
 
@@ -88,15 +91,23 @@ static unsigned int getPageSize(){
 template<ElfFileParams>
 class ElfFile
 {
+public:
+
+    const FileContents fileContents;
+
+private:
+
+    unsigned char * contents;
+
     Elf_Ehdr * hdr;
     vector<Elf_Phdr> phdrs;
     vector<Elf_Shdr> shdrs;
 
     bool littleEndian;
 
-    bool changed;
+    bool changed = false;
 
-    bool isExecutable;
+    bool isExecutable = false;
 
     typedef string SectionName;
     typedef map<SectionName, string> ReplacedSections;
@@ -107,24 +118,18 @@ class ElfFile
 
     /* Align on 4 or 8 bytes boundaries on 32- or 64-bit platforms
        respectively. */
-    unsigned int sectionAlignment;
+    size_t sectionAlignment = sizeof(Elf_Off);
 
     vector<SectionName> sectionsByOldIndex;
 
 public:
 
-    ElfFile()
-    {
-        changed = false;
-        sectionAlignment = sizeof(Elf_Off);
-    }
+    ElfFile(FileContents fileContents);
 
     bool isChanged()
     {
         return changed;
     }
-
-    void parse();
 
 private:
 
@@ -264,64 +269,63 @@ __attribute__((noreturn)) static void error(string msg)
 }
 
 
-static void growFile(off_t newSize)
+static void growFile(FileContents contents, size_t newSize)
 {
-    if (newSize > maxSize) error("maximum file size exceeded");
-    if (newSize <= fileSize) return;
-    if (newSize > fileSize)
-        memset(contents + fileSize, 0, newSize - fileSize);
-    fileSize = newSize;
+    if (newSize > contents->capacity()) error("maximum file size exceeded");
+    if (newSize <= contents->size()) return;
+    contents->resize(newSize, 0);
 }
 
 
-static void readFile(string fileName)
+static FileContents readFile(string fileName)
 {
     struct stat st;
     if (stat(fileName.c_str(), &st) != 0) error("stat");
-    fileSize = st.st_size;
-    maxSize = fileSize + 32 * 1024 * 1024;
 
-    contents = (unsigned char *) malloc(fileSize + maxSize);
-    if (!contents) abort();
+    FileContents contents = std::make_shared<std::vector<unsigned char>>();
+    contents->reserve(st.st_size + 32 * 1024 * 1024);
+    contents->resize(st.st_size, 0);
 
     int fd = open(fileName.c_str(), O_RDONLY);
     if (fd == -1) error("open");
 
-    if (read(fd, contents, fileSize) != fileSize) error("read");
+    if (read(fd, contents->data(), st.st_size) != st.st_size) error("read");
 
     close(fd);
+
+    return contents;
 }
 
 
-static void checkPointer(void * p, unsigned int size)
+static void checkPointer(const FileContents & contents, void * p, unsigned int size)
 {
     unsigned char * q = (unsigned char *) p;
-    assert(q >= contents && q + size <= contents + fileSize);
+    assert(q >= contents->data() && q + size <= contents->data() + contents->size());
 }
 
 
 template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::parse()
+ElfFile<ElfFileParamNames>::ElfFile(FileContents fileContents)
+    : fileContents(fileContents)
+    , contents(fileContents->data())
 {
-    isExecutable = false;
-
     /* Check the ELF header for basic validity. */
-    if (fileSize < (off_t) sizeof(Elf_Ehdr)) error("missing ELF header");
+    if (fileContents->size() < (off_t) sizeof(Elf_Ehdr)) error("missing ELF header");
 
-    hdr = (Elf_Ehdr *) contents;
+    hdr = (Elf_Ehdr *) fileContents->data();
 
     if (memcmp(hdr->e_ident, ELFMAG, SELFMAG) != 0)
         error("not an ELF executable");
 
-    littleEndian = contents[EI_DATA] == ELFDATA2LSB;
+    littleEndian = hdr->e_ident[EI_DATA] == ELFDATA2LSB;
 
     if (rdi(hdr->e_type) != ET_EXEC && rdi(hdr->e_type) != ET_DYN)
         error("wrong ELF type");
 
-    if ((off_t) (rdi(hdr->e_phoff) + rdi(hdr->e_phnum) * rdi(hdr->e_phentsize)) > fileSize)
+    if ((size_t) (rdi(hdr->e_phoff) + rdi(hdr->e_phnum) * rdi(hdr->e_phentsize)) > fileContents->size())
         error("missing program headers");
 
-    if ((off_t) (rdi(hdr->e_shoff) + rdi(hdr->e_shnum) * rdi(hdr->e_shentsize)) > fileSize)
+    if ((size_t) (rdi(hdr->e_shoff) + rdi(hdr->e_shnum) * rdi(hdr->e_shentsize)) > fileContents->size())
         error("missing section headers");
 
     if (rdi(hdr->e_phentsize) != sizeof(Elf_Phdr))
@@ -343,7 +347,7 @@ void ElfFile<ElfFileParamNames>::parse()
     assert(shstrtabIndex < shdrs.size());
     unsigned int shstrtabSize = rdi(shdrs[shstrtabIndex].sh_size);
     char * shstrtab = (char * ) contents + rdi(shdrs[shstrtabIndex].sh_offset);
-    checkPointer(shstrtab, shstrtabSize);
+    checkPointer(fileContents, shstrtab, shstrtabSize);
 
     assert(shstrtabSize > 0);
     assert(shstrtab[shstrtabSize - 1] == 0);
@@ -409,13 +413,13 @@ void ElfFile<ElfFileParamNames>::sortShdrs()
 }
 
 
-static void writeFile(string fileName)
+static void writeFile(string fileName, FileContents contents)
 {
     int fd = open(fileName.c_str(), O_TRUNC | O_WRONLY);
     if (fd == -1)
         error("open");
 
-    if (write(fd, contents, fileSize) != fileSize)
+    if (write(fd, contents->data(), contents->size()) != (off_t) contents->size())
         error("write");
 
     if (close(fd) != 0)
@@ -434,9 +438,9 @@ void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, Elf_Addr sta
 {
     /* Move the entire contents of the file 'extraPages' pages
        further. */
-    unsigned int oldSize = fileSize;
+    unsigned int oldSize = fileContents->size();
     unsigned int shift = extraPages * getPageSize();
-    growFile(fileSize + extraPages * getPageSize());
+    growFile(fileContents, fileContents->size() + extraPages * getPageSize());
     memmove(contents + extraPages * getPageSize(), contents, oldSize);
     memset(contents + sizeof(Elf_Ehdr), 0, shift - sizeof(Elf_Ehdr));
 
@@ -614,9 +618,9 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
     debug("needed space is %d\n", neededSpace);
 
 
-    size_t startOffset = roundUp(fileSize, getPageSize());
+    size_t startOffset = roundUp(fileContents->size(), getPageSize());
 
-    growFile(startOffset + neededSpace);
+    growFile(fileContents, startOffset + neededSpace);
 
 
     /* Even though this file is of type ET_DYN, it could actually be
@@ -641,7 +645,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
             assert(hole % getPageSize() == 0);
             /* !!! We could create an actual hole in the file here,
                but it's probably not worth the effort. */
-            growFile(fileSize + hole);
+            growFile(fileContents, fileContents->size() + hole);
             startOffset += hole;
         }
         startPage = startOffset;
@@ -737,9 +741,9 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
         /* The section headers occur too early in the file and would be
            overwritten by the replaced sections. Move them to the end of the file
            before proceeding. */
-        off_t shoffNew = fileSize;
+        off_t shoffNew = fileContents->size();
         off_t shSize = rdi(hdr->e_shoff) + rdi(hdr->e_shnum) * rdi(hdr->e_shentsize);
-        growFile (fileSize + shSize);
+        growFile(fileContents, fileContents->size() + shSize);
         wri(hdr->e_shoff, shoffNew);
 
         /* Rewrite the section header table.  For neatness, keep the
@@ -1118,9 +1122,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op, vector<string> allowedR
 
         newRPath = "";
 
-        vector<string> rpathDirs = splitColonDelimitedString(rpath);
-        for (vector<string>::iterator it = rpathDirs.begin(); it != rpathDirs.end(); ++it) {
-            const string & dirName = *it;
+        for (auto & dirName : splitColonDelimitedString(rpath)) {
 
             /* Non-absolute entries are allowed (e.g., the special
                "$ORIGIN" hack). */
@@ -1493,8 +1495,6 @@ static bool noDefaultLib = false;
 template<class ElfFile>
 static void patchElf2(ElfFile & elfFile)
 {
-    elfFile.parse();
-
     if (printInterpreter)
         printf("%s\n", elfFile.getInterpreter().c_str());
 
@@ -1528,7 +1528,7 @@ static void patchElf2(ElfFile & elfFile)
 
     if (elfFile.isChanged()){
         elfFile.rewriteSections();
-        writeFile(fileName);
+        writeFile(fileName, elfFile.fileContents);
     }
 }
 
@@ -1540,11 +1540,12 @@ static void patchElf()
 
     debug("Kernel page size is %u bytes\n", getPageSize());
 
-    readFile(fileName);
-
+    auto fileContents = readFile(fileName);
 
     /* Check the ELF header for basic validity. */
-    if (fileSize < (off_t) sizeof(Elf32_Ehdr)) error("missing ELF header");
+    if (fileContents->size() < (off_t) sizeof(Elf32_Ehdr)) error("missing ELF header");
+
+    auto contents = fileContents->data();
 
     if (memcmp(contents, ELFMAG, SELFMAG) != 0)
         error("not an ELF executable");
@@ -1552,13 +1553,13 @@ static void patchElf()
     if (contents[EI_CLASS] == ELFCLASS32 &&
         contents[EI_VERSION] == EV_CURRENT)
     {
-        ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym, Elf32_Verneed> elfFile;
+        ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym, Elf32_Verneed> elfFile(fileContents);
         patchElf2(elfFile);
     }
     else if (contents[EI_CLASS] == ELFCLASS64 &&
         contents[EI_VERSION] == EV_CURRENT)
     {
-        ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym, Elf64_Verneed> elfFile;
+        ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym, Elf64_Verneed> elfFile(fileContents);
         patchElf2(elfFile);
     }
     else {
