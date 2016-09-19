@@ -22,19 +22,20 @@
 #include <map>
 #include <algorithm>
 #include <memory>
+#include <sstream>
+#include <limits>
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdarg.h>
-#include <assert.h>
-#include <string.h>
-#include <errno.h>
+#include <cstdlib>
+#include <cstdio>
+#include <cstdarg>
+#include <cassert>
+#include <cstring>
+#include <cerrno>
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <limits.h>
 
 #include "elf.h"
 
@@ -257,10 +258,44 @@ static void debug(const char * format, ...)
 }
 
 
+void fmt2(std::ostringstream & out)
+{
+}
+
+
+template<typename T, typename... Args>
+void fmt2(std::ostringstream & out, T x, Args... args)
+{
+    out << x;
+    fmt2(out, args...);
+}
+
+
+template<typename... Args>
+std::string fmt(Args... args)
+{
+    std::ostringstream out;
+    fmt2(out, args...);
+    return out.str();
+}
+
+
+struct SysError : std::runtime_error
+{
+    int errNo;
+    SysError(const std::string & msg)
+        : std::runtime_error(fmt(msg + ": " + strerror(errno)))
+        , errNo(errno)
+    { }
+};
+
+
 __attribute__((noreturn)) static void error(std::string msg)
 {
-    if (errno) perror(msg.c_str()); else fprintf(stderr, "%s\n", msg.c_str());
-    exit(1);
+    if (errno)
+        throw SysError(msg);
+    else
+        throw std::runtime_error(msg);
 }
 
 
@@ -276,10 +311,11 @@ static FileContents readFile(std::string fileName,
     size_t cutOff = std::numeric_limits<size_t>::max())
 {
     struct stat st;
-    if (stat(fileName.c_str(), &st) != 0) error("stat");
+    if (stat(fileName.c_str(), &st) != 0)
+        throw SysError(fmt("getting info about '", fileName, "'"));
 
     if ((uint64_t) st.st_size > (uint64_t) std::numeric_limits<size_t>::max())
-        error("cannot read file of size " + std::to_string(st.st_size) + " into memory");
+        throw SysError(fmt("cannot read file of size ", st.st_size, " into memory"));
 
     size_t size = std::min(cutOff, (size_t) st.st_size);
 
@@ -288,9 +324,10 @@ static FileContents readFile(std::string fileName,
     contents->resize(size, 0);
 
     int fd = open(fileName.c_str(), O_RDONLY);
-    if (fd == -1) error("open");
+    if (fd == -1) throw SysError(fmt("opening '", fileName, "'"));
 
-    if ((size_t) read(fd, contents->data(), size) != size) error("read");
+    if ((size_t) read(fd, contents->data(), size) != size)
+        throw SysError(fmt("reading '", fileName, "'"));
 
     close(fd);
 
@@ -1167,13 +1204,14 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
             for (unsigned int j = 0; j < neededLibs.size(); ++j)
                 if (!neededLibFound[j]) {
                     std::string libName = dirName + "/" + neededLibs[j];
-                    struct stat st;
-                    if (stat(libName.c_str(), &st) == 0) {
+                    try {
                         if (getElfType(readFile(libName, sizeof(Elf32_Ehdr))).machine == rdi(hdr->e_machine)) {
                             neededLibFound[j] = true;
                             libFound = true;
                         } else
                             debug("ignoring library '%s' because its machine type differs\n", libName.c_str());
+                    } catch (SysError & e) {
+                        if (e.errNo != ENOENT) throw;
                     }
                 }
 
@@ -1600,7 +1638,7 @@ void showHelp(const std::string & progName)
 }
 
 
-int main(int argc, char * * argv)
+int mainWrapped(int argc, char * * argv)
 {
     if (argc <= 1) {
         showHelp(argv[0]);
@@ -1703,4 +1741,14 @@ int main(int argc, char * * argv)
     patchElf();
 
     return 0;
+}
+
+int main(int argc, char * * argv)
+{
+    try {
+        return mainWrapped(argc, argv);
+    } catch (std::exception & e) {
+        fprintf(stderr, "patchelf: %s\n", e.what());
+        return 1;
+    }
 }
