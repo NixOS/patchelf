@@ -72,13 +72,23 @@ libraries.  In particular, it can do the following:
 
 ## Compiling and Testing
 
-### Via Autotools
+### Via [GNU Autotools](https://www.gnu.org/software/automake/manual/html_node/Autotools-Introduction.html)
 ```console
 ./bootstrap.sh
 ./configure
 make
 make check
 sudo make install
+```
+
+## Via [CMake](https://cmake.org/) (and [Ninja](https://ninja-build.org/))
+
+```console
+mkdir build
+cd build
+cmake .. -GNinja
+ninja all
+sudo ninja install
 ```
 
 ### Via Nix

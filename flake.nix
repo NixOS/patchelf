@@ -30,27 +30,37 @@
       version = lib.removeSuffix "\n" (builtins.readFile ./version);
       pkgs = nixpkgs.legacyPackages.x86_64-linux;
 
-      src = lib.fileset.toSource {
+      baseSrcFiles = [
+        ./COPYING
+        ./README.md
+        ./completions
+        ./patchelf.1
+        ./patchelf.spec.in
+        ./src
+        ./tests
+        ./version
+      ];
+
+      autotoolsSrcFiles = [
+        ./Makefile.am
+        ./configure.ac
+        ./m4
+      ];
+
+      cmakeSrcFiles = [
+        ./CMakeLists.txt
+      ];
+
+      autotoolsSrc = lib.fileset.toSource {
         root = ./.;
-        fileset = lib.fileset.unions [
-          ./COPYING
-          ./Makefile.am
-          ./README.md
-          ./completions
-          ./configure.ac
-          ./m4
-          ./patchelf.1
-          ./patchelf.spec.in
-          ./src
-          ./tests
-          ./version
-        ];
+        fileset = lib.fileset.unions (baseSrcFiles ++ autotoolsSrcFiles);
       };
 
       patchelfFor =
         pkgs:
-        pkgs.callPackage ./package.nix {
-          inherit version src;
+        pkgs.callPackage ./package-autotools.nix {
+          inherit version;
+          src = autotoolsSrc;
         };
 
       # We don't apply flake-parts to the whole flake so that non-development attributes
@@ -76,7 +86,11 @@
       hydraJobs = {
         tarball = pkgs.releaseTools.sourceTarball rec {
           name = "patchelf-tarball";
-          inherit version src;
+          inherit version;
+          src = lib.fileset.toSource {
+            root = ./.;
+            fileset = lib.fileset.unions (baseSrcFiles ++ autotoolsSrcFiles ++ cmakeSrcFiles);
+          };
           versionSuffix = ""; # obsolete
           preAutoconf = "echo ${version} > version";
 
@@ -117,6 +131,8 @@
           })
         );
 
+        build-cmake = forAllSystems (system: self.packages.${system}.patchelf-cmake);
+
         # x86_64-linux seems to be only working clangStdenv at the moment
         build-sanitized-clang = lib.genAttrs [ "x86_64-linux" ] (
           system:
@@ -134,6 +150,7 @@
             self.hydraJobs.tarball
             self.hydraJobs.build.x86_64-linux
             self.hydraJobs.build.i686-linux
+            self.hydraJobs.build-cmake.x86_64-linux
             # FIXME: add aarch64 emulation to our github action...
             #self.hydraJobs.build.aarch64-linux
             self.hydraJobs.build-sanitized.x86_64-linux
@@ -172,8 +189,10 @@
                   }";
                 };
                 nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [
+                  #pkgs.buildPackages.cmake
+                  #pkgs.buildPackages.ninja
                   modular.pre-commit.settings.package
-                  (pkgs.writeScriptBin "pre-commit-hooks-install" modular.pre-commit.settings.installationScript)
+                  (pkgs.buildPackages.writeScriptBin "pre-commit-hooks-install" modular.pre-commit.settings.installationScript)
                 ];
               }
             );
@@ -194,8 +213,9 @@
 
           patchelfForWindowsStatic =
             pkgs:
-            (pkgs.callPackage ./package.nix {
-              inherit version src;
+            (pkgs.callPackage ./package-autotools.nix {
+              inherit version;
+              src = autotoolsSrc;
               # On windows we use win32 threads to get a static binary,
               # otherwise `-static` below doesn't work.
               stdenv = pkgs.stdenv.override (old: {
@@ -216,6 +236,14 @@
         {
           patchelf = patchelfFor pkgs;
           default = self.packages.${system}.patchelf;
+
+          patchelf-cmake = pkgs.callPackage ./package-cmake.nix {
+            inherit version;
+            src = lib.fileset.toSource {
+              root = ./.;
+              fileset = lib.fileset.unions (baseSrcFiles ++ cmakeSrcFiles);
+            };
+          };
 
           # This is a good test to see if packages can be cross-compiled. It also
           # tests if our testsuite uses target-prefixed executable names.
