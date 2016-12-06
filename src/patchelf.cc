@@ -41,6 +41,7 @@
 
 
 static bool debugMode = false;
+static bool quiet = false;
 
 static bool forceRPath = false;
 
@@ -704,7 +705,9 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
         } else {
             size_t hole = startPage - startOffset;
             /* Print a warning, because the hole could be very big. */
-            fprintf(stderr, "warning: working around a Linux kernel bug by creating a hole of %zu bytes in '%s'\n", hole, fileName.c_str());
+            if (debugMode || !quiet) {
+                fprintf(stderr, "warning: working around a Linux kernel bug by creating a hole of %zu bytes in '%s'\n", hole, fileName.c_str());
+            }
             assert(hole % getPageSize() == 0);
             /* !!! We could create an actual hole in the file here,
                but it's probably not worth the effort. */
@@ -971,7 +974,9 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
             unsigned int shndx = rdi(sym->st_shndx);
             if (shndx != SHN_UNDEF && shndx < SHN_LORESERVE) {
                 if (shndx >= sectionsByOldIndex.size()) {
-                    fprintf(stderr, "warning: entry %d in symbol table refers to a non-existent section, skipping\n", shndx);
+                    if (debugMode || !quiet) {
+                        fprintf(stderr, "warning: entry %d in symbol table refers to a non-existent section, skipping\n", shndx);
+                    }
                     continue;
                 }
                 std::string section = sectionsByOldIndex.at(shndx);
@@ -1633,6 +1638,7 @@ void showHelp(const std::string & progName)
   [--print-needed]\n\
   [--no-default-lib]\n\
   [--debug]\n\
+  [--quiet]\n\
   [--version]\n\
   FILENAME\n", progName.c_str());
 }
@@ -1720,6 +1726,9 @@ int mainWrapped(int argc, char * * argv)
         }
         else if (arg == "--debug") {
             debugMode = true;
+        }
+        else if (arg == "--quiet") {
+            quiet = true;
         }
         else if (arg == "--no-default-lib") {
             noDefaultLib = true;
