@@ -1,0 +1,8 @@
+language: c
+dist: trusty
+sudo: false
+script:
+  - ./bootstrap.sh && ./configure && make && make check
+compiler:
+  - clang
+  - gcc
