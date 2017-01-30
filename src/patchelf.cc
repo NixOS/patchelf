@@ -40,6 +40,14 @@
 #include "elf.h"
 
 
+#ifndef PACKAGE_STRING
+#define PACKAGE_STRING "patchelf"
+#endif
+#ifndef PAGESIZE
+#define PAGESIZE 4096
+#endif
+
+
 static bool debugMode = false;
 
 static bool forceRPath = false;
