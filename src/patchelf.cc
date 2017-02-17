@@ -1016,20 +1016,8 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string &
     Elf_Shdr & shdrDynStr = findSection(".dynstr");
     char * strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
 
-    /* Find the DT_STRTAB entry in the dynamic section. */
-    Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
-    Elf_Addr strTabAddr = 0;
-    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++)
-        if (rdi(dyn->d_tag) == DT_STRTAB)
-            strTabAddr = rdi(dyn->d_un.d_ptr);
-    if (!strTabAddr) error("strange: no string table");
-
-    /* We assume that the virtual address in the DT_STRTAB entry
-       of the dynamic section corresponds to the .dynstr section. */
-    assert(strTabAddr == rdi(shdrDynStr.sh_addr));
-
     /* Walk through the dynamic section, look for the DT_SONAME entry. */
-    dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+    Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
     Elf_Dyn * dynSoname = 0;
     char * soname = 0;
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
@@ -1123,15 +1111,6 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
     Elf_Shdr & shdrDynStr = findSection(".dynstr");
     char * strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
 
-    /* Find the DT_STRTAB entry in the dynamic section. */
-    Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
-    Elf_Addr strTabAddr = 0;
-    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++)
-        if (rdi(dyn->d_tag) == DT_STRTAB) strTabAddr = rdi(dyn->d_un.d_ptr);
-    if (!strTabAddr) error("strange: no string table");
-
-    assert(strTabAddr == rdi(shdrDynStr.sh_addr));
-
 
     /* Walk through the dynamic section, look for the RPATH/RUNPATH
        entry.
@@ -1146,7 +1125,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
        generates a DT_RPATH and DT_RUNPATH pointing at the same
        string. */
     std::vector<std::string> neededLibs;
-    dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
+    Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
     Elf_Dyn * dynRPath = 0, * dynRunPath = 0;
     char * rpath = 0;
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
