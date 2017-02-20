@@ -27,6 +27,22 @@ libraries.  In particular, it can do the following:
 
   $ patchelf --shrink-rpath --allowed-rpath-prefixes /usr/lib:/foo/lib my-program
 
+* Sanitize and make the RPATH relative to a specified root directory:
+
+  $ patchelf --make-rpath-relative rootdir my-program
+
+  This removes from the RPATH all directories, which are not under the
+  specified rootdir. "$ORIGIN" and directories already relative to
+  rootdir will be resolved first. If the option '--no-standard-lib' is
+  given, "rootdir/lib" and "rootdir/usr/lib" directories are discarded
+  as well. If the option "--relative-to-file" is given, the RPATH will
+  start with "$ORIGIN" making it relative to the ELF file, otherwise
+  an absolute path relative to ROOTDIR will be used. Furthermore, all
+  directories that do not contain a library referenced by DT_NEEDED
+  fields of the executable or library will be removed. Finally, the
+  directory path is converted to a path relative to rootdir starting
+  with "$ORIGIN".
+
 * Remove declared dependencies on dynamic libraries (DT_NEEDED
   entries):
 
