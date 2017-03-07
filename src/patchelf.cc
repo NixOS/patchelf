@@ -170,6 +170,8 @@ private:
     std::string & replaceSection(const SectionName & sectionName,
         unsigned int size);
 
+    bool haveReplacedSection(const SectionName & sectionName);
+
     void writeReplacedSections(Elf_Off & curOff,
         Elf_Addr startAddr, Elf_Off startOffset);
 
@@ -578,6 +580,15 @@ unsigned int ElfFile<ElfFileParamNames>::findSection3(const SectionName & sectio
     return 0;
 }
 
+template<ElfFileParams>
+bool ElfFile<ElfFileParamNames>::haveReplacedSection(const SectionName & sectionName)
+{
+    ReplacedSections::iterator i = replacedSections.find(sectionName);
+
+    if (i != replacedSections.end())
+        return true;
+    return false;
+}
 
 template<ElfFileParams>
 std::string & ElfFile<ElfFileParamNames>::replaceSection(const SectionName & sectionName,
@@ -672,51 +683,51 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
 
     debug("last page is 0x%llx\n", (unsigned long long) startPage);
 
+    /* Because we're adding a new section header, we're necessarily increasing
+       the size of the program header table.  This can cause the first section
+       to overlap the program header table in memory; we need to shift the first
+       few segments to someplace else. */
+    /* Some sections may already be replaced so account for that */
+    unsigned int i = 1;
+    Elf_Addr pht_size = sizeof(Elf_Ehdr) + (phdrs.size() + 1)*sizeof(Elf_Phdr);
+    while( shdrs[i].sh_addr <= pht_size && i < rdi(hdr->e_shnum) ) {
+        if (not haveReplacedSection(getSectionName(shdrs[i])))
+            replaceSection(getSectionName(shdrs[i]), shdrs[i].sh_size);
+        i++;
+    }
 
-    /* Compute the total space needed for the replaced sections and
-       the program headers. */
-    off_t neededSpace = (phdrs.size() + 1) * sizeof(Elf_Phdr);
+    /* Compute the total space needed for the replaced sections */
+    off_t neededSpace = 0;
     for (auto & i : replacedSections)
         neededSpace += roundUp(i.second.size(), sectionAlignment);
     debug("needed space is %d\n", neededSpace);
-
 
     size_t startOffset = roundUp(fileContents->size(), getPageSize());
 
     growFile(fileContents, startOffset + neededSpace);
 
-
     /* Even though this file is of type ET_DYN, it could actually be
        an executable.  For instance, Gold produces executables marked
-       ET_DYN.  In that case we can still hit the kernel bug that
-       necessitated rewriteSectionsExecutable().  However, such
-       executables also tend to start at virtual address 0, so
+       ET_DYN as does LD when linking with pie. If we move PT_PHDR, it
+       has to stay in the first PT_LOAD segment or any subsequent ones
+       if they're continuous in memory due to linux kernel constraints
+       (see BUGS). Since the end of the file would be after bss, we can't 
+       move PHDR there, we therefore choose to leave PT_PHDR where it is but
+       move enough following sections such that we can add the extra PT_LOAD
+       section to it. This PT_LOAD segment ensures the sections at the end of
+       the file are mapped into memory for ld.so to process.
+       We can't use the approach in rewriteSectionsExecutable()
+       since DYN executables tend to start at virtual address 0, so
        rewriteSectionsExecutable() won't work because it doesn't have
-       any virtual address space to grow downwards into.  As a
-       workaround, make sure that the virtual address of our new
-       PT_LOAD segment relative to the first PT_LOAD segment is equal
-       to its offset; otherwise we hit the kernel bug.  This may
-       require creating a hole in the executable.  The bigger the size
-       of the uninitialised data segment, the bigger the hole. */
+       any virtual address space to grow downwards into. */
     if (isExecutable) {
         if (startOffset >= startPage) {
             debug("shifting new PT_LOAD segment by %d bytes to work around a Linux kernel bug\n", startOffset - startPage);
-        } else {
-            size_t hole = startPage - startOffset;
-            /* Print a warning, because the hole could be very big. */
-            fprintf(stderr, "warning: working around a Linux kernel bug by creating a hole of %zu bytes in '%s'\n", hole, fileName.c_str());
-            assert(hole % getPageSize() == 0);
-            /* !!! We could create an actual hole in the file here,
-               but it's probably not worth the effort. */
-            growFile(fileContents, fileContents->size() + hole);
-            startOffset += hole;
         }
         startPage = startOffset;
     }
 
-
-    /* Add a segment that maps the replaced sections and program
-       headers into memory. */
+    /* Add a segment that maps the replaced sections into memory. */
     phdrs.resize(rdi(hdr->e_phnum) + 1);
     wri(hdr->e_phnum, rdi(hdr->e_phnum) + 1);
     Elf_Phdr & phdr = phdrs[rdi(hdr->e_phnum) - 1];
@@ -729,15 +740,12 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
 
 
     /* Write out the replaced sections. */
-    Elf_Off curOff = startOffset + phdrs.size() * sizeof(Elf_Phdr);
+    Elf_Off curOff = startOffset;
     writeReplacedSections(curOff, startPage, startOffset);
     assert(curOff == startOffset + neededSpace);
 
-
-    /* Move the program header to the start of the new area. */
-    wri(hdr->e_phoff, startOffset);
-
-    rewriteHeaders(startPage);
+    /* Write out the updated program and section headers */
+    rewriteHeaders(hdr->e_phoff);
 }
 
 
