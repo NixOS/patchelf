@@ -32,7 +32,7 @@ let
       };
 
 
-    build = pkgs.lib.genAttrs [ "x86_64-linux" "i686-linux" /* "x86_64-freebsd" "i686-freebsd"  "x86_64-darwin" "i686-solaris" "i686-cygwin" */ ] (system:
+    build = pkgs.lib.genAttrs [ "x86_64-linux" "i686-linux" "aarch64-linux" /* "x86_64-freebsd" "i686-freebsd"  "x86_64-darwin" "i686-solaris" "i686-cygwin" */ ] (system:
 
       with import <nixpkgs> { inherit system; };
 
