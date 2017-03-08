@@ -41,7 +41,7 @@ let
         src = tarball;
         doCheck = !stdenv.isDarwin && system != "i686-cygwin" && system != "i686-solaris";
         buildInputs = lib.optionals stdenv.isLinux [ acl attr ];
-        isReproducible = true;
+        isReproducible = system != "aarch64-linux"; # ARM machines are still on Nix 1.11
       });
 
 
