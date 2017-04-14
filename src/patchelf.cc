@@ -24,6 +24,7 @@
 #include <memory>
 #include <sstream>
 #include <limits>
+#include <stdexcept>
 
 #include <cstdlib>
 #include <cstdio>
