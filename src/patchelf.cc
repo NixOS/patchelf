@@ -173,6 +173,8 @@ private:
     std::string & replaceSection(const SectionName & sectionName,
         unsigned int size);
 
+    std::string & growSection(const SectionName & sectionName, ssize_t amount);
+
     void writeReplacedSections(Elf_Off & curOff,
         Elf_Addr startAddr, Elf_Off startOffset);
 
@@ -579,6 +581,15 @@ unsigned int ElfFile<ElfFileParamNames>::findSection3(const SectionName & sectio
     for (unsigned int i = 1; i < rdi(hdr->e_shnum); ++i)
         if (getSectionName(shdrs[i]) == sectionName) return i;
     return 0;
+}
+
+
+template<ElfFileParams>
+std::string & ElfFile<ElfFileParamNames>::growSection(const SectionName& sectionName,
+                                                      ssize_t amount)
+{
+    Elf_Shdr & shdr = findSection(sectionName);
+    return replaceSection(sectionName, rdi(shdr.sh_size) + amount);
 }
 
 
@@ -1020,7 +1031,6 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string &
         return;
     }
 
-    Elf_Shdr & shdrDynamic = findSection(".dynamic");
     Elf_Shdr & shdrDynStr = findSection(".dynstr");
     char * strTab = sectionContents(".dynstr");
 
@@ -1064,7 +1074,7 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string &
     /* Grow the .dynstr section to make room for the new SONAME. */
     debug("SONAME is too long, resizing...\n");
 
-    std::string & newDynStr = replaceSection(".dynstr", rdi(shdrDynStr.sh_size) + newSoname.size() + 1);
+    std::string & newDynStr = growSection(".dynstr", newSoname.size() + 1);
     setSubstr(newDynStr, rdi(shdrDynStr.sh_size), newSoname + '\0');
 
     /* Update the DT_SONAME entry. */
@@ -1073,7 +1083,7 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string &
     } else {
         /* There is no DT_SONAME entry in the .dynamic section, so we
            have to grow the .dynamic section. */
-        std::string & newDynamic = replaceSection(".dynamic", rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn));
+        std::string & newDynamic = growSection(".dynamic", sizeof(Elf_Dyn));
 
         unsigned int idx = 0;
         for (; rdi(((Elf_Dyn *) newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++);
@@ -1112,8 +1122,6 @@ template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
     const std::vector<std::string> & allowedRpathPrefixes, std::string newRPath)
 {
-    Elf_Shdr & shdrDynamic = findSection(".dynamic");
-
     /* !!! We assume that the virtual address in the DT_STRTAB entry
        of the dynamic section corresponds to the .dynstr section. */
     Elf_Shdr & shdrDynStr = findSection(".dynstr");
@@ -1265,8 +1273,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
     /* Grow the .dynstr section to make room for the new RPATH. */
     debug("rpath is too long, resizing...\n");
 
-    std::string & newDynStr = replaceSection(".dynstr",
-        rdi(shdrDynStr.sh_size) + newRPath.size() + 1);
+    std::string & newDynStr = growSection(".dynstr", newRPath.size() + 1);
     setSubstr(newDynStr, rdi(shdrDynStr.sh_size), newRPath + '\0');
 
     /* Update the DT_RUNPATH and DT_RPATH entries. */
@@ -1278,8 +1285,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
     else {
         /* There is no DT_RUNPATH entry in the .dynamic section, so we
            have to grow the .dynamic section. */
-        std::string & newDynamic = replaceSection(".dynamic",
-            rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn));
+        std::string & newDynamic = growSection(".dynamic", sizeof(Elf_Dyn));
 
         unsigned int idx = 0;
         for ( ; rdi(((Elf_Dyn *) newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
@@ -1351,8 +1357,7 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
                 // we'll therefore add a new string
                 debug("resizing .dynstr ...\n");
 
-                std::string & newDynStr = replaceSection(".dynstr",
-                    rdi(shdrDynStr.sh_size) + replacement.size() + 1 + dynStrAddedBytes);
+                std::string & newDynStr = growSection(".dynstr", replacement.size() + 1 + dynStrAddedBytes);
                 setSubstr(newDynStr, rdi(shdrDynStr.sh_size) + dynStrAddedBytes, replacement + '\0');
 
                 wri(dyn->d_un.d_val, rdi(shdrDynStr.sh_size) + dynStrAddedBytes);
@@ -1399,8 +1404,8 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
                 debug("replacing .gnu.version_r entry '%s' with '%s'\n", file, replacement.c_str());
                 debug("resizing string section %s ...\n", versionRStringsSName.c_str());
 
-                std::string & newVerDynStr = replaceSection(versionRStringsSName,
-                    rdi(shdrVersionRStrings.sh_size) + replacement.size() + 1 + verStrAddedBytes);
+                std::string & newVerDynStr = growSection(versionRStringsSName,
+                                                         replacement.size() + 1 + verStrAddedBytes);
                 setSubstr(newVerDynStr, rdi(shdrVersionRStrings.sh_size) + verStrAddedBytes, replacement + '\0');
 
                 wri(need->vn_file, rdi(shdrVersionRStrings.sh_size) + verStrAddedBytes);
@@ -1423,15 +1428,13 @@ void ElfFile<ElfFileParamNames>::addNeeded(const std::set<std::string> & libs)
 {
     if (libs.empty()) return;
 
-    Elf_Shdr & shdrDynamic = findSection(".dynamic");
     Elf_Shdr & shdrDynStr = findSection(".dynstr");
 
     /* add all new libs to the dynstr string table */
     unsigned int length = 0;
     for (auto & i : libs) length += i.size() + 1;
 
-    std::string & newDynStr = replaceSection(".dynstr",
-        rdi(shdrDynStr.sh_size) + length + 1);
+    std::string & newDynStr = growSection(".dynstr", length + 1);
     std::set<Elf64_Xword> libStrings;
     unsigned int pos = 0;
     for (auto & i : libs) {
@@ -1441,8 +1444,7 @@ void ElfFile<ElfFileParamNames>::addNeeded(const std::set<std::string> & libs)
     }
 
     /* add all new needed entries to the dynamic section */
-    std::string & newDynamic = replaceSection(".dynamic",
-        rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn) * libs.size());
+    std::string & newDynamic = growSection(".dynamic", sizeof(Elf_Dyn) * libs.size());
 
     unsigned int idx = 0;
     for ( ; rdi(((Elf_Dyn *) newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
@@ -1483,8 +1485,6 @@ void ElfFile<ElfFileParamNames>::printNeededLibs()
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::noDefaultLib()
 {
-    Elf_Shdr & shdrDynamic = findSection(".dynamic");
-
     Elf_Dyn * dyn = (Elf_Dyn *) sectionContents(".dynamic");
     Elf_Dyn * dynFlags1 = 0;
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
@@ -1498,8 +1498,7 @@ void ElfFile<ElfFileParamNames>::noDefaultLib()
             return;
         dynFlags1->d_un.d_val |= DF_1_NODEFLIB;
     } else {
-        std::string & newDynamic = replaceSection(".dynamic",
-                rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn));
+        std::string & newDynamic = growSection(".dynamic", sizeof(Elf_Dyn));
 
         unsigned int idx = 0;
         for ( ; rdi(((Elf_Dyn *) newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
