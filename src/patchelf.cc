@@ -557,8 +557,12 @@ template<ElfFileParams>
 Elf_Shdr & ElfFile<ElfFileParamNames>::findSection(const SectionName & sectionName)
 {
     Elf_Shdr * shdr = findSection2(sectionName);
-    if (!shdr)
-        error("cannot find section '" + sectionName + "'");
+    if (!shdr) {
+        std::string extraMsg = "";
+        if (sectionName == ".interp" || sectionName == ".dynamic" || sectionName == ".dynstr")
+            extraMsg = ". The input file is most likely statically linked";
+        error("cannot find section '" + sectionName + "'" + extraMsg);
+    }
     return *shdr;
 }
 
