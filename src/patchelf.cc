@@ -1464,6 +1464,7 @@ void ElfFile<ElfFileParamNames>::addNeeded(const std::set<std::string> & libs)
         wri(newDyn.d_tag, DT_NEEDED);
         wri(newDyn.d_un.d_val, j);
         setSubstr(newDynamic, i * sizeof(Elf_Dyn), std::string((char *) &newDyn, sizeof(Elf_Dyn)));
+        i++;
     }
 
     changed = true;
