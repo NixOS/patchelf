@@ -45,7 +45,7 @@ static bool debugMode = false;
 
 static bool forceRPath = false;
 
-static std::string fileName;
+static std::vector<std::string> fileNames;
 static int pageSize = PAGESIZE;
 
 typedef std::shared_ptr<std::vector<unsigned char>> FileContents;
@@ -1546,7 +1546,7 @@ static bool printNeeded = false;
 static bool noDefaultLib = false;
 
 template<class ElfFile>
-static void patchElf2(ElfFile && elfFile)
+static void patchElf2(ElfFile && elfFile, std::string fileName)
 {
     if (printInterpreter)
         printf("%s\n", elfFile.getInterpreter().c_str());
@@ -1588,17 +1588,19 @@ static void patchElf2(ElfFile && elfFile)
 
 static void patchElf()
 {
-    if (!printInterpreter && !printRPath && !printSoname && !printNeeded)
-        debug("patching ELF file '%s'\n", fileName.c_str());
+    for (auto fileName : fileNames) {
+        if (!printInterpreter && !printRPath && !printSoname && !printNeeded)
+            debug("patching ELF file '%s'\n", fileName.c_str());
 
-    debug("Kernel page size is %u bytes\n", getPageSize());
+        debug("Kernel page size is %u bytes\n", getPageSize());
 
-    auto fileContents = readFile(fileName);
+        auto fileContents = readFile(fileName);
 
-    if (getElfType(fileContents).is32Bit)
-        patchElf2(ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym, Elf32_Verneed>(fileContents));
-    else
-        patchElf2(ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym, Elf64_Verneed>(fileContents));
+        if (getElfType(fileContents).is32Bit)
+            patchElf2(ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym, Elf32_Verneed>(fileContents), fileName);
+        else
+            patchElf2(ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym, Elf64_Verneed>(fileContents), fileName);
+    }
 }
 
 
@@ -1721,11 +1723,12 @@ int mainWrapped(int argc, char * * argv)
             printf(PACKAGE_STRING "\n");
             return 0;
         }
-        else break;
+        else {
+            fileNames.push_back(arg);
+        }
     }
 
-    if (i == argc) error("missing filename");
-    fileName = argv[i];
+    if (fileNames.empty()) error("missing filename");
 
     patchElf();
 
