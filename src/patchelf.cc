@@ -486,7 +486,16 @@ void ElfFile<ElfFileParamNames>::sortShdrs()
 
 static void writeFile(std::string fileName, FileContents contents)
 {
-    int fd = open(fileName.c_str(), O_TRUNC | O_WRONLY);
+    struct stat st;
+    int fd;
+
+    if (stat(fileName.c_str(), &st) != 0)
+        error("stat");
+
+    if (chmod(fileName.c_str(), 0600) != 0)
+        error("chmod");
+
+    fd = open(fileName.c_str(), O_TRUNC | O_WRONLY);
     if (fd == -1)
         error("open");
 
@@ -495,6 +504,9 @@ static void writeFile(std::string fileName, FileContents contents)
 
     if (close(fd) != 0)
         error("close");
+
+    if (chmod(fileName.c_str(), st.st_mode) != 0)
+        error("chmod");
 }
 
 
