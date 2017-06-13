@@ -48,6 +48,16 @@ libraries.  In particular, it can do the following:
   This option can be give multiple times.
 
 
+INSTALLING
+
+You can download a pre-compiled binary from the releases or compile it by yourself:
+
+  ./bootstrap.sh
+  ./configure
+  make
+  sudo make install
+
+
 AUTHOR
 
 Copyright 2004-2016 Eelco Dolstra <eelco.dolstra@logicblox.com>.
