@@ -1725,6 +1725,7 @@ int mainWrapped(int argc, char * * argv)
     }
 
     if (i == argc) error("missing filename");
+    if (i + 1 < argc) error("only one target filename permitted");
     fileName = argv[i];
 
     patchElf();
