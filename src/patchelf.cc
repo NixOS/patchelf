@@ -720,10 +720,8 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
        since DYN executables tend to start at virtual address 0, so
        rewriteSectionsExecutable() won't work because it doesn't have
        any virtual address space to grow downwards into. */
-    if (isExecutable) {
-        if (startOffset >= startPage) {
-            debug("shifting new PT_LOAD segment by %d bytes to work around a Linux kernel bug\n", startOffset - startPage);
-        }
+    if (isExecutable && startOffset > startPage) {
+        debug("shifting new PT_LOAD segment by %d bytes to work around a Linux kernel bug\n", startOffset - startPage);
         startPage = startOffset;
     }
 
