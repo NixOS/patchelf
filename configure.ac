@@ -13,7 +13,7 @@ AC_ARG_WITH([page-size],
 )
 
 if test "$PAGESIZE" = auto; then
-    if type -p getconf &>/dev/null; then
+    if command -v getconf >/dev/null; then
         PAGESIZE=$(getconf PAGESIZE || getconf PAGE_SIZE)
     fi
     if test "$PAGESIZE" = auto -o -z "$PAGESIZE"; then
