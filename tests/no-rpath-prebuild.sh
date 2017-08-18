@@ -1,6 +1,7 @@
 #! /bin/sh -e
 set -x
 ARCH="$1"
+PAGESIZE=4096
 
 if [ -z "$ARCH" ]; then
   ARCH=$(basename $0 .sh | sed -e 's/.*-//')
@@ -25,13 +26,13 @@ mkdir -p ${SCRATCH}
 
 cp $no_rpath_bin ${SCRATCH}/no-rpath
 
-oldRPath=$(../src/patchelf --print-rpath ${SCRATCH}/no-rpath)
+oldRPath=$(../src/patchelf --page-size ${PAGESIZE} --print-rpath ${SCRATCH}/no-rpath)
 if test -n "$oldRPath"; then exit 1; fi
-../src/patchelf \
-  --set-interpreter "$(../src/patchelf --print-interpreter ../src/patchelf)" \
+../src/patchelf --page-size ${PAGESIZE} \
+  --set-interpreter "$(../src/patchelf --page-size ${PAGESIZE} --print-interpreter ../src/patchelf)" \
   --set-rpath /foo:/bar:/xxxxxxxxxxxxxxx ${SCRATCH}/no-rpath
 
-newRPath=$(../src/patchelf --print-rpath ${SCRATCH}/no-rpath)
+newRPath=$(../src/patchelf --page-size ${PAGESIZE} --print-rpath ${SCRATCH}/no-rpath)
 if ! echo "$newRPath" | grep -q '/foo:/bar'; then
     echo "incomplete RPATH"
     exit 1

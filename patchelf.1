@@ -22,6 +22,9 @@ of executables and change the RPATH of executables and libraries.
 
 The single option given operates on a given FILE, editing in place.
 
+.IP "--page-size SIZE"
+Uses the given page size instead of the default.
+
 .IP "--set-interpreter INTERPRETER"
 Change the dynamic loader ("ELF interpreter") of executable given to
 INTERPRETER.
@@ -29,8 +32,18 @@ INTERPRETER.
 .IP --print-interpreter
 Prints the ELF interpreter of the executable.
 
+.IP --print-soname
+Prints DT_SONAME entry of .dynamic section.
+Raises an error if DT_SONAME doesn't exist.
+
+.IP "--set-soname SONAME"
+Sets DT_SONAME entry of a library to SONAME.
+
 .IP "--set-rpath RPATH"
 Change the RPATH of the executable or library to RPATH.
+
+.IP --remove-rpath
+Removes the DT_RPATH or DT_RUNPATH entry of the executable or library.
 
 .IP --shrink-rpath
 Remove from the RPATH all directories that do not contain a
@@ -39,6 +52,12 @@ library referenced by DT_NEEDED fields of the executable or library.
 For instance, if an executable references one library libfoo.so, has
 an RPATH "/lib:/usr/lib:/foo/lib", and libfoo.so can only be found
 in /foo/lib, then the new RPATH will be "/foo/lib".
+
+.IP "--allowed-rpath-prefixes PREFIXES"
+Combined with the "--shrink-rpath" option, this can be used for
+further rpath tuning. For instance, if an executable has an RPATH
+"/tmp/build-foo/.libs:/foo/lib", it is probably desirable to keep
+the "/foo/lib" reference instead of the "/tmp" entry.
 
 .IP --print-rpath
 Prints the RPATH for an executable or library.
@@ -56,7 +75,7 @@ Replaces a declared dependency on a dynamic library with another one (DT_NEEDED)
 This option can be give multiple times.
 
 .IP "--remove-needed LIBRARY"
-Removes a declared depency on LIBRARY (DT_NEEDED entry). This
+Removes a declared dependency on LIBRARY (DT_NEEDED entry). This
 option can be given multiple times.
 
 .IP "--no-default-lib"
