@@ -44,6 +44,8 @@ let
         isReproducible = system != "aarch64-linux"; # ARM machines are still on Nix 1.11
       });
 
+    rpm_centos73x86_64 = makeRPM_x86_64 (diskImages: diskImages.centos73x86_64);
+    rpm_centos74x86_64 = makeRPM_x86_64 (diskImages: diskImages.centos74x86_64);
 
     rpm_fedora24i386 = makeRPM_i686 (diskImages: diskImages.fedora24i386);
     rpm_fedora24x86_64 = makeRPM_x86_64 (diskImages: diskImages.fedora24x86_64);
@@ -72,6 +74,7 @@ let
             #build.x86_64-freebsd
             #build.i686-freebsd
             #build.x86_64-darwin
+            rpm_centos74x86_64
             rpm_fedora25i386
             rpm_fedora25x86_64
             deb_debian8i386
