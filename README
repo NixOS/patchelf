@@ -47,6 +47,10 @@ libraries.  In particular, it can do the following:
 
   This option can be give multiple times.
 
+* Change SONAME of a dynamic library:
+
+  $ patchelf --set-soname libnewname.so.3.4.5 path/to/libmylibrary.so.1.2.3
+  
 
 INSTALLING
 
