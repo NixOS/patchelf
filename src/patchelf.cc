@@ -135,9 +135,12 @@ private:
         ElfFile * elfFile;
         bool operator ()(const Elf_Phdr & x, const Elf_Phdr & y)
         {
-            if (x.p_type == PT_PHDR) return true;
-            if (y.p_type == PT_PHDR) return false;
-            return elfFile->rdi(x.p_paddr) < elfFile->rdi(y.p_paddr);
+          // A PHDR comes before everything else.
+          if (y.p_type == PT_PHDR) return false;
+          if (x.p_type == PT_PHDR) return true;
+
+          // Sort non-PHDRs by address.
+          return elfFile->rdi(x.p_paddr) < elfFile->rdi(y.p_paddr);
         }
     };
 
