@@ -45,11 +45,14 @@ static bool debugMode = false;
 
 static bool forceRPath = false;
 
+static bool noStandardLibDirs = false;
+
+static bool relativeToFile = false;
+
 static std::string fileName;
 static int pageSize = PAGESIZE;
 
 typedef std::shared_ptr<std::vector<unsigned char>> FileContents;
-
 
 #define ElfFileParams class Elf_Ehdr, class Elf_Phdr, class Elf_Shdr, class Elf_Addr, class Elf_Off, class Elf_Dyn, class Elf_Sym, class Elf_Verneed
 #define ElfFileParamNames Elf_Ehdr, Elf_Phdr, Elf_Shdr, Elf_Addr, Elf_Off, Elf_Dyn, Elf_Sym, Elf_Verneed
@@ -84,6 +87,49 @@ static unsigned int getPageSize()
     return pageSize;
 }
 
+static bool absolutePathExists(const std::string & path, std::string & canonicalPath)
+{
+    char *cpath = realpath(path.c_str(), NULL);
+    if (cpath) {
+        canonicalPath = cpath;
+        free(cpath);
+        return true;
+    } else {
+        return false;
+    }
+}
+
+static std::string makePathRelative(const std::string & path,
+    const std::string & refPath)
+{
+    std::string relPath = "$ORIGIN";
+    std::string p = path, refP = refPath;
+    std::size_t pos;
+
+    /* Strip the common part of path and refPath */
+    while (true) {
+        pos = p.find_first_of('/', 1);
+	if (refP.find_first_of('/', 1) != pos)
+	    break;
+	if (p.substr(0, pos) != refP.substr(0, pos))
+            break;
+	if (pos == std::string::npos)
+	    break;
+	p = p.substr(pos);
+	refP = refP.substr(pos);
+    }
+    /* Check if both pathes are equal */
+    if (p != refP) {
+	pos = 0;
+	while (pos != std::string::npos) {
+	    pos =refP.find_first_of('/', pos + 1);
+	    relPath.append("/..");
+	}
+	relPath.append(p);
+    }
+
+    return relPath;
+}
 
 template<ElfFileParams>
 class ElfFile
@@ -197,9 +243,15 @@ public:
 
     void setInterpreter(const std::string & newInterpreter);
 
-    typedef enum { rpPrint, rpShrink, rpSet, rpRemove } RPathOp;
+    typedef enum { rpPrint, rpShrink, rpMakeRelative, rpSet, rpRemove} RPathOp;
 
-    void modifyRPath(RPathOp op, const std::vector<std::string> & allowedRpathPrefixes, std::string newRPath);
+    bool libFoundInRPath(const std::string & dirName,
+			 const std::vector<std::string> neededLibs,
+			 std::vector<bool> & neededLibFound);
+
+    void modifyRPath(RPathOp op,
+                     const std::vector<std::string> & allowedRpathPrefixes,
+                     std::string rootDir, std::string newRPath);
 
     void addNeeded(const std::set<std::string> & libs);
 
@@ -1118,10 +1170,33 @@ static void concatToRPath(std::string & rpath, const std::string & path)
     rpath += path;
 }
 
+template<ElfFileParams>
+bool ElfFile<ElfFileParamNames>::libFoundInRPath(const std::string & dirName,
+     const std::vector<std::string> neededLibs, std::vector<bool> & neededLibFound)
+{
+    /* For each library that we haven't found yet, see if it
+       exists in this directory. */
+    bool libFound = false;
+    for (unsigned int j = 0; j < neededLibs.size(); ++j)
+	if (!neededLibFound[j]) {
+	    std::string libName = dirName + "/" + neededLibs[j];
+	    try {
+		if (getElfType(readFile(libName, sizeof(Elf32_Ehdr))).machine == rdi(hdr->e_machine)) {
+		    neededLibFound[j] = true;
+		    libFound = true;
+		} else
+		    debug("ignoring library '%s' because its machine type differs\n", libName.c_str());
+	    } catch (SysError & e) {
+		if (e.errNo != ENOENT) throw;
+	    }
+	}
+    return libFound;
+}
 
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
-    const std::vector<std::string> & allowedRpathPrefixes, std::string newRPath)
+    const std::vector<std::string> & allowedRpathPrefixes,
+    std::string rootDir, std::string newRPath)
 {
     Elf_Shdr & shdrDynamic = findSection(".dynamic");
 
@@ -1172,6 +1247,10 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
         return;
     }
 
+    if (op == rpMakeRelative && !rpath) {
+        debug("no RPATH to make relative\n");
+        return;
+    }
 
     /* For each directory in the RPATH, check if it contains any
        needed library. */
@@ -1196,27 +1275,79 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
                 continue;
             }
 
-            /* For each library that we haven't found yet, see if it
-               exists in this directory. */
-            bool libFound = false;
-            for (unsigned int j = 0; j < neededLibs.size(); ++j)
-                if (!neededLibFound[j]) {
-                    std::string libName = dirName + "/" + neededLibs[j];
-                    try {
-                        if (getElfType(readFile(libName, sizeof(Elf32_Ehdr))).machine == rdi(hdr->e_machine)) {
-                            neededLibFound[j] = true;
-                            libFound = true;
-                        } else
-                            debug("ignoring library '%s' because its machine type differs\n", libName.c_str());
-                    } catch (SysError & e) {
-                        if (e.errNo != ENOENT) throw;
-                    }
-                }
-
-            if (!libFound)
+            if (!libFoundInRPath(dirName, neededLibs, neededLibFound))
                 debug("removing directory '%s' from RPATH\n", dirName.c_str());
             else
                 concatToRPath(newRPath, dirName);
+        }
+    }
+
+    /* Make the the RPATH relative to the specified path */
+    if (op == rpMakeRelative) {
+        std::vector<bool> neededLibFound(neededLibs.size(), false);
+        std::string fileDir = fileName.substr(0, fileName.find_last_of("/"));
+        newRPath = "";
+
+        for (auto & dirName : splitColonDelimitedString(rpath)) {
+            std::string canonicalPath;
+            std::string path;
+
+            /* Figure out if we should keep or discard the path; there are several
+               cases to handled:
+               "dirName" starts with "$ORIGIN":
+                   The original build-system already took care of setting a relative
+                   RPATH, resolve it and test if it is worthwhile to keep it.
+               "dirName" start with "rootDir":
+                   The original build-system added some absolute RPATH (absolute on
+                   the build machine). While this is wrong, it can still be fixed; so
+                   test if it is worthwhile to keep it.
+               "rootDir"/"dirName" exists:
+                    The original build-system already took care of setting an absolute
+                    RPATH (absolute in the final rootfs), resolve it and test if it is
+                    worthwhile to keep it;
+                "dirName" points somewhere else:
+                    (can be anywhere: build trees, staging tree, host location,
+                    non-existing location, etc.). Just discard such a path. */
+            if (!dirName.compare(0, 7, "$ORIGIN")) {
+                path = fileDir + dirName.substr(7);
+                if (!absolutePathExists(path, canonicalPath)) {
+                    debug("removing directory '%s' from RPATH because it doesn't exist\n", dirName.c_str());
+                    continue;
+                }
+            } else if (!dirName.compare(0, rootDir.length(), rootDir)) {
+                if (!absolutePathExists(dirName, canonicalPath)) {
+                    debug("removing directory '%s' from RPATH because it doesn't exist\n", dirName.c_str());
+                    continue;
+                }
+            } else {
+                path = rootDir + dirName;
+                if (!absolutePathExists(path, canonicalPath)) {
+                    debug("removing directory '%s' from RPATH because it's not under the root directory\n",
+                          dirName.c_str());
+                    continue;
+                }
+            }
+
+            if (noStandardLibDirs) {
+                if (!canonicalPath.compare(rootDir + "/lib") ||
+                    !canonicalPath.compare(rootDir + "/usr/lib")) {
+                    debug("removing directory '%s' from RPATH because it's a standard library directory\n",
+                         dirName.c_str());
+                    continue;
+                }
+            }
+
+            if (!libFoundInRPath(canonicalPath, neededLibs, neededLibFound)) {
+                debug("removing directory '%s' from RPATH\n", dirName.c_str());
+                continue;
+	    }
+
+            /* Finally make "canonicalPath" relative to "filedir" in "rootDir" */
+            if (relativeToFile)
+                concatToRPath(newRPath, makePathRelative(canonicalPath, fileDir));
+            else
+                concatToRPath(newRPath, canonicalPath.substr(rootDir.length()));
+	    debug("keeping relative path of %s\n", canonicalPath.c_str());
         }
     }
 
@@ -1548,7 +1679,9 @@ static std::vector<std::string> allowedRpathPrefixes;
 static bool removeRPath = false;
 static bool setRPath = false;
 static bool printRPath = false;
+static bool makeRPathRelative = false;
 static std::string newRPath;
+static std::string rootDir;
 static std::set<std::string> neededLibsToRemove;
 static std::map<std::string, std::string> neededLibsToReplace;
 static std::set<std::string> neededLibsToAdd;
@@ -1571,14 +1704,16 @@ static void patchElf2(ElfFile && elfFile)
         elfFile.setInterpreter(newInterpreter);
 
     if (printRPath)
-        elfFile.modifyRPath(elfFile.rpPrint, {}, "");
+        elfFile.modifyRPath(elfFile.rpPrint, {}, {}, "");
 
     if (shrinkRPath)
-        elfFile.modifyRPath(elfFile.rpShrink, allowedRpathPrefixes, "");
+        elfFile.modifyRPath(elfFile.rpShrink, allowedRpathPrefixes, "", "");
     else if (removeRPath)
-        elfFile.modifyRPath(elfFile.rpRemove, {}, "");
+        elfFile.modifyRPath(elfFile.rpRemove, {}, "", "");
     else if (setRPath)
-        elfFile.modifyRPath(elfFile.rpSet, {}, newRPath);
+        elfFile.modifyRPath(elfFile.rpSet, {}, "", newRPath);
+    else if (makeRPathRelative)
+        elfFile.modifyRPath(elfFile.rpMakeRelative, {}, rootDir, "");
 
     if (printNeeded) elfFile.printNeededLibs();
 
@@ -1624,6 +1759,9 @@ void showHelp(const std::string & progName)
   [--remove-rpath]\n\
   [--shrink-rpath]\n\
   [--allowed-rpath-prefixes PREFIXES]\t\tWith '--shrink-rpath', reject rpath entries not starting with the allowed prefix\n\
+  [--make-rpath-relative ROOTDIR]\n\
+  [--no-standard-lib-dirs]\n\
+  [--relative-to-file]\n\
   [--print-rpath]\n\
   [--force-rpath]\n\
   [--add-needed LIBRARY]\n\
@@ -1683,6 +1821,17 @@ int mainWrapped(int argc, char * * argv)
             if (++i == argc) error("missing argument");
             setRPath = true;
             newRPath = argv[i];
+        }
+        else if (arg == "--make-rpath-relative") {
+            if (++i == argc) error("missing argument to --make-rpath-relative");
+            makeRPathRelative = true;
+            rootDir = argv[i];
+        }
+        else if (arg == "--no-standard-lib-dirs") {
+            noStandardLibDirs = true;
+        }
+        else if (arg == "--relative-to-file") {
+            relativeToFile = true;
         }
         else if (arg == "--print-rpath") {
             printRPath = true;
