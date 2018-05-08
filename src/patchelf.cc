@@ -332,7 +332,12 @@ static FileContents readFile(std::string fileName,
     int fd = open(fileName.c_str(), O_RDONLY);
     if (fd == -1) throw SysError(fmt("opening '", fileName, "'"));
 
-    if ((size_t) read(fd, contents->data(), size) != size)
+    size_t bytesRead = 0;
+    ssize_t portion;
+    while ((portion = read(fd, contents->data() + bytesRead, size - bytesRead)) > 0)
+        bytesRead += portion;
+
+    if (bytesRead != size)
         throw SysError(fmt("reading '", fileName, "'"));
 
     close(fd);
@@ -496,7 +501,12 @@ static void writeFile(std::string fileName, FileContents contents)
     if (fd == -1)
         error("open");
 
-    if (write(fd, contents->data(), contents->size()) != (off_t) contents->size())
+    size_t bytesWritten = 0;
+    ssize_t portion;
+    while ((portion = write(fd, contents->data() + bytesWritten, contents->size() - bytesWritten)) > 0)
+        bytesWritten += portion;
+
+    if (bytesWritten != contents->size())
         error("write");
 
     if (close(fd) != 0)
