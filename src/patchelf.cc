@@ -1269,13 +1269,13 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
     debug("new rpath is '%s'\n", newRPath.c_str());
 
     if (!forceRPath && dynRPath && !dynRunPath) { /* convert DT_RPATH to DT_RUNPATH */
-        dynRPath->d_tag = DT_RUNPATH;
+        wri(dynRPath->d_tag, DT_RUNPATH);
         dynRunPath = dynRPath;
         dynRPath = 0;
     }
 
     if (forceRPath && dynRPath && dynRunPath) { /* convert DT_RUNPATH to DT_RPATH */
-        dynRunPath->d_tag = DT_IGNORE;
+        wri(dynRPath->d_tag, DT_RUNPATH);
     }
 
     if (newRPath.size() <= rpathSize) {
