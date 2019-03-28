@@ -50,7 +50,7 @@ libraries.  In particular, it can do the following:
 * Change SONAME of a dynamic library:
 
   $ patchelf --set-soname libnewname.so.3.4.5 path/to/libmylibrary.so.1.2.3
-  
+
 
 INSTALLING
 
@@ -64,7 +64,7 @@ You can download a pre-compiled binary from the releases or compile it by yourse
 
 AUTHOR
 
-Copyright 2004-2016 Eelco Dolstra <eelco.dolstra@logicblox.com>.
+Copyright 2004-2019 Eelco Dolstra <edolstra@gmail.com>.
 
 
 LICENSE
@@ -98,6 +98,18 @@ This appears to be a bug in binutils
 
 
 RELEASE HISTORY
+
+0.10 (March 28, 2019):
+
+* Many bug fixes. Please refer to the Git commit log:
+
+    https://github.com/NixOS/patchelf/commits/master
+
+  This release has contributions from Adam Trhoň, Benjamin Hipple,
+  Bernardo Ramos, Bjørn Forsman, Domen Kožar, Eelco Dolstra, Ezra
+  Cooper, Felipe Sateler, Jakub Wilk, James Le Cuirot, Karl Millar,
+  Linus Heckemann, Nathaniel J. Smith, Richard Purdie, Stanislav
+  Markevich and Tuomas Tynkkynen.
 
 0.9 (February 29, 2016):
 
@@ -169,4 +181,3 @@ RELEASE HISTORY
 0.1 (October 11, 2005):
 
 * Initial release.
-
