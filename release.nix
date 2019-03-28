@@ -44,25 +44,15 @@ let
         isReproducible = system != "aarch64-linux"; # ARM machines are still on Nix 1.11
       });
 
-    rpm_centos73x86_64 = makeRPM_x86_64 (diskImages: diskImages.centos73x86_64);
-    rpm_centos74x86_64 = makeRPM_x86_64 (diskImages: diskImages.centos74x86_64);
+    /*
+    rpm_fedora27x86_64 = makeRPM_x86_64 (diskImages: diskImages.fedora27x86_64);
 
-    rpm_fedora24i386 = makeRPM_i686 (diskImages: diskImages.fedora24i386);
-    rpm_fedora24x86_64 = makeRPM_x86_64 (diskImages: diskImages.fedora24x86_64);
-    rpm_fedora25i386 = makeRPM_i686 (diskImages: diskImages.fedora25i386);
-    rpm_fedora25x86_64 = makeRPM_x86_64 (diskImages: diskImages.fedora25x86_64);
+    deb_debian9i386 = makeDeb_i686 (diskImages: diskImages.debian9i386);
+    deb_debian9x86_64 = makeDeb_x86_64 (diskImages: diskImages.debian9x86_64);
 
-    deb_debian7i386 = makeDeb_i686 (diskImages: diskImages.debian7i386);
-    deb_debian7x86_64 = makeDeb_x86_64 (diskImages: diskImages.debian7x86_64);
-    deb_debian8i386 = makeDeb_i686 (diskImages: diskImages.debian8i386);
-    deb_debian8x86_64 = makeDeb_x86_64 (diskImages: diskImages.debian8x86_64);
-
-    deb_ubuntu1404i386 = makeDeb_i686 (diskImages: diskImages.ubuntu1404i386);
-    deb_ubuntu1404x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu1404x86_64);
-    deb_ubuntu1604i386 = makeDeb_i686 (diskImages: diskImages.ubuntu1604i386);
-    deb_ubuntu1604x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu1604x86_64);
-    deb_ubuntu1610i386 = makeDeb_i686 (diskImages: diskImages.ubuntu1610i386);
-    deb_ubuntu1610x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu1610x86_64);
+    deb_ubuntu1804i386 = makeDeb_i686 (diskImages: diskImages.ubuntu1804i386);
+    deb_ubuntu1804x86_64 = makeDeb_x86_64 (diskImages: diskImages.ubuntu1804x86_64);
+    */
 
 
     release = pkgs.releaseTools.aggregate
@@ -71,16 +61,13 @@ let
           [ tarball
             build.x86_64-linux
             build.i686-linux
-            #build.x86_64-freebsd
-            #build.i686-freebsd
-            #build.x86_64-darwin
-            rpm_centos74x86_64
-            rpm_fedora25i386
-            rpm_fedora25x86_64
-            deb_debian8i386
-            deb_debian8x86_64
-            deb_ubuntu1610i386
-            deb_ubuntu1610x86_64
+            /*
+            rpm_fedora27x86_64
+            deb_debian9i386
+            deb_debian9x86_64
+            deb_ubuntu1804i386
+            deb_ubuntu1804x86_64
+            */
           ];
         meta.description = "Release-critical builds";
       };
