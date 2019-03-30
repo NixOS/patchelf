@@ -1142,7 +1142,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
        string. */
     std::vector<std::string> neededLibs;
     Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
-    Elf_Dyn * dynRPath = 0, * dynRunPath = 0;
+    Elf_Dyn * dynRPath = 0, * dynRunPath = 0, * dynReplaceable = 0;
     char * rpath = 0;
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_RPATH) {
@@ -1157,6 +1157,12 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
         }
         else if (rdi(dyn->d_tag) == DT_NEEDED)
             neededLibs.push_back(std::string(strTab + rdi(dyn->d_un.d_val)));
+        /* Try to replace an IGNORE rather than growing and moving the section, if possible */
+        else if (rdi(dyn->d_tag) == DT_IGNORE)
+            dynReplaceable = dyn;
+        /* If we don't find an IGNORE, RELCOUNT/RELACOUNT are redundant and optional, so we can replace those */
+        else if (!dynReplaceable && (rdi(dyn->d_tag) == DT_RELCOUNT || rdi(dyn->d_tag) == DT_RELACOUNT))
+            dynReplaceable = dyn;
     }
 
     if (op == rpPrint) {
@@ -1283,7 +1289,11 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
         if (dynRunPath) dynRunPath->d_un.d_val = shdrDynStr.sh_size;
         if (dynRPath) dynRPath->d_un.d_val = shdrDynStr.sh_size;
     }
-
+    /* Convert an unused or redundant entry to a DT_RPATH or DT_RUNPATH */
+    else if (dynReplaceable) {
+        dynReplaceable->d_un.d_val = shdrDynStr.sh_size;
+        dynReplaceable->d_tag = forceRPath ? DT_RPATH : DT_RUNPATH;
+    }
     else {
         /* There is no DT_RUNPATH entry in the .dynamic section, so we
            have to grow the .dynamic section. */
