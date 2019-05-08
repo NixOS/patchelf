@@ -1,10 +1,11 @@
 { patchelfSrc ? { outPath = ./.; revCount = 1234; shortRev = "abcdef"; }
+, nixpkgs ? builtins.fetchTarball https://github.com/NixOS/nixpkgs-channels/archive/nixos-19.03.tar.gz
 , officialRelease ? false
 }:
 
 let
 
-  pkgs = import <nixpkgs> { };
+  pkgs = import nixpkgs { system = builtins.currentSystem or "x86_64-linux"; };
 
 
   jobs = rec {
@@ -34,7 +35,7 @@ let
 
     build = pkgs.lib.genAttrs [ "x86_64-linux" "i686-linux" "aarch64-linux" /* "x86_64-freebsd" "i686-freebsd"  "x86_64-darwin" "i686-solaris" "i686-cygwin" */ ] (system:
 
-      with import <nixpkgs> { inherit system; };
+      with import nixpkgs { inherit system; };
 
       releaseTools.nixBuild {
         name = "patchelf";
@@ -81,7 +82,7 @@ let
   makeRPM =
     system: diskImageFun:
 
-    with import <nixpkgs> { inherit system; };
+    with import nixpkgs { inherit system; };
 
     releaseTools.rpmBuild rec {
       name = "patchelf-rpm";
@@ -97,7 +98,7 @@ let
   makeDeb =
     system: diskImageFun:
 
-    with import <nixpkgs> { inherit system; };
+    with import nixpkgs { inherit system; };
 
     releaseTools.debBuild {
       name = "patchelf-deb";
