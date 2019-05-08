@@ -14,7 +14,7 @@ let
     tarball =
       pkgs.releaseTools.sourceTarball rec {
         name = "patchelf-tarball";
-        version = builtins.readFile ./version + (if officialRelease then "" else "pre${toString patchelfSrc.revCount}_${patchelfSrc.shortRev}");
+        version = builtins.readFile ./version + (if officialRelease then "" else "pre${toString patchelfSrc.revCount or 0}_${patchelfSrc.shortRev or "0000000"}");
         versionSuffix = ""; # obsolete
         src = patchelfSrc;
         preAutoconf = "echo ${version} > version";
