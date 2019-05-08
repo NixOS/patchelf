@@ -1,7 +1,7 @@
 {
     "nonFlakeRequires": {},
     "requires": {
-        "github:edolstra/nixpkgs/a4d896e89932e873c4117908d558db6210fa3b56": {
+        "nixpkgs": {
             "uri": "github:edolstra/nixpkgs/a4d896e89932e873c4117908d558db6210fa3b56"
         }
     },
