@@ -1,6 +1,8 @@
 {
   name = "patchelf";
 
+  epoch = 2019;
+
   description = "A tool for modifying ELF executables and libraries";
 
   requires = [ "nixpkgs" ];
