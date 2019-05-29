@@ -1074,13 +1074,6 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string &
         return;
     }
 
-    /* Zero out the previous SONAME */
-    unsigned int sonameSize = 0;
-    if (soname) {
-        sonameSize = strlen(soname);
-        memset(soname, 'X', sonameSize);
-    }
-
     debug("new SONAME is '%s'\n", newSoname.c_str());
 
     /* Grow the .dynstr section to make room for the new SONAME. */
