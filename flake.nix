@@ -5,14 +5,16 @@
 
   description = "A tool for modifying ELF executables and libraries";
 
-  requires = [ "nixpkgs" ];
+  inputs = [ "nixpkgs" ];
 
-  provides = deps: rec {
+  outputs = inputs: rec {
 
     hydraJobs = import ./release.nix {
-      patchelfSrc = deps.self;
-      nixpkgs = deps.nixpkgs;
+      patchelfSrc = inputs.self;
+      nixpkgs = inputs.nixpkgs;
     };
+
+    checks.build = hydraJobs.build.x86_64-linux;
 
     packages.patchelf = hydraJobs.build.x86_64-linux;
 
