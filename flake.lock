@@ -1,10 +1,13 @@
 {
     "inputs": {
         "nixpkgs": {
-            "narHash": "sha256-rMiWaLXkhizEEMEeMDutUl0Y/c+VEjfjvMkvBwvuQJU=",
-            "uri": "github:edolstra/nixpkgs/eeeffd24cd7e407cfaa99e98cfbb8f93bf4cc033"
+            "id": "nixpkgs",
+            "inputs": {},
+            "narHash": "sha256-5/HXWs25BLukwG9VaxmdmUf/9o79e32aW/tmhcWEbKk=",
+            "nonFlakeInputs": {},
+            "uri": "github:edolstra/nixpkgs/62ac6f7f504c8d3998558d9b269d22d26f13f1f0"
         }
     },
     "nonFlakeInputs": {},
-    "version": 1
+    "version": 2
 }
