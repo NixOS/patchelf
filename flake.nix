@@ -1,7 +1,7 @@
 {
   name = "patchelf";
 
-  epoch = 201906;
+  edition = 201906;
 
   description = "A tool for modifying ELF executables and libraries";
 
