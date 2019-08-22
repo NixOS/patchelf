@@ -1574,9 +1574,10 @@ typedef struct
 
 /* Legal values for p_type field of Elf32_Phdr.  */
 
-#define PT_MIPS_REGINFO	0x70000000	/* Register usage information */
-#define PT_MIPS_RTPROC  0x70000001	/* Runtime procedure table. */
-#define PT_MIPS_OPTIONS 0x70000002
+#define PT_MIPS_REGINFO	  0x70000000	/* Register usage information. */
+#define PT_MIPS_RTPROC	  0x70000001	/* Runtime procedure table. */
+#define PT_MIPS_OPTIONS	  0x70000002
+#define PT_MIPS_ABIFLAGS  0x70000003	/* FP mode requirement. */
 
 /* Special program header types.  */
 
