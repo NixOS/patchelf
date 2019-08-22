@@ -1642,7 +1642,11 @@ typedef struct
    PLT is writable.  For a non-writable PLT, this is omitted or has a zero
    value.  */
 #define DT_MIPS_RWPLT        0x70000034
-#define DT_MIPS_NUM	     0x35
+/* An alternative description of the classic MIPS RLD_MAP that is usable
+   in a PIE as it stores a relative offset from the address of the tag
+   rather than an absolute address.  */
+#define DT_MIPS_RLD_MAP_REL  0x70000035
+#define DT_MIPS_NUM          0x36
 
 /* Legal values for DT_MIPS_FLAGS Elf32_Dyn entry.  */
 

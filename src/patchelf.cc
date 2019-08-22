@@ -1098,9 +1098,9 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
        (e.g., those produced by klibc's klcc). */
     auto shdrDynamic = findSection2(".dynamic");
     if (shdrDynamic) {
-        auto dyn = (Elf_Dyn *)(contents + rdi(shdrDynamic->sh_offset));
+        auto dyn_table = (Elf_Dyn *) (contents + rdi(shdrDynamic->sh_offset));
         unsigned int d_tag;
-        for ( ; (d_tag = rdi(dyn->d_tag)) != DT_NULL; dyn++)
+        for (auto dyn = dyn_table; (d_tag = rdi(dyn->d_tag)) != DT_NULL; dyn++)
             if (d_tag == DT_STRTAB)
                 dyn->d_un.d_ptr = findSection(".dynstr").sh_addr;
             else if (d_tag == DT_STRSZ)
@@ -1142,6 +1142,23 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                 dyn->d_un.d_ptr = findSection(".gnu.version_r").sh_addr;
             else if (d_tag == DT_VERSYM)
                 dyn->d_un.d_ptr = findSection(".gnu.version").sh_addr;
+            else if (d_tag == DT_MIPS_RLD_MAP_REL) {
+                /* the MIPS_RLD_MAP_REL tag stores the offset to the debug
+                   pointer, relative to the address of the tag */
+                auto shdr = findSection2(".rld_map");
+                if (shdr) {
+                    auto rld_map_addr = findSection(".rld_map").sh_addr;
+                    auto dyn_offset = ((char*)dyn) - ((char*)dyn_table);
+                    dyn->d_un.d_ptr = rld_map_addr + dyn_offset - shdrDynamic->sh_addr;
+                } else {
+                    /* ELF file with DT_MIPS_RLD_MAP_REL but without .rld_map
+                       is broken, and it's not our job to fix it; yet, we have
+                       to find some location for dynamic loader to write the
+                       debug pointer to; well, let's write it right here */
+                    fprintf(stderr, "warning: DT_MIPS_RLD_MAP_REL entry is present, but .rld_map section is not\n");
+                    dyn->d_un.d_ptr = 0;
+                }
+            }
     }
 
 
