@@ -1,17 +1,13 @@
 {
-  name = "patchelf";
-
-  edition = 201906;
+  edition = 201909;
 
   description = "A tool for modifying ELF executables and libraries";
 
-  inputs = [ "nixpkgs" ];
-
-  outputs = inputs: rec {
+  outputs = { self, nixpkgs }: rec {
 
     hydraJobs = import ./release.nix {
-      patchelfSrc = inputs.self;
-      nixpkgs = inputs.nixpkgs;
+      patchelfSrc = self;
+      nixpkgs = nixpkgs;
     };
 
     checks.build = hydraJobs.build.x86_64-linux;
