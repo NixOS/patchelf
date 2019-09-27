@@ -211,6 +211,8 @@ public:
 
     void noDefaultLib();
 
+    bool hasSection(const SectionName & sectionName);
+
 private:
 
     /* Convert an integer in big or little endian representation (as
@@ -1548,6 +1550,11 @@ void ElfFile<ElfFileParamNames>::noDefaultLib()
     changed = true;
 }
 
+template<ElfFileParams>
+bool ElfFile<ElfFileParamNames>::hasSection(const SectionName & sectionName)
+{
+    return findSection2(sectionName) != NULL;
+}
 
 static bool printInterpreter = false;
 static bool printSoname = false;
@@ -1558,6 +1565,7 @@ static bool shrinkRPath = false;
 static std::vector<std::string> allowedRpathPrefixes;
 static bool removeRPath = false;
 static bool setRPath = false;
+static bool silent = false;
 static bool printRPath = false;
 static std::string newRPath;
 static std::set<std::string> neededLibsToRemove;
@@ -1581,8 +1589,11 @@ static void patchElf2(ElfFile && elfFile, std::string fileName)
     if (newInterpreter != "")
         elfFile.setInterpreter(newInterpreter);
 
-    if (printRPath)
+    if (printRPath) {
+        if (!elfFile.hasSection(".dynamic") && silent)
+            return;
         elfFile.modifyRPath(elfFile.rpPrint, {}, "");
+    }
 
     if (shrinkRPath)
         elfFile.modifyRPath(elfFile.rpShrink, allowedRpathPrefixes, "");
@@ -1631,12 +1642,13 @@ void showHelp(const std::string & progName)
   [--set-interpreter FILENAME]\n\
   [--page-size SIZE]\n\
   [--print-interpreter]\n\
-  [--print-soname]\t\tPrints 'DT_SONAME' entry of .dynamic section. Raises an error if DT_SONAME doesn't exist\n\
-  [--set-soname SONAME]\t\tSets 'DT_SONAME' entry to SONAME.\n\
+  [--print-soname]\t\t\tPrints 'DT_SONAME' entry of .dynamic section. Raises an error if DT_SONAME doesn't exist\n\
+  [--set-soname SONAME]\t\t\tSets 'DT_SONAME' entry to SONAME.\n\
   [--set-rpath RPATH]\n\
   [--remove-rpath]\n\
   [--shrink-rpath]\n\
-  [--allowed-rpath-prefixes PREFIXES]\t\tWith '--shrink-rpath', reject rpath entries not starting with the allowed prefix\n\
+  [--allowed-rpath-prefixes PREFIXES]\tWith '--shrink-rpath', reject rpath entries not starting with the allowed prefix\n\
+  [--silent]\t\t\t\tWith '--print-rpath', do not fail when file is statically linked\n\
   [--print-rpath]\n\
   [--force-rpath]\n\
   [--add-needed LIBRARY]\n\
@@ -1696,6 +1708,9 @@ int mainWrapped(int argc, char * * argv)
             if (++i == argc) error("missing argument");
             setRPath = true;
             newRPath = argv[i];
+        }
+        else if (arg == "--silent") {
+            silent = true;
         }
         else if (arg == "--print-rpath") {
             printRPath = true;
