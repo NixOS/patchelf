@@ -17,8 +17,8 @@ let
         version = builtins.readFile ./version +
                   (if officialRelease then "" else
                     "." +
-                    ((if patchelfSrc ? lastModified
-                      then builtins.substring 0 8 patchelfSrc.lastModified
+                    ((if patchelfSrc ? lastModifiedDate
+                      then builtins.substring 0 8 patchelfSrc.lastModifiedDate
                       else toString patchelfSrc.revCount or 0)
                     + "." + patchelfSrc.shortRev));
         versionSuffix = ""; # obsolete
