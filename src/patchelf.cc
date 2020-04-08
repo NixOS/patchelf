@@ -1646,7 +1646,7 @@ void showHelp(const std::string & progName)
   [--no-default-lib]\n\
   [--debug]\n\
   [--version]\n\
-  FILENAME\n", progName.c_str());
+  FILENAME...\n", progName.c_str());
 }
 
 
