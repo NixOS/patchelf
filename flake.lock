@@ -1,11 +1,28 @@
 {
-    "inputs": {
-        "nixpkgs": {
-            "inputs": {},
-            "narHash": "sha256-yfhWbT0TL6NiCc5lCXauGsImnpDFNHV7ngjyUYrm6CY=",
-            "originalUrl": "nixpkgs",
-            "url": "github:edolstra/nixpkgs/d4a07f018e707b31a0eb7aff3f2838d01d53a0df"
-        }
+  "nodes": {
+    "nixpkgs": {
+      "info": {
+        "lastModified": 1590140420,
+        "narHash": "sha256-ozgGYyqGHoEKvgL00r6G0ht+ODXHuhpfW37IYxAda0A="
+      },
+      "locked": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "48723f48ab92381f0afd50143f38e45cf3080405",
+        "type": "github"
+      },
+      "original": {
+        "id": "nixpkgs",
+        "ref": "nixos-20.03",
+        "type": "indirect"
+      }
     },
-    "version": 3
+    "root": {
+      "inputs": {
+        "nixpkgs": "nixpkgs"
+      }
+    }
+  },
+  "root": "root",
+  "version": 5
 }

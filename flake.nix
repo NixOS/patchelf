@@ -1,7 +1,7 @@
 {
-  edition = 201909;
-
   description = "A tool for modifying ELF executables and libraries";
+
+  inputs.nixpkgs.url = "nixpkgs/nixos-20.03";
 
   outputs = { self, nixpkgs }:
 
