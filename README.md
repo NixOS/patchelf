@@ -52,22 +52,21 @@ libraries.  In particular, it can do the following:
   $ patchelf --set-soname libnewname.so.3.4.5 path/to/libmylibrary.so.1.2.3
 
 
-INSTALLING
+## INSTALLING
 
 You can download a pre-compiled binary from the releases or compile it by yourself:
 
-  ./bootstrap.sh
-  ./configure
-  make
-  sudo make install
+    ./bootstrap.sh
+    ./configure
+    make
+    sudo make install
 
-
-AUTHOR
+## AUTHOR
 
 Copyright 2004-2019 Eelco Dolstra <edolstra@gmail.com>.
 
 
-LICENSE
+## LICENSE
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -83,12 +82,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-HOMEPAGE
+## HOMEPAGE
 
 http://nixos.org/patchelf.html
 
 
-BUGS
+## BUGS
 
 The `strip' command from binutils generated broken executables when
 applied to the output of patchelf (if `--set-rpath' or
@@ -97,7 +96,7 @@ This appears to be a bug in binutils
 (http://bugs.strategoxt.org/browse/NIXPKGS-85).
 
 
-RELEASE HISTORY
+## RELEASE HISTORY
 
 0.10 (March 28, 2019):
 
