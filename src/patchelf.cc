@@ -46,6 +46,8 @@ static bool debugMode = false;
 static bool forceRPath = false;
 
 static std::vector<std::string> fileNames;
+static std::string outputFileName;
+static bool alwaysWrite = false;
 static int pageSize = PAGESIZE;
 
 typedef std::shared_ptr<std::vector<unsigned char>> FileContents;
@@ -497,7 +499,9 @@ void ElfFile<ElfFileParamNames>::sortShdrs()
 
 static void writeFile(std::string fileName, FileContents contents)
 {
-    int fd = open(fileName.c_str(), O_TRUNC | O_WRONLY);
+    debug("writing %s\n", fileName.c_str());
+
+    int fd = open(fileName.c_str(), O_CREAT | O_TRUNC | O_WRONLY, 0777);
     if (fd == -1)
         error("open");
 
@@ -1567,7 +1571,7 @@ static bool printNeeded = false;
 static bool noDefaultLib = false;
 
 template<class ElfFile>
-static void patchElf2(ElfFile && elfFile, std::string fileName)
+static void patchElf2(ElfFile && elfFile, const FileContents & fileContents, std::string fileName)
 {
     if (printInterpreter)
         printf("%s\n", elfFile.getInterpreter().c_str());
@@ -1603,6 +1607,9 @@ static void patchElf2(ElfFile && elfFile, std::string fileName)
     if (elfFile.isChanged()){
         elfFile.rewriteSections();
         writeFile(fileName, elfFile.fileContents);
+    } else if (alwaysWrite) {
+        debug("not modified, but alwaysWrite=true\n");
+        writeFile(fileName, fileContents);
     }
 }
 
@@ -1616,11 +1623,12 @@ static void patchElf()
         debug("Kernel page size is %u bytes\n", getPageSize());
 
         auto fileContents = readFile(fileName);
+        std::string outputFileName2 = outputFileName.empty() ? fileName : outputFileName;
 
         if (getElfType(fileContents).is32Bit)
-            patchElf2(ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym, Elf32_Verneed>(fileContents), fileName);
+            patchElf2(ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym, Elf32_Verneed>(fileContents), fileContents, outputFileName2);
         else
-            patchElf2(ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym, Elf64_Verneed>(fileContents), fileName);
+            patchElf2(ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym, Elf64_Verneed>(fileContents), fileContents, outputFileName2);
     }
 }
 
@@ -1644,6 +1652,7 @@ void showHelp(const std::string & progName)
   [--replace-needed LIBRARY NEW_LIBRARY]\n\
   [--print-needed]\n\
   [--no-default-lib]\n\
+  [--output FILE]\n\
   [--debug]\n\
   [--version]\n\
   FILENAME...\n", progName.c_str());
@@ -1730,6 +1739,11 @@ int mainWrapped(int argc, char * * argv)
             neededLibsToReplace[ argv[i+1] ] = argv[i+2];
             i += 2;
         }
+        else if (arg == "--output") {
+            if (++i == argc) error("missing argument");
+            outputFileName = argv[i];
+            alwaysWrite = true;
+        }
         else if (arg == "--debug") {
             debugMode = true;
         }
@@ -1750,6 +1764,9 @@ int mainWrapped(int argc, char * * argv)
     }
 
     if (fileNames.empty()) error("missing filename");
+
+    if (!outputFileName.empty() && fileNames.size() != 1)
+        error("--output option only allowed with single input file");
 
     patchElf();
 
