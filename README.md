@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ## HOMEPAGE
 
-http://nixos.org/patchelf.html
+https://nixos.org/patchelf.html
 
 
 ## BUGS
