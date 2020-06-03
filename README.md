@@ -52,14 +52,13 @@ libraries.  In particular, it can do the following:
   $ patchelf --set-soname libnewname.so.3.4.5 path/to/libmylibrary.so.1.2.3
 
 
-## INSTALLING
-
-You can download a pre-compiled binary from the releases or compile it by yourself:
+## COMPILING & TESTING
 
     ./bootstrap.sh
     ./configure
     make
     sudo make install
+    make check
 
 ## AUTHOR
 
