@@ -752,6 +752,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
     }
 
     /* Add a segment that maps the replaced sections into memory. */
+    wri(hdr->e_phoff, sizeof(Elf_Ehdr));
     phdrs.resize(rdi(hdr->e_phnum) + 1);
     wri(hdr->e_phnum, rdi(hdr->e_phnum) + 1);
     Elf_Phdr & phdr = phdrs[rdi(hdr->e_phnum) - 1];
