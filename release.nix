@@ -1,13 +1,21 @@
 { patchelfSrc ? { outPath = ./.; revCount = 1234; shortRev = "abcdef"; }
-, nixpkgs ? builtins.fetchTarball https://github.com/NixOS/nixpkgs-channels/archive/nixos-20.03.tar.gz
+, nixpkgs ? builtins.fetchTarball https://github.com/NixOS/nixpkgs-channels/archive/nixos-unstable.tar.gz
 , officialRelease ? false
+, isMusl ? false
+, systems ? [ "x86_64-linux" "i686-linux" "aarch64-linux" ]
 }:
 
 let
 
-  pkgs = import nixpkgs { system = builtins.currentSystem or "x86_64-linux"; };
+  loadPkgs = system:
+    let 
+      pkgsInit = import nixpkgs { inherit system; };
+    in if isMusl
+      then pkgsInit.pkgsMusl
+      else pkgsInit;
 
-
+  pkgs = loadPkgs (builtins.currentSystem or "x86_64-linux");
+    
   jobs = rec {
 
 
@@ -39,9 +47,9 @@ let
       };
 
 
-    build = pkgs.lib.genAttrs [ "x86_64-linux" "i686-linux" "aarch64-linux" /* "x86_64-freebsd" "i686-freebsd"  "x86_64-darwin" "i686-solaris" "i686-cygwin" */ ] (system:
+    build = pkgs.lib.genAttrs systems (system:
 
-      with import nixpkgs { inherit system; };
+      with (loadPkgs system);
 
       releaseTools.nixBuild {
         name = "patchelf";
@@ -67,7 +75,7 @@ let
         constituents =
           [ tarball
             build.x86_64-linux
-            build.i686-linux
+            (build.i686-linux or null)
             /*
             rpm_fedora27x86_64
             deb_debian9i386
@@ -88,7 +96,7 @@ let
   makeRPM =
     system: diskImageFun:
 
-    with import nixpkgs { inherit system; };
+    with (loadPkgs system);
 
     releaseTools.rpmBuild rec {
       name = "patchelf-rpm";
@@ -104,7 +112,7 @@ let
   makeDeb =
     system: diskImageFun:
 
-    with import nixpkgs { inherit system; };
+    with (loadPkgs system);
 
     releaseTools.debBuild {
       name = "patchelf-deb";

@@ -11,3 +11,11 @@ jobs:
       with: 
         skip_adding_nixpkgs_channel: true
     - run: nix-build release.nix
+  tests-musl:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: cachix/install-nix-action@v9
+      with: 
+        skip_adding_nixpkgs_channel: true
+    - run: nix-build release.nix --arg isMusl true --arg systems '[ "x86_64-linux" ]'
