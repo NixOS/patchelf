@@ -1,7 +1,0 @@
-language: cpp
-dist: xenial
-script:
-  - ./bootstrap.sh
-  - ./configure
-  - make
-  - cd tests && make check
