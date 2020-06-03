@@ -25,8 +25,8 @@ let
         src = patchelfSrc;
         preAutoconf = "echo ${version} > version";
         postDist = ''
-          cp README $out/
-          echo "doc readme $out/README" >> $out/nix-support/hydra-build-products
+          cp README.md $out/
+          echo "doc readme $out/README.md" >> $out/nix-support/hydra-build-products
         '';
       };
 
