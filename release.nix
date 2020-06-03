@@ -1,5 +1,5 @@
 { patchelfSrc ? { outPath = ./.; revCount = 1234; shortRev = "abcdef"; }
-, nixpkgs ? builtins.fetchTarball https://github.com/NixOS/nixpkgs-channels/archive/nixos-19.03.tar.gz
+, nixpkgs ? builtins.fetchTarball https://github.com/NixOS/nixpkgs-channels/archive/nixos-20.03.tar.gz
 , officialRelease ? false
 }:
 

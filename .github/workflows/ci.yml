@@ -1,0 +1,13 @@
+name: "CI"
+on:
+  pull_request:
+  push:
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: cachix/install-nix-action@v9
+      with: 
+        skip_adding_nixpkgs_channel: true
+    - run: nix-build release.nix
