@@ -22,6 +22,7 @@ src_TESTS = \
   plain-fail.sh plain-run.sh shrink-rpath.sh set-interpreter-short.sh \
   set-interpreter-long.sh set-rpath.sh no-rpath.sh big-dynstr.sh \
   set-rpath-library.sh soname.sh shrink-rpath-with-allowed-prefixes.sh \
+  force-rpath.sh \
   output-flag.sh
 
 build_TESTS = \

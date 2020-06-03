@@ -1259,7 +1259,17 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
     }
 
 
-    if (std::string(rpath ? rpath : "") == newRPath) return;
+    if (!forceRPath && dynRPath && !dynRunPath) { /* convert DT_RPATH to DT_RUNPATH */
+        dynRPath->d_tag = DT_RUNPATH;
+        dynRunPath = dynRPath;
+        dynRPath = 0;
+    } else if (forceRPath && dynRunPath) { /* convert DT_RUNPATH to DT_RPATH */
+        dynRunPath->d_tag = DT_RPATH;
+        dynRPath = dynRunPath;
+        dynRunPath = 0;
+    } else if (std::string(rpath ? rpath : "") == newRPath) {
+        return;
+    }
 
     changed = true;
 
@@ -1273,15 +1283,6 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
 
     debug("new rpath is '%s'\n", newRPath.c_str());
 
-    if (!forceRPath && dynRPath && !dynRunPath) { /* convert DT_RPATH to DT_RUNPATH */
-        dynRPath->d_tag = DT_RUNPATH;
-        dynRunPath = dynRPath;
-        dynRPath = 0;
-    }
-
-    if (forceRPath && dynRPath && dynRunPath) { /* convert DT_RUNPATH to DT_RPATH */
-        dynRunPath->d_tag = DT_IGNORE;
-    }
 
     if (newRPath.size() <= rpathSize) {
         strcpy(rpath, newRPath.c_str());
