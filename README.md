@@ -86,15 +86,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 https://nixos.org/patchelf.html
 
 
-## BUGS
-
-The `strip' command from binutils generated broken executables when
-applied to the output of patchelf (if `--set-rpath' or
-`--set-interpreter' with a larger path than the original is used).
-This appears to be a bug in binutils
-(http://bugs.strategoxt.org/browse/NIXPKGS-85).
-
-
 ## RELEASE HISTORY
 
 0.10 (March 28, 2019):
