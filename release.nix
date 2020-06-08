@@ -32,6 +32,7 @@ let
         versionSuffix = ""; # obsolete
         src = patchelfSrc;
         preAutoconf = "echo ${version} > version";
+        preFinal = "set -xe";
         postDist = ''
           cp README.md $out/
           echo "doc readme $out/README.md" >> $out/nix-support/hydra-build-products
