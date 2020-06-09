@@ -82,6 +82,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ## RELEASE HISTORY
 
+0.11 (June 9, 2020):
+
+* New `--output` flag.
+
+* Some bug fixes.
+
 0.10 (March 28, 2019):
 
 * Many bug fixes. Please refer to the Git commit log:
