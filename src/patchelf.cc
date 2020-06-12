@@ -250,7 +250,6 @@ I ElfFile<ElfFileParamNames>::rdi(I i)
     return r;
 }
 
-
 /* Ugly: used to erase DT_RUNPATH when using --force-rpath. */
 #define DT_IGNORE       0x00726e67
 
@@ -737,7 +736,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
        ET_DYN as does LD when linking with pie. If we move PT_PHDR, it
        has to stay in the first PT_LOAD segment or any subsequent ones
        if they're continuous in memory due to linux kernel constraints
-       (see BUGS). Since the end of the file would be after bss, we can't 
+       (see BUGS). Since the end of the file would be after bss, we can't
        move PHDR there, we therefore choose to leave PT_PHDR where it is but
        move enough following sections such that we can add the extra PT_LOAD
        section to it. This PT_LOAD segment ensures the sections at the end of
