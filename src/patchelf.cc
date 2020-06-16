@@ -106,8 +106,6 @@ private:
 
     bool changed = false;
 
-    bool isExecutable = false;
-
     typedef std::string SectionName;
     typedef std::map<SectionName, std::string> ReplacedSections;
 
@@ -415,10 +413,8 @@ ElfFile<ElfFileParamNames>::ElfFile(FileContents fileContents)
         error("program headers have wrong size");
 
     /* Copy the program and section headers. */
-    for (int i = 0; i < rdi(hdr->e_phnum); ++i) {
+    for (int i = 0; i < rdi(hdr->e_phnum); ++i)
         phdrs.push_back(* ((Elf_Phdr *) (contents + rdi(hdr->e_phoff)) + i));
-        if (rdi(phdrs[i].p_type) == PT_INTERP) isExecutable = true;
-    }
 
     for (int i = 0; i < rdi(hdr->e_shnum); ++i)
         shdrs.push_back(* ((Elf_Shdr *) (contents + rdi(hdr->e_shoff)) + i));
@@ -741,10 +737,9 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
        since DYN executables tend to start at virtual address 0, so
        rewriteSectionsExecutable() won't work because it doesn't have
        any virtual address space to grow downwards into. */
-    if (isExecutable && startOffset > startPage) {
+    if (startOffset > startPage)
         debug("shifting new PT_LOAD segment by %d bytes to work around a Linux kernel bug\n", startOffset - startPage);
-        startPage = startOffset;
-    }
+    startPage = startOffset;
 
     /* Add a segment that maps the replaced sections into memory. */
     wri(hdr->e_phoff, sizeof(Elf_Ehdr));
