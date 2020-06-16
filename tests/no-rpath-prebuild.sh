@@ -4,7 +4,7 @@ ARCH="$1"
 PAGESIZE=4096
 
 if [ -z "$ARCH" ]; then
-  ARCH=$(basename $0 .sh | sed -e 's/.*-//')
+  ARCH=$(basename $0 .sh | sed -e 's/^no-rpath-//')
 fi
 
 SCRATCH=scratch/no-rpath-$ARCH
