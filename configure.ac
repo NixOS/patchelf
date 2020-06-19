@@ -7,23 +7,16 @@ AM_INIT_AUTOMAKE([1.11.1 -Wall -Werror dist-bzip2 foreign color-tests parallel-t
 AM_PROG_CC_C_O
 AC_PROG_CXX
 
-PAGESIZE=auto
+DEFAULT_PAGESIZE=auto
 AC_ARG_WITH([page-size],
    AS_HELP_STRING([--with-page-size=SIZE], [Specify default pagesize (default auto)]),
-   PAGESIZE=$withval
+   DEFAULT_PAGESIZE=$withval
 )
 
-if test "$PAGESIZE" = auto; then
-    if command -v getconf >/dev/null; then
-        PAGESIZE=$(getconf PAGESIZE || getconf PAGE_SIZE)
-    fi
-    if test "$PAGESIZE" = auto -o -z "$PAGESIZE"; then
-        PAGESIZE=4096
-    fi
+if test "$DEFAULT_PAGESIZE" != auto; then
+    AC_DEFINE_UNQUOTED(DEFAULT_PAGESIZE, ${DEFAULT_PAGESIZE})
+    AC_MSG_RESULT([Setting page size to ${DEFAULT_PAGESIZE}])
 fi
-
-AC_DEFINE_UNQUOTED(PAGESIZE, ${PAGESIZE})
-AC_MSG_RESULT([Setting page size to ${PAGESIZE}])
 
 AC_ARG_WITH([asan],
    AS_HELP_STRING([--with-asan], [Link with libasan])
