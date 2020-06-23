@@ -1,0 +1,4 @@
+arch:
+  - arm64
+language: nix
+script: nix-build release.nix -A build.aarch64-linux
