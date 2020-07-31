@@ -187,6 +187,8 @@ private:
 
     void rewriteSectionsExecutable();
 
+    void normalizeNoteSegments();
+
 public:
 
     void rewriteSections();
@@ -671,6 +673,7 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
     for (auto & i : replacedSections) {
         std::string sectionName = i.first;
         auto & shdr = findSection(sectionName);
+        Elf_Shdr orig_shdr = shdr;
         debug("rewriting section '%s' from offset 0x%x (size %d) to offset 0x%x (size %d)\n",
             sectionName.c_str(), rdi(shdr.sh_offset), rdi(shdr.sh_size), curOff, i.second.size());
 
@@ -705,6 +708,41 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
                 }
         }
 
+        /* If this is a note section, there might be a PT_NOTE segment that
+           must be sync'ed with it. Note that normalizeNoteSegments() will have
+           already taken care of PT_NOTE segments containing multiple note
+           sections. At this point, we can assume that the segment will map to
+           exactly one section.
+
+           Note sections also have particular alignment constraints: the
+           data inside the section is formatted differently depending on the
+           section alignment. Keep the original alignment if possible. */
+        if (rdi(shdr.sh_type) == SHT_NOTE) {
+            if (orig_shdr.sh_addralign < sectionAlignment)
+                shdr.sh_addralign = orig_shdr.sh_addralign;
+
+            for (unsigned int j = 0; j < phdrs.size(); ++j)
+                if (rdi(phdrs[j].p_type) == PT_NOTE) {
+                    Elf_Off p_start = rdi(phdrs[j].p_offset);
+                    Elf_Off p_end = p_start + rdi(phdrs[j].p_filesz);
+                    Elf_Off s_start = rdi(orig_shdr.sh_offset);
+                    Elf_Off s_end = s_start + rdi(orig_shdr.sh_size);
+
+                    /* Skip if no overlap. */
+                    if (!(s_start >= p_start && s_start < p_end) &&
+                        !(s_end > p_start && s_end <= p_end))
+                        continue;
+
+                    /* We only support exact matches. */
+                    if (p_start != s_start || p_end != s_end)
+                        error("unsupported overlap of SHT_NOTE and PT_NOTE");
+
+                    phdrs[j].p_offset = shdr.sh_offset;
+                    phdrs[j].p_vaddr = phdrs[j].p_paddr = shdr.sh_addr;
+                    phdrs[j].p_filesz = phdrs[j].p_memsz = shdr.sh_size;
+                }
+        }
+
         curOff += roundUp(i.second.size(), sectionAlignment);
     }
 
@@ -727,13 +765,20 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
 
     debug("last page is 0x%llx\n", (unsigned long long) startPage);
 
+    /* When normalizing note segments we will in the worst case be adding
+       1 program header for each SHT_NOTE section. */
+    unsigned int num_notes = 0;
+    for (const auto & shdr : shdrs)
+        if (rdi(shdr.sh_type) == SHT_NOTE)
+            num_notes++;
+
     /* Because we're adding a new section header, we're necessarily increasing
        the size of the program header table.  This can cause the first section
        to overlap the program header table in memory; we need to shift the first
        few segments to someplace else. */
     /* Some sections may already be replaced so account for that */
     unsigned int i = 1;
-    Elf_Addr pht_size = sizeof(Elf_Ehdr) + (phdrs.size() + 1)*sizeof(Elf_Phdr);
+    Elf_Addr pht_size = sizeof(Elf_Ehdr) + (phdrs.size() + num_notes + 1)*sizeof(Elf_Phdr);
     while( shdrs[i].sh_addr <= pht_size && i < rdi(hdr->e_shnum) ) {
         if (not haveReplacedSection(getSectionName(shdrs[i])))
             replaceSection(getSectionName(shdrs[i]), shdrs[i].sh_size);
@@ -780,6 +825,9 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
     wri(phdr.p_filesz, wri(phdr.p_memsz, neededSpace));
     wri(phdr.p_flags, PF_R | PF_W);
     wri(phdr.p_align, getPageSize());
+
+
+    normalizeNoteSegments();
 
 
     /* Write out the replaced sections. */
@@ -869,6 +917,9 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
     }
 
 
+    normalizeNoteSegments();
+
+
     /* Compute the total space needed for the replaced sections, the
        ELF header, and the program headers. */
     size_t neededSpace = sizeof(Elf_Ehdr) + phdrs.size() * sizeof(Elf_Phdr);
@@ -910,6 +961,67 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
 
 
     rewriteHeaders(firstPage + rdi(hdr->e_phoff));
+}
+
+
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::normalizeNoteSegments()
+{
+    /* Break up PT_NOTE segments containing multiple SHT_NOTE sections. This
+       is to avoid having to deal with moving multiple sections together if
+       one of them has to be replaced. */
+
+    /* We don't need to do anything if no note segments were replaced. */
+    bool replaced_note = false;
+    for (const auto & i : replacedSections) {
+        if (rdi(findSection(i.first).sh_type) == SHT_NOTE)
+            replaced_note = true;
+    }
+    if (!replaced_note) return;
+
+    size_t orig_count = phdrs.size();
+    for (size_t i = 0; i < orig_count; ++i) {
+        auto & phdr = phdrs[i];
+        if (rdi(phdr.p_type) != PT_NOTE) continue;
+
+        size_t start_off = rdi(phdr.p_offset);
+        size_t curr_off = start_off;
+        size_t end_off = start_off + rdi(phdr.p_filesz);
+        while (curr_off < end_off) {
+            /* Find a section that starts at the current offset. If we can't
+               find one, it means the SHT_NOTE sections weren't contiguous
+               within the segment. */
+            size_t size = 0;
+            for (const auto & shdr : shdrs) {
+                if (rdi(shdr.sh_type) != SHT_NOTE) continue;
+                if (rdi(shdr.sh_offset) != curr_off) continue;
+                size = rdi(shdr.sh_size);
+                break;
+            }
+            if (size == 0)
+                error("cannot normalize PT_NOTE segment: non-contiguous SHT_NOTE sections");
+            if (curr_off + size > end_off)
+                error("cannot normalize PT_NOTE segment: partially mapped SHT_NOTE section");
+
+            /* Build a new phdr for this note section. */
+            Elf_Phdr new_phdr = phdr;
+            wri(new_phdr.p_offset, curr_off);
+            wri(new_phdr.p_vaddr, rdi(phdr.p_vaddr) + (curr_off - start_off));
+            wri(new_phdr.p_paddr, rdi(phdr.p_paddr) + (curr_off - start_off));
+            wri(new_phdr.p_filesz, size);
+            wri(new_phdr.p_memsz, size);
+
+            /* If we haven't yet, reuse the existing phdr entry. Otherwise add
+               a new phdr to the table. */
+            if (curr_off == start_off)
+                phdr = new_phdr;
+            else
+                phdrs.push_back(new_phdr);
+
+            curr_off += size;
+        }
+    }
+    wri(hdr->e_phnum, phdrs.size());
 }
 
 
