@@ -20,7 +20,7 @@ let
                     ((if patchelfSrc ? lastModifiedDate
                       then builtins.substring 0 8 patchelfSrc.lastModifiedDate
                       else toString patchelfSrc.revCount or 0)
-                    + "." + patchelfSrc.shortRev));
+                    + "." + (patchelfSrc.shortRev or "")));
         versionSuffix = ""; # obsolete
         src = patchelfSrc;
         preAutoconf = "echo ${version} > version";
