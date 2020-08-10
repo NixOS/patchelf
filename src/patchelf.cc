@@ -474,7 +474,7 @@ void ElfFile<ElfFileParamNames>::sortPhdrs()
     /* Sort the segments by offset. */
     CompPhdr comp;
     comp.elfFile = this;
-    sort(phdrs.begin(), phdrs.end(), comp);
+    stable_sort(phdrs.begin(), phdrs.end(), comp);
 }
 
 
@@ -501,7 +501,7 @@ void ElfFile<ElfFileParamNames>::sortShdrs()
     /* Sort the sections by offset. */
     CompShdr comp;
     comp.elfFile = this;
-    sort(shdrs.begin() + 1, shdrs.end(), comp);
+    stable_sort(shdrs.begin() + 1, shdrs.end(), comp);
 
     /* Restore the sh_link mappings. */
     for (unsigned int i = 1; i < rdi(hdr->e_shnum); ++i)
