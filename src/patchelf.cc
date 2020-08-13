@@ -254,9 +254,6 @@ I ElfFile<ElfFileParamNames>::rdi(I i) const
     return r;
 }
 
-/* Ugly: used to erase DT_RUNPATH when using --force-rpath. */
-#define DT_IGNORE       0x00726e67
-
 
 static void debug(const char * format, ...)
 {
