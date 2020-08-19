@@ -1384,11 +1384,15 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
         wri(dynRPath->d_tag, DT_RUNPATH);
         dynRunPath = dynRPath;
         dynRPath = 0;
+        changed = true;
     } else if (forceRPath && dynRunPath) { /* convert DT_RUNPATH to DT_RPATH */
         wri(dynRunPath->d_tag, DT_RPATH);
         dynRPath = dynRunPath;
         dynRunPath = 0;
-    } else if (std::string(rpath ? rpath : "") == newRPath) {
+        changed = true;
+    }
+
+    if (std::string(rpath ? rpath : "") == newRPath) {
         return;
     }
 
