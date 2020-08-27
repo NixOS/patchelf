@@ -3,69 +3,86 @@ libraries.  In particular, it can do the following:
 
 * Change the dynamic loader ("ELF interpreter") of executables:
 
+  ```console
   $ patchelf --set-interpreter /lib/my-ld-linux.so.2 my-program
+  ```
 
-* Change the RPATH of executables and libraries:
+* Change the `RPATH` of executables and libraries:
 
+  ```console
   $ patchelf --set-rpath /opt/my-libs/lib:/other-libs my-program
+  ```
 
-* Shrink the RPATH of executables and libraries:
+* Shrink the `RPATH` of executables and libraries:
 
+  ```console
   $ patchelf --shrink-rpath my-program
+  ```
 
-  This removes from the RPATH all directories that do not contain a
-  library referenced by DT_NEEDED fields of the executable or library.
-  For instance, if an executable references one library libfoo.so, has
-  an RPATH "/lib:/usr/lib:/foo/lib", and libfoo.so can only be found
-  in /foo/lib, then the new RPATH will be "/foo/lib".
+  This removes from the `RPATH` all directories that do not contain a
+  library referenced by `DT_NEEDED` fields of the executable or library.
+  For instance, if an executable references one library `libfoo.so`, has
+  an RPATH `/lib:/usr/lib:/foo/lib`, and `libfoo.so` can only be found
+  in `/foo/lib`, then the new `RPATH` will be `/foo/lib`.
 
-  In addition, the '--allowed-rpath-prefixes' option can be used for
-  further rpath tuning. For instance, if an executable has an RPATH
-  "/tmp/build-foo/.libs:/foo/lib", it is probably desirable to keep
-  the "/foo/lib" reference instead of the "/tmp" entry. To accomplish
+  In addition, the `--allowed-rpath-prefixes` option can be used for
+  further rpath tuning. For instance, if an executable has an `RPATH`
+  `/tmp/build-foo/.libs:/foo/lib`, it is probably desirable to keep
+  the `/foo/lib` reference instead of the `/tmp` entry. To accomplish
   that, use:
 
+  ```console
   $ patchelf --shrink-rpath --allowed-rpath-prefixes /usr/lib:/foo/lib my-program
+  ```
 
-* Remove declared dependencies on dynamic libraries (DT_NEEDED
+* Remove declared dependencies on dynamic libraries (`DT_NEEDED`
   entries):
 
+  ```console
   $ patchelf --remove-needed libfoo.so.1 my-program
+  ```
 
   This option can be given multiple times.
 
-* Add a declared dependency on a dynamic library (DT_NEEDED):
+* Add a declared dependency on a dynamic library (`DT_NEEDED`):
 
+  ```console
   $ patchelf --add-needed libfoo.so.1 my-program
+  ```
 
   This option can be give multiple times.
 
 * Replace a declared dependency on a dynamic library with another one
-  (DT_NEEDED):
+  (`DT_NEEDED`):
 
+  ```console
   $ patchelf --replace-needed liboriginal.so.1 libreplacement.so.1 my-program
+  ```
 
   This option can be give multiple times.
 
-* Change SONAME of a dynamic library:
+* Change `SONAME` of a dynamic library:
 
+  ```console
   $ patchelf --set-soname libnewname.so.3.4.5 path/to/libmylibrary.so.1.2.3
+  ```
 
 
 ## COMPILING & TESTING
 
-    ./bootstrap.sh
-    ./configure
-    make
-    sudo make install
-    make check
+```console
+./bootstrap.sh
+./configure
+make
+sudo make install
+make check
+```
 
-## AUTHOR
+## Author
 
 Copyright 2004-2019 Eelco Dolstra <edolstra@gmail.com>.
 
-
-## LICENSE
+## License
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -80,7 +97,7 @@ General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-## RELEASE HISTORY
+## Release History
 
 0.11 (June 9, 2020):
 
