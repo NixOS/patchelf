@@ -68,14 +68,14 @@ libraries.  In particular, it can do the following:
   ```
 
 
-## COMPILING & TESTING
+## Compiling and Testing
 
 ```console
 ./bootstrap.sh
 ./configure
 make
-sudo make install
 make check
+sudo make install
 ```
 
 ## Author
