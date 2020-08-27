@@ -99,6 +99,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ## Release History
 
+0.12 (August 27, 2020):
+
+* New `--clear-symbol-version` flag.
+
+* Better support for relocating NOTE sections/segments.
+
+* Improved the default section alignment choice.
+
+* Bug fixes.
+
 0.11 (June 9, 2020):
 
 * New `--output` flag.
