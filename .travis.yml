@@ -1,4 +1,5 @@
 arch:
   - arm64
-language: nix
+version: ~> 1.0
+import: nix-community/nix-travis-ci:nix.yml@main
 script: nix-build release.nix -A build.aarch64-linux
