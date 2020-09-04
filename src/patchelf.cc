@@ -710,7 +710,7 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
 
         /* If this is the .dynamic section, then the PT_DYNAMIC segment
            must be sync'ed with it. */
-        if (sectionName == ".dynamic") {
+        else if (sectionName == ".dynamic") {
             for (auto & phdr : phdrs) {
                 if (rdi(phdr.p_type) == PT_DYNAMIC) {
                     phdr.p_offset = shdr.sh_offset;
