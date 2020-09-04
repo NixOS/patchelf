@@ -900,7 +900,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
             debug("replacing section '%s' which is in the way\n", sectionName.c_str());
             replaceSection(sectionName, rdi(shdr.sh_size));
         }
-        prevSection = sectionName;
+        prevSection = std::move(sectionName);
     }
 
     debug("first reserved offset/addr is 0x%x/0x%llx\n",
