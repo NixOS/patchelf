@@ -803,7 +803,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
         neededSpace += roundUp(i.second.size(), sectionAlignment);
     debug("needed space is %d\n", neededSpace);
 
-    size_t startOffset = roundUp(fileContents->size(), getPageSize());
+    Elf_Off startOffset = roundUp(fileContents->size(), getPageSize());
 
     growFile(fileContents, startOffset + neededSpace);
 
