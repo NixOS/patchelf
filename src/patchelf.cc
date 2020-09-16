@@ -541,7 +541,7 @@ static void writeFile(std::string fileName, FileContents contents)
 }
 
 
-static unsigned int roundUp(unsigned int n, unsigned int m)
+static uint64_t roundUp(uint64_t n, uint64_t m)
 {
     return ((n - 1) / m + 1) * m;
 }
