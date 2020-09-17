@@ -380,8 +380,8 @@ static void checkPointer(const FileContents & contents, void * p, unsigned int s
 
 
 template<ElfFileParams>
-ElfFile<ElfFileParamNames>::ElfFile(FileContents fileContents)
-    : fileContents(fileContents)
+ElfFile<ElfFileParamNames>::ElfFile(FileContents fContents)
+    : fileContents(fContents)
     , contents(fileContents->data())
 {
     /* Check the ELF header for basic validity. */
@@ -799,8 +799,8 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
 
     /* Compute the total space needed for the replaced sections */
     off_t neededSpace = 0;
-    for (auto & i : replacedSections)
-        neededSpace += roundUp(i.second.size(), sectionAlignment);
+    for (auto & s : replacedSections)
+        neededSpace += roundUp(s.second.size(), sectionAlignment);
     debug("needed space is %d\n", neededSpace);
 
     Elf_Off startOffset = roundUp(fileContents->size(), getPageSize());
@@ -1369,7 +1369,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
             return;
         }
 
-        auto dyn = (Elf_Dyn *)(contents + rdi(shdrDynamic.sh_offset));
+        dyn = (Elf_Dyn *)(contents + rdi(shdrDynamic.sh_offset));
         Elf_Dyn * last = dyn;
         for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
             if (rdi(dyn->d_tag) == DT_RPATH) {
