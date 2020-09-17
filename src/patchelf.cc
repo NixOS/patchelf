@@ -1504,7 +1504,7 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
         if (rdi(dyn->d_tag) == DT_NEEDED) {
             char * name = strTab + rdi(dyn->d_un.d_val);
             auto i = libs.find(name);
-            if (i != libs.end()) {
+            if (i != libs.end() && name != i->second) {
                 auto replacement = i->second;
 
                 debug("replacing DT_NEEDED entry '%s' with '%s'\n", name, replacement.c_str());
@@ -1556,7 +1556,7 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
         while (verNeedNum > 0) {
             char * file = verStrTab + rdi(need->vn_file);
             auto i = libs.find(file);
-            if (i != libs.end()) {
+            if (i != libs.end() && file != i->second) {
                 auto replacement = i->second;
 
                 debug("replacing .gnu.version_r entry '%s' with '%s'\n", file, replacement.c_str());
