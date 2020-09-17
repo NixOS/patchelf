@@ -27,7 +27,8 @@ src_TESTS = \
   output-flag.sh \
   no-rpath-pie-powerpc.sh \
   build-id.sh \
-  invalid-elf.sh
+  invalid-elf.sh \
+  replace-needed.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)
