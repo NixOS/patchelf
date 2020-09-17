@@ -1636,6 +1636,10 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
         debug("found .gnu.version_r with %i entries, strings in %s\n", verNeedNum, versionRStringsSName.c_str());
 
         unsigned int verStrAddedBytes = 0;
+        // It may be that it is .dynstr again, in which case we must take the already
+        // added bytes into account.
+        if (versionRStringsSName == ".dynstr")
+            verStrAddedBytes += dynStrAddedBytes;
 
         auto need = (Elf_Verneed *)(fileContents->data() + rdi(shdrVersionR.sh_offset));
         while (verNeedNum > 0) {
