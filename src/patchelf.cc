@@ -673,7 +673,7 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
        *before* writing the new section contents (below) to prevent
        clobbering previously written new section contents. */
     for (auto & i : replacedSections) {
-        std::string sectionName = i.first;
+        const std::string & sectionName = i.first;
         Elf_Shdr & shdr = findSection(sectionName);
         if (rdi(shdr.sh_type) != SHT_NOBITS)
             memset(contents + rdi(shdr.sh_offset), 'X', rdi(shdr.sh_size));
@@ -681,7 +681,7 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
 
     std::set<unsigned int> noted_phdrs = {};
     for (auto & i : replacedSections) {
-        std::string sectionName = i.first;
+        const std::string & sectionName = i.first;
         auto & shdr = findSection(sectionName);
         Elf_Shdr orig_shdr = shdr;
         debug("rewriting section '%s' from offset 0x%x (size %d) to offset 0x%x (size %d)\n",
@@ -1143,7 +1143,7 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                     fprintf(stderr, "warning: entry %d in symbol table refers to a non-existent section, skipping\n", shndx);
                     continue;
                 }
-                std::string section = sectionsByOldIndex.at(shndx);
+                const std::string & section = sectionsByOldIndex.at(shndx);
                 assert(!section.empty());
                 auto newIndex = findSection3(section); // inefficient
                 //debug("rewriting symbol %d: index = %d (%s) -> %d\n", entry, shndx, section.c_str(), newIndex);
@@ -1198,7 +1198,7 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string &
 
     if (op == printSoname) {
         if (soname) {
-            if (std::string(soname ? soname : "").empty())
+            if (strlen(soname) == 0)
                 debug("DT_SONAME is empty\n");
             else
                 printf("%s\n", soname);
@@ -1208,7 +1208,7 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string &
         return;
     }
 
-    if (std::string(soname ? soname : "") == newSoname) {
+    if (soname && soname == newSoname) {
         debug("current and proposed new SONAMEs are equal keeping DT_SONAME entry\n");
         return;
     }
@@ -1399,7 +1399,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
         changed = true;
     }
 
-    if (std::string(rpath ? rpath : "") == newRPath) {
+    if (rpath && rpath == newRPath) {
         return;
     }
 
@@ -1732,7 +1732,7 @@ static bool printNeeded = false;
 static bool noDefaultLib = false;
 
 template<class ElfFile>
-static void patchElf2(ElfFile && elfFile, const FileContents & fileContents, std::string fileName)
+static void patchElf2(ElfFile && elfFile, const FileContents & fileContents, const std::string & fileName)
 {
     if (printInterpreter)
         printf("%s\n", elfFile.getInterpreter().c_str());
@@ -1783,7 +1783,7 @@ static void patchElf()
             debug("patching ELF file '%s'\n", fileName.c_str());
 
         auto fileContents = readFile(fileName);
-        std::string outputFileName2 = outputFileName.empty() ? fileName : outputFileName;
+        const std::string & outputFileName2 = outputFileName.empty() ? fileName : outputFileName;
 
         if (getElfType(fileContents).is32Bit)
             patchElf2(ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym, Elf32_Verneed, Elf32_Versym>(fileContents), fileContents, outputFileName2);
