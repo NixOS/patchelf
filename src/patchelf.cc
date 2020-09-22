@@ -778,7 +778,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
     /* Some sections may already be replaced so account for that */
     unsigned int i = 1;
     Elf_Addr pht_size = sizeof(Elf_Ehdr) + (phdrs.size() + num_notes + 1)*sizeof(Elf_Phdr);
-    while( shdrs[i].sh_addr <= pht_size && i < rdi(hdr->e_shnum) ) {
+    while( shdrs[i].sh_offset <= pht_size && i < rdi(hdr->e_shnum) ) {
         if (not haveReplacedSection(getSectionName(shdrs[i])))
             replaceSection(getSectionName(shdrs[i]), shdrs[i].sh_size);
         i++;
