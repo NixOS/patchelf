@@ -12,8 +12,6 @@ cp libbar.so ${SCRATCH}/libsB/
 
 ../src/patchelf --force-rpath --add-rpath $(pwd)/${SCRATCH}/libsA ${SCRATCH}/main
 ../src/patchelf --force-rpath --add-rpath $(pwd)/${SCRATCH}/libsB ${SCRATCH}/main
-#patchelf --add-rpath $(pwd)/${SCRATCH}/libsA ${SCRATCH}/main
-#patchelf --add-rpath $(pwd)/${SCRATCH}/libsB ${SCRATCH}/main
 
 if test "$(uname)" = FreeBSD; then
     export LD_LIBRARY_PATH=$(pwd)/${SCRATCH}/libsB
