@@ -25,6 +25,7 @@ src_TESTS = \
   force-rpath.sh \
   plain-needed.sh \
   output-flag.sh \
+  no-rpath-pie-powerpc.sh \
   build-id.sh
 
 build_TESTS = \

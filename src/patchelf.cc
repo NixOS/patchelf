@@ -136,8 +136,8 @@ private:
         bool operator ()(const Elf_Phdr & x, const Elf_Phdr & y)
         {
             // A PHDR comes before everything else.
-            if (y.p_type == PT_PHDR) return false;
-            if (x.p_type == PT_PHDR) return true;
+            if (elfFile->rdi(y.p_type) == PT_PHDR) return false;
+            if (elfFile->rdi(x.p_type) == PT_PHDR) return true;
 
             // Sort non-PHDRs by address.
             return elfFile->rdi(x.p_paddr) < elfFile->rdi(y.p_paddr);
@@ -453,7 +453,7 @@ unsigned int ElfFile<ElfFileParamNames>::getPageSize() const
     // Architectures (and ABIs) can have different minimum section alignment
     // requirements. There is no authoritative list of these values. The
     // current list is extracted from GNU gold's source code (abi_pagesize).
-    switch (hdr->e_machine) {
+    switch (rdi(hdr->e_machine)) {
       case EM_SPARC:
       case EM_MIPS:
       case EM_PPC:
@@ -665,7 +665,7 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
     for (auto & i : replacedSections) {
         std::string sectionName = i.first;
         Elf_Shdr & shdr = findSection(sectionName);
-        if (shdr.sh_type != SHT_NOBITS)
+        if (rdi(shdr.sh_type) != SHT_NOBITS)
             memset(contents + rdi(shdr.sh_offset), 'X', rdi(shdr.sh_size));
     }
 
@@ -778,9 +778,9 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
     /* Some sections may already be replaced so account for that */
     unsigned int i = 1;
     Elf_Addr pht_size = sizeof(Elf_Ehdr) + (phdrs.size() + num_notes + 1)*sizeof(Elf_Phdr);
-    while( shdrs[i].sh_offset <= pht_size && i < rdi(hdr->e_shnum) ) {
+    while( rdi(shdrs[i].sh_offset) <= pht_size && i < rdi(hdr->e_shnum) ) {
         if (not haveReplacedSection(getSectionName(shdrs[i])))
-            replaceSection(getSectionName(shdrs[i]), shdrs[i].sh_size);
+            replaceSection(getSectionName(shdrs[i]), rdi(shdrs[i].sh_size));
         i++;
     }
 
@@ -835,7 +835,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
     assert(curOff == startOffset + neededSpace);
 
     /* Write out the updated program and section headers */
-    rewriteHeaders(hdr->e_phoff);
+    rewriteHeaders(rdi(hdr->e_phoff));
 }
 
 
