@@ -104,8 +104,6 @@ private:
 
     bool changed = false;
 
-    bool isExecutable = false;
-
     typedef std::string SectionName;
     typedef std::map<SectionName, std::string> ReplacedSections;
 
@@ -416,10 +414,8 @@ ElfFile<ElfFileParamNames>::ElfFile(FileContents fileContents)
         error("program headers have wrong size");
 
     /* Copy the program and section headers. */
-    for (int i = 0; i < rdi(hdr->e_phnum); ++i) {
+    for (int i = 0; i < rdi(hdr->e_phnum); ++i)
         phdrs.push_back(* ((Elf_Phdr *) (contents + rdi(hdr->e_phoff)) + i));
-        if (rdi(phdrs[i].p_type) == PT_INTERP) isExecutable = true;
-    }
 
     for (int i = 0; i < rdi(hdr->e_shnum); ++i)
         shdrs.push_back(* ((Elf_Shdr *) (contents + rdi(hdr->e_shoff)) + i));
@@ -808,10 +804,9 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
        since DYN executables tend to start at virtual address 0, so
        rewriteSectionsExecutable() won't work because it doesn't have
        any virtual address space to grow downwards into. */
-    if (isExecutable && startOffset > startPage) {
+    if (startOffset > startPage)
         debug("shifting new PT_LOAD segment by %d bytes to work around a Linux kernel bug\n", startOffset - startPage);
-        startPage = startOffset;
-    }
+    startPage = startOffset;
 
     /* Add a segment that maps the replaced sections into memory. */
     wri(hdr->e_phoff, sizeof(Elf_Ehdr));
@@ -1281,7 +1276,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
        string. */
     std::vector<std::string> neededLibs;
     Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
-    Elf_Dyn * dynRPath = 0, * dynRunPath = 0;
+    Elf_Dyn * dynRPath = 0, * dynRunPath = 0, * dynReplaceable = 0;
     char * rpath = 0;
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_RPATH) {
@@ -1296,6 +1291,12 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
         }
         else if (rdi(dyn->d_tag) == DT_NEEDED)
             neededLibs.push_back(std::string(strTab + rdi(dyn->d_un.d_val)));
+        /* Try to replace an IGNORE rather than growing and moving the section, if possible */
+        else if (rdi(dyn->d_tag) == DT_IGNORE)
+            dynReplaceable = dyn;
+        /* If we don't find an IGNORE, RELCOUNT/RELACOUNT are redundant and optional, so we can replace those */
+        else if (!dynReplaceable && (rdi(dyn->d_tag) == DT_RELCOUNT || rdi(dyn->d_tag) == DT_RELACOUNT))
+            dynReplaceable = dyn;
     }
 
     if (op == rpPrint) {
@@ -1426,7 +1427,11 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
         if (dynRunPath) dynRunPath->d_un.d_val = shdrDynStr.sh_size;
         if (dynRPath) dynRPath->d_un.d_val = shdrDynStr.sh_size;
     }
-
+    /* Convert an unused or redundant entry to a DT_RPATH or DT_RUNPATH */
+    else if (dynReplaceable) {
+        dynReplaceable->d_un.d_val = shdrDynStr.sh_size;
+        dynReplaceable->d_tag = forceRPath ? DT_RPATH : DT_RUNPATH;
+    }
     else {
         /* There is no DT_RUNPATH entry in the .dynamic section, so we
            have to grow the .dynamic section. */
