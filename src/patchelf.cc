@@ -447,8 +447,8 @@ ElfFile<ElfFileParamNames>::ElfFile(FileContents fileContents)
 
     sectionNames = std::string(shstrtab, shstrtabSize);
 
-    sectionsByOldIndex.resize(hdr->e_shnum);
-    for (unsigned int i = 1; i < rdi(hdr->e_shnum); ++i)
+    sectionsByOldIndex.resize(shdrs.size());
+    for (size_t i = 1; i < shdrs.size(); ++i)
         sectionsByOldIndex[i] = getSectionName(shdrs[i]);
 }
 
