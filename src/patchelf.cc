@@ -428,7 +428,9 @@ ElfFile<ElfFileParamNames>::ElfFile(FileContents fileContents)
        index in the section header table is given by e_shstrndx field
        of the ELF header. */
     unsigned int shstrtabIndex = rdi(hdr->e_shstrndx);
-    assert(shstrtabIndex < shdrs.size());
+    if (shstrtabIndex >= shdrs.size())
+        error("string table index out of bounds");
+
     unsigned int shstrtabSize = rdi(shdrs[shstrtabIndex].sh_size);
     char * shstrtab = (char * ) contents + rdi(shdrs[shstrtabIndex].sh_offset);
     checkPointer(fileContents, shstrtab, shstrtabSize);
