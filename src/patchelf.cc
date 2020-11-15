@@ -436,7 +436,9 @@ ElfFile<ElfFileParamNames>::ElfFile(FileContents fileContents)
     char * shstrtab = (char * ) contents + rdi(shdrs[shstrtabIndex].sh_offset);
     checkPointer(fileContents, shstrtab, shstrtabSize);
 
-    assert(shstrtabSize > 0);
+    if (shstrtabSize == 0)
+        error("string table size is zero");
+
     assert(shstrtab[shstrtabSize - 1] == 0);
 
     sectionNames = std::string(shstrtab, shstrtabSize);
