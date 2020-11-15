@@ -418,7 +418,10 @@ ElfFile<ElfFileParamNames>::ElfFile(FileContents fileContents)
 
     /* Copy the program and section headers. */
     for (int i = 0; i < rdi(hdr->e_phnum); ++i) {
-        phdrs.push_back(* ((Elf_Phdr *) (contents + rdi(hdr->e_phoff)) + i));
+        Elf_Phdr *phdr = (Elf_Phdr *) (contents + rdi(hdr->e_phoff)) + i;
+
+        checkPointer(fileContents, phdr, sizeof(*phdr));
+        phdrs.push_back(*phdr);
         if (rdi(phdrs[i].p_type) == PT_INTERP) isExecutable = true;
     }
 
