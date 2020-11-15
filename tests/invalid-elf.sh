@@ -15,7 +15,7 @@ TEST_DIR=$(dirname $(readlink -f $0))/invalid-elf
 
 # Each test case is listed here. The names should roughly indicate
 # what makes the given ELF file invalid.
-TEST_CASES="invalid-shrstrtab-idx invalid-shrstrtab-size"
+TEST_CASES="invalid-shrstrtab-idx invalid-shrstrtab-size invalid-shrstrtab-zero"
 
 FAILED_TESTS=""
 
