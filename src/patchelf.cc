@@ -425,8 +425,12 @@ ElfFile<ElfFileParamNames>::ElfFile(FileContents fileContents)
         if (rdi(phdrs[i].p_type) == PT_INTERP) isExecutable = true;
     }
 
-    for (int i = 0; i < rdi(hdr->e_shnum); ++i)
-        shdrs.push_back(* ((Elf_Shdr *) (contents + rdi(hdr->e_shoff)) + i));
+    for (int i = 0; i < rdi(hdr->e_shnum); ++i) {
+        Elf_Shdr *shdr = (Elf_Shdr *) (contents + rdi(hdr->e_shoff)) + i;
+
+        checkPointer(fileContents, shdr, sizeof(*shdr));
+        shdrs.push_back(*shdr);
+    }
 
     /* Get the section header string table section (".shstrtab").  Its
        index in the section header table is given by e_shstrndx field
