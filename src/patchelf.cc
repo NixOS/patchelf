@@ -600,7 +600,12 @@ void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, Elf_Addr sta
 template<ElfFileParams>
 std::string ElfFile<ElfFileParamNames>::getSectionName(const Elf_Shdr & shdr) const
 {
-    return std::string(sectionNames.c_str() + rdi(shdr.sh_name));
+    const size_t name_off = rdi(shdr.sh_name);
+
+    if (name_off >= sectionNames.size())
+        error("section name offset out of bounds");
+
+    return std::string(sectionNames.c_str() + name_off);
 }
 
 
