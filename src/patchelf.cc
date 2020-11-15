@@ -381,7 +381,8 @@ ElfType getElfType(const FileContents & fileContents)
 static void checkPointer(const FileContents & contents, void * p, unsigned int size)
 {
     unsigned char * q = (unsigned char *) p;
-    assert(q >= contents->data() && q + size <= contents->data() + contents->size());
+    if (!(q >= contents->data() && q + size <= contents->data() + contents->size()))
+        error("data region extends past file end");
 }
 
 
