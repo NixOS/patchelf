@@ -439,7 +439,8 @@ ElfFile<ElfFileParamNames>::ElfFile(FileContents fileContents)
     if (shstrtabSize == 0)
         error("string table size is zero");
 
-    assert(shstrtab[shstrtabSize - 1] == 0);
+    if (shstrtab[shstrtabSize - 1] != 0)
+        error("string table is not zero terminated");
 
     sectionNames = std::string(shstrtab, shstrtabSize);
 
