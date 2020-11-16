@@ -381,7 +381,8 @@ ElfType getElfType(const FileContents & fileContents)
 static void checkPointer(const FileContents & contents, void * p, unsigned int size)
 {
     unsigned char * q = (unsigned char *) p;
-    assert(q >= contents->data() && q + size <= contents->data() + contents->size());
+    if (!(q >= contents->data() && q + size <= contents->data() + contents->size()))
+        error("data region extends past file end");
 }
 
 
@@ -417,29 +418,41 @@ ElfFile<ElfFileParamNames>::ElfFile(FileContents fileContents)
 
     /* Copy the program and section headers. */
     for (int i = 0; i < rdi(hdr->e_phnum); ++i) {
-        phdrs.push_back(* ((Elf_Phdr *) (contents + rdi(hdr->e_phoff)) + i));
+        Elf_Phdr *phdr = (Elf_Phdr *) (contents + rdi(hdr->e_phoff)) + i;
+
+        checkPointer(fileContents, phdr, sizeof(*phdr));
+        phdrs.push_back(*phdr);
         if (rdi(phdrs[i].p_type) == PT_INTERP) isExecutable = true;
     }
 
-    for (int i = 0; i < rdi(hdr->e_shnum); ++i)
-        shdrs.push_back(* ((Elf_Shdr *) (contents + rdi(hdr->e_shoff)) + i));
+    for (int i = 0; i < rdi(hdr->e_shnum); ++i) {
+        Elf_Shdr *shdr = (Elf_Shdr *) (contents + rdi(hdr->e_shoff)) + i;
+
+        checkPointer(fileContents, shdr, sizeof(*shdr));
+        shdrs.push_back(*shdr);
+    }
 
     /* Get the section header string table section (".shstrtab").  Its
        index in the section header table is given by e_shstrndx field
        of the ELF header. */
     unsigned int shstrtabIndex = rdi(hdr->e_shstrndx);
-    assert(shstrtabIndex < shdrs.size());
+    if (shstrtabIndex >= shdrs.size())
+        error("string table index out of bounds");
+
     unsigned int shstrtabSize = rdi(shdrs[shstrtabIndex].sh_size);
     char * shstrtab = (char * ) contents + rdi(shdrs[shstrtabIndex].sh_offset);
     checkPointer(fileContents, shstrtab, shstrtabSize);
 
-    assert(shstrtabSize > 0);
-    assert(shstrtab[shstrtabSize - 1] == 0);
+    if (shstrtabSize == 0)
+        error("string table size is zero");
+
+    if (shstrtab[shstrtabSize - 1] != 0)
+        error("string table is not zero terminated");
 
     sectionNames = std::string(shstrtab, shstrtabSize);
 
-    sectionsByOldIndex.resize(hdr->e_shnum);
-    for (unsigned int i = 1; i < rdi(hdr->e_shnum); ++i)
+    sectionsByOldIndex.resize(shdrs.size());
+    for (size_t i = 1; i < shdrs.size(); ++i)
         sectionsByOldIndex[i] = getSectionName(shdrs[i]);
 }
 
@@ -594,7 +607,12 @@ void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, Elf_Addr sta
 template<ElfFileParams>
 std::string ElfFile<ElfFileParamNames>::getSectionName(const Elf_Shdr & shdr) const
 {
-    return std::string(sectionNames.c_str() + rdi(shdr.sh_name));
+    const size_t name_off = rdi(shdr.sh_name);
+
+    if (name_off >= sectionNames.size())
+        error("section name offset out of bounds");
+
+    return std::string(sectionNames.c_str() + name_off);
 }
 
 
