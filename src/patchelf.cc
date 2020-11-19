@@ -687,6 +687,7 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
             memset(contents + rdi(shdr.sh_offset), 'X', rdi(shdr.sh_size));
     }
 
+    std::set<unsigned int> noted_phdrs = {};
     for (auto & i : replacedSections) {
         std::string sectionName = i.first;
         auto & shdr = findSection(sectionName);
@@ -739,7 +740,7 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
                 shdr.sh_addralign = orig_shdr.sh_addralign;
 
             for (unsigned int j = 0; j < phdrs.size(); ++j)
-                if (rdi(phdrs[j].p_type) == PT_NOTE) {
+                if (rdi(phdrs[j].p_type) == PT_NOTE && noted_phdrs.find(j) == noted_phdrs.end()) {
                     Elf_Off p_start = rdi(phdrs[j].p_offset);
                     Elf_Off p_end = p_start + rdi(phdrs[j].p_filesz);
                     Elf_Off s_start = rdi(orig_shdr.sh_offset);
@@ -757,6 +758,8 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
                     phdrs[j].p_offset = shdr.sh_offset;
                     phdrs[j].p_vaddr = phdrs[j].p_paddr = shdr.sh_addr;
                     phdrs[j].p_filesz = phdrs[j].p_memsz = shdr.sh_size;
+
+                    noted_phdrs.insert(j);
                 }
         }
 
