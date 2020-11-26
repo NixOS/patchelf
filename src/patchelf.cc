@@ -1939,6 +1939,9 @@ int mainWrapped(int argc, char * * argv)
     if (!outputFileName.empty() && fileNames.size() != 1)
         error("--output option only allowed with single input file");
 
+    if (setRPath && addRPath)
+        error("--set-rpath option not allowed with --add-rpath");
+
     patchElf();
 
     return 0;
