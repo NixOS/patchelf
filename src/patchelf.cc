@@ -118,8 +118,7 @@ private:
     std::vector<SectionName> sectionsByOldIndex;
 
 public:
-
-    ElfFile(FileContents fileContents);
+    explicit ElfFile(FileContents fileContents);
 
     bool isChanged()
     {
@@ -289,7 +288,7 @@ std::string fmt(Args... args)
 struct SysError : std::runtime_error
 {
     int errNo;
-    SysError(const std::string & msg)
+    explicit SysError(const std::string & msg)
         : std::runtime_error(fmt(msg + ": " + strerror(errno)))
         , errNo(errno)
     { }
