@@ -641,7 +641,7 @@ unsigned int ElfFile<ElfFileParamNames>::findSection3(const SectionName & sectio
 template<ElfFileParams>
 bool ElfFile<ElfFileParamNames>::haveReplacedSection(const SectionName & sectionName) const
 {
-    return (replacedSections.find(sectionName) != replacedSections.end());
+    return replacedSections.count(sectionName);
 }
 
 template<ElfFileParams>
@@ -734,7 +734,7 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
                 shdr.sh_addralign = orig_shdr.sh_addralign;
 
             for (unsigned int j = 0; j < phdrs.size(); ++j)
-                if (rdi(phdrs[j].p_type) == PT_NOTE && noted_phdrs.find(j) == noted_phdrs.end()) {
+                if (rdi(phdrs[j].p_type) == PT_NOTE && !noted_phdrs.count(j)) {
                     Elf_Off p_start = rdi(phdrs[j].p_offset);
                     Elf_Off p_end = p_start + rdi(phdrs[j].p_filesz);
                     Elf_Off s_start = rdi(orig_shdr.sh_offset);
@@ -781,8 +781,8 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
 
     /* When normalizing note segments we will in the worst case be adding
        1 program header for each SHT_NOTE section. */
-    unsigned int num_notes = std::count_if(shdrs.begin(), shdrs.end(), [this](Elf_Shdr shdr) { return rdi(shdr.sh_type) == SHT_NOTE; });
-    ;
+    unsigned int num_notes = std::count_if(shdrs.begin(), shdrs.end(),
+        [this](Elf_Shdr shdr) { return rdi(shdr.sh_type) == SHT_NOTE; });
 
     /* Because we're adding a new section header, we're necessarily increasing
        the size of the program header table.  This can cause the first section
@@ -864,7 +864,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
     unsigned int lastReplaced = 0;
     for (unsigned int i = 1; i < rdi(hdr->e_shnum); ++i) {
         std::string sectionName = getSectionName(shdrs[i]);
-        if (replacedSections.find(sectionName) != replacedSections.end()) {
+        if (replacedSections.count(sectionName)) {
             debug("using replaced section '%s'\n", sectionName.c_str());
             lastReplaced = i;
         }
@@ -896,7 +896,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
             lastReplaced = i - 1;
             break;
         }
-        if (replacedSections.find(sectionName) == replacedSections.end()) {
+        if (!replacedSections.count(sectionName)) {
             debug("replacing section '%s' which is in the way\n", sectionName.c_str());
             replaceSection(sectionName, rdi(shdr.sh_size));
         }
@@ -983,7 +983,8 @@ void ElfFile<ElfFileParamNames>::normalizeNoteSegments()
        one of them has to be replaced. */
 
     /* We don't need to do anything if no note segments were replaced. */
-    bool replaced_note = std::any_of(replacedSections.begin(), replacedSections.end(), [this](std::pair<const std::string, std::string> & i) { return rdi(findSection(i.first).sh_type) == SHT_NOTE; });
+    bool replaced_note = std::any_of(replacedSections.begin(), replacedSections.end(),
+        [this](std::pair<const std::string, std::string> & i) { return rdi(findSection(i.first).sh_type) == SHT_NOTE; });
     if (!replaced_note) return;
 
     for (auto & phdr : phdrs) {
@@ -1470,7 +1471,7 @@ void ElfFile<ElfFileParamNames>::removeNeeded(const std::set<std::string> & libs
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_NEEDED) {
             char * name = strTab + rdi(dyn->d_un.d_val);
-            if (libs.find(name) != libs.end()) {
+            if (libs.count(name)) {
                 debug("removing DT_NEEDED entry '%s'\n", name);
                 changed = true;
             } else {
@@ -1589,7 +1590,8 @@ void ElfFile<ElfFileParamNames>::addNeeded(const std::set<std::string> & libs)
     auto shdrDynStr = findSection(".dynstr");
 
     /* add all new libs to the dynstr string table */
-    unsigned int length = std::count_if(libs.begin(), libs.end(), [](const std::string & lib) { return lib.size() + 1; });
+    unsigned int length = std::count_if(libs.begin(), libs.end(),
+        [](const std::string & lib) { return lib.size() + 1; });
 
     std::string & newDynStr = replaceSection(".dynstr",
         rdi(shdrDynStr.sh_size) + length + 1);
@@ -1703,7 +1705,7 @@ void ElfFile<ElfFileParamNames>::clearSymbolVersions(const std::set<std::string>
     for (size_t i = 0; i < count; i++) {
         auto dynsym = dynsyms[i];
         auto name = strTab + rdi(dynsym.st_name);
-        if (syms.find(name) != syms.end()) {
+        if (syms.count(name)) {
             debug("clearing symbol version for %s\n", name);
             wri(versyms[i], 1);
         }
