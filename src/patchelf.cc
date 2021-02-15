@@ -699,23 +699,25 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
         /* If this is the .interp section, then the PT_INTERP segment
            must be sync'ed with it. */
         if (sectionName == ".interp") {
-            for (unsigned int j = 0; j < phdrs.size(); ++j)
-                if (rdi(phdrs[j].p_type) == PT_INTERP) {
-                    phdrs[j].p_offset = shdr.sh_offset;
-                    phdrs[j].p_vaddr = phdrs[j].p_paddr = shdr.sh_addr;
-                    phdrs[j].p_filesz = phdrs[j].p_memsz = shdr.sh_size;
+            for (auto & phdr : phdrs) {
+                if (rdi(phdr.p_type) == PT_INTERP) {
+                    phdr.p_offset = shdr.sh_offset;
+                    phdr.p_vaddr = phdr.p_paddr = shdr.sh_addr;
+                    phdr.p_filesz = phdr.p_memsz = shdr.sh_size;
                 }
+            }
         }
 
         /* If this is the .dynamic section, then the PT_DYNAMIC segment
            must be sync'ed with it. */
         if (sectionName == ".dynamic") {
-            for (unsigned int j = 0; j < phdrs.size(); ++j)
-                if (rdi(phdrs[j].p_type) == PT_DYNAMIC) {
-                    phdrs[j].p_offset = shdr.sh_offset;
-                    phdrs[j].p_vaddr = phdrs[j].p_paddr = shdr.sh_addr;
-                    phdrs[j].p_filesz = phdrs[j].p_memsz = shdr.sh_size;
+            for (auto & phdr : phdrs) {
+                if (rdi(phdr.p_type) == PT_DYNAMIC) {
+                    phdr.p_offset = shdr.sh_offset;
+                    phdr.p_vaddr = phdr.p_paddr = shdr.sh_addr;
+                    phdr.p_filesz = phdr.p_memsz = shdr.sh_size;
                 }
+            }
         }
 
         /* If this is a note section, there might be a PT_NOTE segment that
@@ -770,8 +772,8 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
        PT_LOAD segment located directly after the last virtual address
        page of other segments. */
     Elf_Addr startPage = 0;
-    for (unsigned int i = 0; i < phdrs.size(); ++i) {
-        Elf_Addr thisPage = roundUp(rdi(phdrs[i].p_vaddr) + rdi(phdrs[i].p_memsz), getPageSize());
+    for (auto & phdr : phdrs) {
+        Elf_Addr thisPage = roundUp(rdi(phdr.p_vaddr) + rdi(phdr.p_memsz), getPageSize());
         if (thisPage > startPage) startPage = thisPage;
     }
 
@@ -984,9 +986,7 @@ void ElfFile<ElfFileParamNames>::normalizeNoteSegments()
     bool replaced_note = std::any_of(replacedSections.begin(), replacedSections.end(), [this](std::pair<const std::string, std::string> & i) { return rdi(findSection(i.first).sh_type) == SHT_NOTE; });
     if (!replaced_note) return;
 
-    size_t orig_count = phdrs.size();
-    for (size_t i = 0; i < orig_count; ++i) {
-        auto & phdr = phdrs[i];
+    for (auto & phdr : phdrs) {
         if (rdi(phdr.p_type) != PT_NOTE) continue;
 
         size_t start_off = rdi(phdr.p_offset);
@@ -1056,11 +1056,11 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
 
     /* If there is a segment for the program header table, update it.
        (According to the ELF spec, there can only be one.) */
-    for (unsigned int i = 0; i < phdrs.size(); ++i) {
-        if (rdi(phdrs[i].p_type) == PT_PHDR) {
-            phdrs[i].p_offset = hdr->e_phoff;
-            wri(phdrs[i].p_vaddr, wri(phdrs[i].p_paddr, phdrAddress));
-            wri(phdrs[i].p_filesz, wri(phdrs[i].p_memsz, phdrs.size() * sizeof(Elf_Phdr)));
+    for (auto phdr : phdrs) {
+        if (rdi(phdr.p_type) == PT_PHDR) {
+            phdr.p_offset = hdr->e_phoff;
+            wri(phdr.p_vaddr, wri(phdr.p_paddr, phdrAddress));
+            wri(phdr.p_filesz, wri(phdr.p_memsz, phdrs.size() * sizeof(Elf_Phdr)));
             break;
         }
     }
