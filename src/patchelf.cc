@@ -79,9 +79,7 @@ static std::vector<std::string> splitColonDelimitedString(const char * s)
 
 static bool hasAllowedPrefix(const std::string & s, const std::vector<std::string> & allowedPrefixes)
 {
-    for (auto & i : allowedPrefixes)
-        if (!s.compare(0, i.size(), i)) return true;
-    return false;
+    return std::any_of(allowedPrefixes.begin(), allowedPrefixes.end(), [&](const std::string & i) { return !s.compare(0, i.size(), i); });
 }
 
 
@@ -787,10 +785,8 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
 
     /* When normalizing note segments we will in the worst case be adding
        1 program header for each SHT_NOTE section. */
-    unsigned int num_notes = 0;
-    for (const auto & shdr : shdrs)
-        if (rdi(shdr.sh_type) == SHT_NOTE)
-            num_notes++;
+    unsigned int num_notes = std::count_if(shdrs.begin(), shdrs.end(), [this](Elf_Shdr shdr) { return rdi(shdr.sh_type) == SHT_NOTE; });
+    ;
 
     /* Because we're adding a new section header, we're necessarily increasing
        the size of the program header table.  This can cause the first section
@@ -992,11 +988,7 @@ void ElfFile<ElfFileParamNames>::normalizeNoteSegments()
        one of them has to be replaced. */
 
     /* We don't need to do anything if no note segments were replaced. */
-    bool replaced_note = false;
-    for (const auto & i : replacedSections) {
-        if (rdi(findSection(i.first).sh_type) == SHT_NOTE)
-            replaced_note = true;
-    }
+    bool replaced_note = std::any_of(replacedSections.begin(), replacedSections.end(), [this](std::pair<const std::string, std::string> & i) { return rdi(findSection(i.first).sh_type) == SHT_NOTE; });
     if (!replaced_note) return;
 
     size_t orig_count = phdrs.size();
@@ -1604,8 +1596,7 @@ void ElfFile<ElfFileParamNames>::addNeeded(const std::set<std::string> & libs)
     auto shdrDynStr = findSection(".dynstr");
 
     /* add all new libs to the dynstr string table */
-    unsigned int length = 0;
-    for (auto & i : libs) length += i.size() + 1;
+    unsigned int length = std::count_if(libs.begin(), libs.end(), [](const std::string & lib) { return lib.size() + 1; });
 
     std::string & newDynStr = replaceSection(".dynstr",
         rdi(shdrDynStr.sh_size) + length + 1);
