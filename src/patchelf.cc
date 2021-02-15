@@ -1783,7 +1783,7 @@ static void patchElf2(ElfFile && elfFile, const FileContents & fileContents, std
 
 static void patchElf()
 {
-    for (auto fileName : fileNames) {
+    for (const auto & fileName : fileNames) {
         if (!printInterpreter && !printRPath && !printSoname && !printNeeded)
             debug("patching ELF file '%s'\n", fileName.c_str());
 
