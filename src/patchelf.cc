@@ -315,10 +315,10 @@ static FileContents readFile(const std::string & fileName,
     if (stat(fileName.c_str(), &st) != 0)
         throw SysError(fmt("getting info about '", fileName, "'"));
 
-    if ((uint64_t) st.st_size > (uint64_t) std::numeric_limits<size_t>::max())
+    if (static_cast<uint64_t>(st.st_size) > static_cast<uint64_t>(std::numeric_limits<size_t>::max()))
         throw SysError(fmt("cannot read file of size ", st.st_size, " into memory"));
 
-    size_t size = std::min(cutOff, (size_t) st.st_size);
+    size_t size = std::min(cutOff, static_cast<size_t>(st.st_size));
 
     FileContents contents = std::make_shared<std::vector<unsigned char>>();
     contents->reserve(size + 32 * 1024 * 1024);
@@ -351,7 +351,8 @@ struct ElfType
 ElfType getElfType(const FileContents & fileContents)
 {
     /* Check the ELF header for basic validity. */
-    if (fileContents->size() < (off_t) sizeof(Elf32_Ehdr)) error("missing ELF header");
+    if (fileContents->size() < static_cast<off_t>(sizeof(Elf32_Ehdr)))
+        error("missing ELF header");
 
     auto contents = fileContents->data();
 
@@ -367,13 +368,13 @@ ElfType getElfType(const FileContents & fileContents)
     bool is32Bit = contents[EI_CLASS] == ELFCLASS32;
 
     // FIXME: endianness
-    return ElfType{is32Bit, is32Bit ? ((Elf32_Ehdr *) contents)->e_machine : ((Elf64_Ehdr *) contents)->e_machine};
+    return ElfType { is32Bit, is32Bit ? (reinterpret_cast<Elf32_Ehdr *>(contents))->e_machine : (reinterpret_cast<Elf64_Ehdr *>(contents))->e_machine };
 }
 
 
 static void checkPointer(const FileContents & contents, void * p, unsigned int size)
 {
-    unsigned char * q = (unsigned char *) p;
+    unsigned char * q = static_cast<unsigned char *>(p);
     if (!(q >= contents->data() && q + size <= contents->data() + contents->size()))
         error("data region extends past file end");
 }
