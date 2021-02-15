@@ -299,8 +299,7 @@ __attribute__((noreturn)) static void error(const std::string & msg)
 {
     if (errno)
         throw SysError(msg);
-    else
-        throw std::runtime_error(msg);
+    throw std::runtime_error(msg);
 }
 
 static void growFile(const FileContents & contents, size_t newSize)
@@ -895,11 +894,10 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
             startAddr = rdi(shdr.sh_addr);
             lastReplaced = i - 1;
             break;
-        } else {
-            if (replacedSections.find(sectionName) == replacedSections.end()) {
-                debug("replacing section '%s' which is in the way\n", sectionName.c_str());
-                replaceSection(sectionName, rdi(shdr.sh_size));
-            }
+        }
+        if (replacedSections.find(sectionName) == replacedSections.end()) {
+            debug("replacing section '%s' which is in the way\n", sectionName.c_str());
+            replaceSection(sectionName, rdi(shdr.sh_size));
         }
         prevSection = sectionName;
     }
