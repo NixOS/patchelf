@@ -295,8 +295,7 @@ struct SysError : std::runtime_error
     { }
 };
 
-
-__attribute__((noreturn)) static void error(std::string msg)
+__attribute__((noreturn)) static void error(const std::string & msg)
 {
     if (errno)
         throw SysError(msg);
@@ -304,16 +303,14 @@ __attribute__((noreturn)) static void error(std::string msg)
         throw std::runtime_error(msg);
 }
 
-
-static void growFile(FileContents contents, size_t newSize)
+static void growFile(const FileContents & contents, size_t newSize)
 {
     if (newSize > contents->capacity()) error("maximum file size exceeded");
     if (newSize <= contents->size()) return;
     contents->resize(newSize, 0);
 }
 
-
-static FileContents readFile(std::string fileName,
+static FileContents readFile(const std::string & fileName,
     size_t cutOff = std::numeric_limits<size_t>::max())
 {
     struct stat st;
@@ -530,8 +527,7 @@ void ElfFile<ElfFileParamNames>::sortShdrs()
     wri(hdr->e_shstrndx, findSection3(shstrtabName));
 }
 
-
-static void writeFile(std::string fileName, FileContents contents)
+static void writeFile(const std::string & fileName, const FileContents & contents)
 {
     debug("writing %s\n", fileName.c_str());
 
