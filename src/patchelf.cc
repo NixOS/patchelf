@@ -1200,7 +1200,7 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string &
 
     if (op == printSoname) {
         if (soname) {
-            if (std::string(soname ? soname : "") == "")
+            if (std::string(soname ? soname : "").empty())
                 debug("DT_SONAME is empty\n");
             else
                 printf("%s\n", soname);
@@ -1744,7 +1744,7 @@ static void patchElf2(ElfFile && elfFile, const FileContents & fileContents, std
     if (setSoname)
         elfFile.modifySoname(elfFile.replaceSoname, newSoname);
 
-    if (newInterpreter != "")
+    if (!newInterpreter.empty())
         elfFile.setInterpreter(newInterpreter);
 
     if (printRPath)
