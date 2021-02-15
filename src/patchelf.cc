@@ -634,7 +634,7 @@ template<ElfFileParams>
 Elf_Shdr * ElfFile<ElfFileParamNames>::findSection2(const SectionName & sectionName)
 {
     auto i = findSection3(sectionName);
-    return i ? &shdrs[i] : 0;
+    return i ? &shdrs[i] : nullptr;
 }
 
 
@@ -1201,8 +1201,8 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string &
 
     /* Walk through the dynamic section, look for the DT_SONAME entry. */
     Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
-    Elf_Dyn * dynSoname = 0;
-    char * soname = 0;
+    Elf_Dyn * dynSoname = nullptr;
+    char * soname = nullptr;
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_SONAME) {
             dynSoname = dyn;
@@ -1302,8 +1302,8 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
        string. */
     std::vector<std::string> neededLibs;
     Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
-    Elf_Dyn * dynRPath = 0, * dynRunPath = 0;
-    char * rpath = 0;
+    Elf_Dyn *dynRPath = nullptr, *dynRunPath = nullptr;
+    char * rpath = nullptr;
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_RPATH) {
             dynRPath = dyn;
@@ -1404,12 +1404,12 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
     if (!forceRPath && dynRPath && !dynRunPath) { /* convert DT_RPATH to DT_RUNPATH */
         wri(dynRPath->d_tag, DT_RUNPATH);
         dynRunPath = dynRPath;
-        dynRPath = 0;
+        dynRPath = nullptr;
         changed = true;
     } else if (forceRPath && dynRunPath) { /* convert DT_RUNPATH to DT_RPATH */
         wri(dynRunPath->d_tag, DT_RPATH);
         dynRPath = dynRunPath;
-        dynRunPath = 0;
+        dynRunPath = nullptr;
         changed = true;
     }
 
@@ -1666,7 +1666,7 @@ void ElfFile<ElfFileParamNames>::noDefaultLib()
     auto shdrDynamic = findSection(".dynamic");
 
     Elf_Dyn * dyn = (Elf_Dyn *) (contents + rdi(shdrDynamic.sh_offset));
-    Elf_Dyn * dynFlags1 = 0;
+    Elf_Dyn * dynFlags1 = nullptr;
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_FLAGS_1) {
             dynFlags1 = dyn;
@@ -1841,7 +1841,8 @@ int mainWrapped(int argc, char * * argv)
         return 1;
     }
 
-    if (getenv("PATCHELF_DEBUG") != 0) debugMode = true;
+    if (getenv("PATCHELF_DEBUG") != nullptr)
+        debugMode = true;
 
     int i;
     for (i = 1; i < argc; ++i) {
