@@ -397,13 +397,13 @@ ElfFile<ElfFileParamNames>::ElfFile(FileContents fileContents)
     if (rdi(hdr->e_type) != ET_EXEC && rdi(hdr->e_type) != ET_DYN)
         error("wrong ELF type");
 
-    if (size_t(rdi(hdr->e_phoff) + rdi(hdr->e_phnum)) * rdi(hdr->e_phentsize) > fileContents->size())
+    if (rdi(hdr->e_phoff) + size_t(rdi(hdr->e_phnum) * rdi(hdr->e_phentsize)) > fileContents->size())
         error("program header table out of bounds");
 
     if (rdi(hdr->e_shnum) == 0)
         error("no section headers. The input file is probably a statically linked, self-decompressing binary");
 
-    if (size_t(rdi(hdr->e_shoff) + rdi(hdr->e_shnum)) * rdi(hdr->e_shentsize) > fileContents->size())
+    if (rdi(hdr->e_shoff) + size_t(rdi(hdr->e_shnum) * rdi(hdr->e_shentsize)) > fileContents->size())
         error("section header table out of bounds");
 
     if (rdi(hdr->e_phentsize) != sizeof(Elf_Phdr))
