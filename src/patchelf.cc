@@ -581,18 +581,6 @@ void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, Elf_Addr sta
             wri(phdrs[i].p_align, getPageSize());
         }
     }
-
-    /* Add a segment that maps the new program/section headers and
-       PT_INTERP segment into memory.  Otherwise glibc will choke. */
-    phdrs.resize(rdi(hdr->e_phnum) + 1);
-    wri(hdr->e_phnum, rdi(hdr->e_phnum) + 1);
-    Elf_Phdr & phdr = phdrs[rdi(hdr->e_phnum) - 1];
-    wri(phdr.p_type, PT_LOAD);
-    wri(phdr.p_offset, 0);
-    wri(phdr.p_vaddr, wri(phdr.p_paddr, startPage));
-    wri(phdr.p_filesz, wri(phdr.p_memsz, shift));
-    wri(phdr.p_flags, PF_R | PF_W);
-    wri(phdr.p_align, getPageSize());
 }
 
 
@@ -957,6 +945,18 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
         startOffset += neededPages * getPageSize();
 
         shiftFile(neededPages, firstPage);
+
+        /* Add a segment that maps the new program/section headers and
+           PT_INTERP segment into memory.  Otherwise glibc will choke. */
+        phdrs.resize(rdi(hdr->e_phnum) + 1);
+        wri(hdr->e_phnum, rdi(hdr->e_phnum) + 1);
+        Elf_Phdr & phdr = phdrs[rdi(hdr->e_phnum) - 1];
+        wri(phdr.p_type, PT_LOAD);
+        wri(phdr.p_offset, 0);
+        wri(phdr.p_vaddr, wri(phdr.p_paddr, firstPage));
+        wri(phdr.p_filesz, wri(phdr.p_memsz, neededSpace));
+        wri(phdr.p_flags, PF_R | PF_W); // Can this be read-only?
+        wri(phdr.p_align, getPageSize());
     }
 
 
