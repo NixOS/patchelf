@@ -1346,7 +1346,8 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
                 if (!neededLibFound[j]) {
                     std::string libName = dirName + "/" + neededLibs[j];
                     try {
-                        if (getElfType(readFile(libName, sizeof(Elf32_Ehdr))).machine == rdi(hdr->e_machine)) {
+                        Elf32_Half library_e_machine = getElfType(readFile(libName, sizeof(Elf32_Ehdr))).machine;
+                        if (rdi(library_e_machine) == rdi(hdr->e_machine)) {
                             neededLibFound[j] = true;
                             libFound = true;
                         } else
