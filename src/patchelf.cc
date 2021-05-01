@@ -1000,8 +1000,9 @@ void ElfFile<ElfFileParamNames>::normalizeNoteSegments()
             size_t size = 0;
             for (const auto & shdr : shdrs) {
                 if (rdi(shdr.sh_type) != SHT_NOTE) continue;
-                if (rdi(shdr.sh_offset) != curr_off) continue;
+                if (rdi(shdr.sh_offset) != roundUp(curr_off, rdi(shdr.sh_addralign))) continue;
                 size = rdi(shdr.sh_size);
+                curr_off = roundUp(curr_off, rdi(shdr.sh_addralign));
                 break;
             }
             if (size == 0)
