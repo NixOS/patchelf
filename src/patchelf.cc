@@ -1025,6 +1025,8 @@ void ElfFile<ElfFileParamNames>::normalizeNoteSegments()
                 phdrs.push_back(new_phdr);
 
             curr_off += size;
+            /* The next section offset would be aligned */
+            curr_off = roundUp(curr_off, sectionAlignment);
         }
     }
     wri(hdr->e_phnum, phdrs.size());
