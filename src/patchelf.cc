@@ -1060,7 +1060,7 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
 
     /* If there is a segment for the program header table, update it.
        (According to the ELF spec, there can only be one.) */
-    for (auto &phdr : phdrs) {
+    for (auto & phdr : phdrs) {
         if (rdi(phdr.p_type) == PT_PHDR) {
             phdr.p_offset = hdr->e_phoff;
             wri(phdr.p_vaddr, wri(phdr.p_paddr, phdrAddress));
