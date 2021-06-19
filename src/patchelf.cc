@@ -772,12 +772,15 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
        PT_LOAD segment located directly after the last virtual address
        page of other segments. */
     Elf_Addr startPage = 0;
+    Elf_Addr firstPage = 0;
     for (auto & phdr : phdrs) {
         Elf_Addr thisPage = roundUp(rdi(phdr.p_vaddr) + rdi(phdr.p_memsz), getPageSize());
         if (thisPage > startPage) startPage = thisPage;
+        if (rdi(phdr.p_type) == PT_PHDR) firstPage = rdi(phdr.p_vaddr) - rdi(phdr.p_offset);
     }
 
     debug("last page is 0x%llx\n", (unsigned long long) startPage);
+    debug("first page is 0x%llx\n", (unsigned long long) firstPage);
 
     /* When normalizing note segments we will in the worst case be adding
        1 program header for each SHT_NOTE section. */
@@ -848,7 +851,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
     assert(curOff == startOffset + neededSpace);
 
     /* Write out the updated program and section headers */
-    rewriteHeaders(rdi(hdr->e_phoff));
+    rewriteHeaders(firstPage + hdr->e_phoff);
 }
 
 
@@ -1057,7 +1060,7 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
 
     /* If there is a segment for the program header table, update it.
        (According to the ELF spec, there can only be one.) */
-    for (auto phdr : phdrs) {
+    for (auto & phdr : phdrs) {
         if (rdi(phdr.p_type) == PT_PHDR) {
             phdr.p_offset = hdr->e_phoff;
             wri(phdr.p_vaddr, wri(phdr.p_paddr, phdrAddress));
