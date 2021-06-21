@@ -851,7 +851,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
     assert(curOff == startOffset + neededSpace);
 
     /* Write out the updated program and section headers */
-    rewriteHeaders(firstPage + hdr->e_phoff);
+    rewriteHeaders(firstPage + rdi(hdr->e_phoff));
 }
 
 
