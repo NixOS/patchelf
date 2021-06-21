@@ -67,6 +67,13 @@ libraries.  In particular, it can do the following:
   $ patchelf --set-soname libnewname.so.3.4.5 path/to/libmylibrary.so.1.2.3
   ```
 
+## Use in NixOS
+
+On NixOS you can find the interpreter as follows:
+
+```console
+patchelf --set-interpreter $(< "$NIX_CC/nix-support/dynamic-linker") my-progam
+```
 
 ## Compiling and Testing
 
