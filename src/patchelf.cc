@@ -757,6 +757,18 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
                 }
         }
 
+        /* If there is .MIPS.abiflags section, then the PT_MIPS_ABIFLAGS
+           segment must be sync'ed with it. */
+        if (sectionName == ".MIPS.abiflags") {
+            for (auto & phdr : phdrs) {
+                if (rdi(phdr.p_type) == PT_MIPS_ABIFLAGS) {
+                    phdr.p_offset = shdr.sh_offset;
+                    phdr.p_vaddr = phdr.p_paddr = shdr.sh_addr;
+                    phdr.p_filesz = phdr.p_memsz = shdr.sh_size;
+                }
+            }
+        }
+
         curOff += roundUp(i.second.size(), sectionAlignment);
     }
 
@@ -1088,9 +1100,9 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
        (e.g., those produced by klibc's klcc). */
     auto shdrDynamic = findSection2(".dynamic");
     if (shdrDynamic) {
-        auto dyn = (Elf_Dyn *)(contents + rdi(shdrDynamic->sh_offset));
+        auto dyn_table = (Elf_Dyn *) (contents + rdi(shdrDynamic->sh_offset));
         unsigned int d_tag;
-        for ( ; (d_tag = rdi(dyn->d_tag)) != DT_NULL; dyn++)
+        for (auto dyn = dyn_table; (d_tag = rdi(dyn->d_tag)) != DT_NULL; dyn++)
             if (d_tag == DT_STRTAB)
                 dyn->d_un.d_ptr = findSection(".dynstr").sh_addr;
             else if (d_tag == DT_STRSZ)
@@ -1129,6 +1141,14 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                 dyn->d_un.d_ptr = findSection(".gnu.version_r").sh_addr;
             else if (d_tag == DT_VERSYM)
                 dyn->d_un.d_ptr = findSection(".gnu.version").sh_addr;
+            else if (d_tag == DT_MIPS_RLD_MAP_REL) {
+                /* the MIPS_RLD_MAP_REL tag stores the offset to the debug
+                   pointer, relative to the address of the tag */
+                debug("Updating DT_MIPS_RLD_MAP_REL");
+                Elf_Addr rtld_map_addr = findSection(".rld_map").sh_addr;
+                auto dyn_offset = ((char*)dyn) - ((char*)dyn_table);
+                dyn->d_un.d_ptr = rtld_map_addr + dyn_offset - shdrDynamic->sh_addr;
+            }
     }
 
 
