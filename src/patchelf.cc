@@ -197,7 +197,7 @@ public:
 
     void setInterpreter(const std::string & newInterpreter);
 
-    typedef enum { rpPrint, rpShrink, rpSet, rpRemove } RPathOp;
+    typedef enum { rpPrint, rpShrink, rpSet, rpRemove, rpConvert } RPathOp;
 
     void modifyRPath(RPathOp op, const std::vector<std::string> & allowedRpathPrefixes, std::string newRPath);
 
@@ -1389,6 +1389,11 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
         return;
     }
 
+    /* Check if a DT_RPATH that could be converted to DT_RUNPATH exists. */
+    if (op == rpConvert && !rpath) {
+        debug("no RPATH to convert\n");
+        return;
+    }
 
     if (!forceRPath && dynRPath && !dynRunPath) { /* convert DT_RPATH to DT_RUNPATH */
         wri(dynRPath->d_tag, DT_RUNPATH);
@@ -1405,6 +1410,9 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
     if (std::string(rpath ? rpath : "") == newRPath) {
         return;
     }
+
+    /* convert DT_RPATH to DT_RUNPATH */
+    if (op == rpConvert && rpath) newRPath = string(rpath ? rpath : "");
 
     changed = true;
 
@@ -1726,6 +1734,7 @@ static std::vector<std::string> allowedRpathPrefixes;
 static bool removeRPath = false;
 static bool setRPath = false;
 static bool printRPath = false;
+static bool convertRPath = false;
 static std::string newRPath;
 static std::set<std::string> neededLibsToRemove;
 static std::map<std::string, std::string> neededLibsToReplace;
@@ -1756,6 +1765,8 @@ static void patchElf2(ElfFile && elfFile, const FileContents & fileContents, std
         elfFile.modifyRPath(elfFile.rpShrink, allowedRpathPrefixes, "");
     else if (removeRPath)
         elfFile.modifyRPath(elfFile.rpRemove, {}, "");
+    else if (convertRPath)
+        elfFile.modifyRPath(elfFile.rpConvert, {}, "");
     else if (setRPath)
         elfFile.modifyRPath(elfFile.rpSet, {}, newRPath);
 
@@ -1810,6 +1821,7 @@ void showHelp(const std::string & progName)
   [--allowed-rpath-prefixes PREFIXES]\t\tWith '--shrink-rpath', reject rpath entries not starting with the allowed prefix\n\
   [--print-rpath]\n\
   [--force-rpath]\n\
+  [--convert-rpath]\n\
   [--add-needed LIBRARY]\n\
   [--remove-needed LIBRARY]\n\
   [--replace-needed LIBRARY NEW_LIBRARY]\n\
@@ -1887,6 +1899,9 @@ int mainWrapped(int argc, char * * argv)
                to DT_RUNPATH, and if neither is present, a DT_RPATH is
                added. */
             forceRPath = true;
+        }
+        else if (arg == "--convert-rpath") {
+            convertRPath = true;
         }
         else if (arg == "--print-needed") {
             printNeeded = true;
