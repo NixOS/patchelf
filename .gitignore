@@ -18,6 +18,8 @@ Makefile
 .deps
 *.o
 
+CMakeLists.txt.user
+
 /tests/*.log
 /tests/*.trs
 /tests/no-rpath
