@@ -1204,7 +1204,7 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string &
             if (std::string(soname ? soname : "").empty())
                 debug("DT_SONAME is empty\n");
             else
-                printf("%s\n", soname);
+                printf("DT_SONAME: %s\n", soname);
         } else {
             debug("no DT_SONAME found\n");
         }
@@ -1309,7 +1309,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
     }
 
     if (op == rpPrint) {
-        printf("%s\n", rpath ? rpath : "");
+        printf("RPATH: %s\n", rpath ? rpath : "");
         return;
     }
 
@@ -1468,6 +1468,7 @@ void ElfFile<ElfFileParamNames>::removeNeeded(const std::set<std::string> & libs
     auto shdrDynamic = findSection(".dynamic");
     auto shdrDynStr = findSection(".dynstr");
     char * strTab = (char *) contents + rdi(shdrDynStr.sh_offset);
+    bool found = false;
 
     auto dyn = (Elf_Dyn *)(contents + rdi(shdrDynamic.sh_offset));
     Elf_Dyn * last = dyn;
@@ -1476,7 +1477,9 @@ void ElfFile<ElfFileParamNames>::removeNeeded(const std::set<std::string> & libs
             char * name = strTab + rdi(dyn->d_un.d_val);
             if (libs.count(name)) {
                 debug("removing DT_NEEDED entry '%s'\n", name);
+                printf("Removed entry %s\n", name);
                 changed = true;
+                found = true;
             } else {
                 debug("keeping DT_NEEDED entry '%s'\n", name);
                 *last++ = *dyn;
@@ -1484,6 +1487,9 @@ void ElfFile<ElfFileParamNames>::removeNeeded(const std::set<std::string> & libs
         } else
             *last++ = *dyn;
     }
+
+    if (!found)
+      printf("Error: entry to remove not found\n");
 
     memset(last, 0, sizeof(Elf_Dyn) * (dyn - last));
 }
@@ -1643,7 +1649,7 @@ void ElfFile<ElfFileParamNames>::printNeededLibs() // const
     for (; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_NEEDED) {
             const char *name = strTab + rdi(dyn->d_un.d_val);
-            printf("%s\n", name);
+            printf("LIB: %s\n", name);
         }
     }
 }
@@ -1738,7 +1744,7 @@ template<class ElfFile>
 static void patchElf2(ElfFile && elfFile, const FileContents & fileContents, std::string fileName)
 {
     if (printInterpreter)
-        printf("%s\n", elfFile.getInterpreter().c_str());
+        printf("INTERPRETER: %s\n", elfFile.getInterpreter().c_str());
 
     if (printSoname)
         elfFile.modifySoname(elfFile.printSoname, "");
@@ -1936,6 +1942,13 @@ int mainWrapped(int argc, char * * argv)
 
     if (!outputFileName.empty() && fileNames.size() != 1)
         error("--output option only allowed with single input file");
+        
+    if (argc == 2) {
+        printInterpreter = true;
+        printSoname = true;
+        printRPath = true;
+        printNeeded = true;
+    }
 
     patchElf();
 
