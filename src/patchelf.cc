@@ -1592,12 +1592,15 @@ void ElfFile<ElfFileParamNames>::addNeeded(const std::set<std::string> & libs)
     auto shdrDynamic = findSection(".dynamic");
     auto shdrDynStr = findSection(".dynstr");
 
+    unsigned int length = 0;
+
     /* add all new libs to the dynstr string table */
-    unsigned int length = std::count_if(libs.begin(), libs.end(),
-        [](const std::string & lib) { return lib.size() + 1; });
+    for (auto &lib : libs)
+        length += lib.size() + 1;
 
     std::string & newDynStr = replaceSection(".dynstr",
         rdi(shdrDynStr.sh_size) + length + 1);
+
     std::set<Elf64_Xword> libStrings;
     unsigned int pos = 0;
     for (auto & i : libs) {
