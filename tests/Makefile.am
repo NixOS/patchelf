@@ -1,6 +1,6 @@
 LIBS =
 
-check_PROGRAMS = simple main main-scoped big-dynstr no-rpath contiguous_note_sections
+check_PROGRAMS = simple main main-scoped big-dynstr no-rpath
 
 no_rpath_arch_TESTS = \
   no-rpath-amd64.sh \
@@ -27,8 +27,7 @@ src_TESTS = \
   output-flag.sh \
   no-rpath-pie-powerpc.sh \
   build-id.sh \
-  invalid-elf.sh \
-  contiguous_note_sections.sh
+  invalid-elf.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)
@@ -107,6 +106,3 @@ libsimple_so_LDFLAGS = $(LDFLAGS_sharedlib)
 no_rpath_SOURCES = no-rpath.c
 # no -fpic for no-rpath.o
 no_rpath_CFLAGS =
-
-contiguous_note_sections_SOURCES = contiguous_note_sections.s
-contiguous_note_sections_CFLAGS = -nostdlib -T contiguous_note_sections.ld
