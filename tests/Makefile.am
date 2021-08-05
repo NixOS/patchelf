@@ -28,6 +28,7 @@ src_TESTS = \
   no-rpath-pie-powerpc.sh \
   build-id.sh \
   invalid-elf.sh \
+  endianness.sh \
   contiguous_note_sections.sh
 
 build_TESTS = \
