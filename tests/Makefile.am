@@ -36,7 +36,7 @@ build_TESTS = \
 
 TESTS = $(src_TESTS) $(build_TESTS)
 
-EXTRA_DIST = no-rpath-prebuild $(src_TESTS) no-rpath-prebuild.sh invalid-elf
+EXTRA_DIST = no-rpath-prebuild $(src_TESTS) no-rpath-prebuild.sh invalid-elf endianness
 
 TESTS_ENVIRONMENT = PATCHELF_DEBUG=1
 
