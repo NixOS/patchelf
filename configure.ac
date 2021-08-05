@@ -6,6 +6,7 @@ AM_INIT_AUTOMAKE([1.11.1 -Wall -Werror dist-bzip2 foreign color-tests parallel-t
 
 AM_PROG_CC_C_O
 AC_PROG_CXX
+AM_PROG_AS
 
 DEFAULT_PAGESIZE=auto
 AC_ARG_WITH([page-size],

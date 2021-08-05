@@ -1,6 +1,6 @@
 LIBS =
 
-check_PROGRAMS = simple main too-many-strtab main-scoped big-dynstr no-rpath
+check_PROGRAMS = simple main too-many-strtab main-scoped big-dynstr no-rpath contiguous_note_sections
 
 no_rpath_arch_TESTS = \
   no-rpath-amd64.sh \
@@ -20,20 +20,24 @@ no_rpath_arch_TESTS = \
 
 src_TESTS = \
   plain-fail.sh plain-run.sh shrink-rpath.sh set-interpreter-short.sh \
-  set-interpreter-long.sh set-rpath.sh no-rpath.sh big-dynstr.sh \
+  set-interpreter-long.sh set-rpath.sh add-rpath.sh no-rpath.sh big-dynstr.sh \
   set-rpath-library.sh soname.sh shrink-rpath-with-allowed-prefixes.sh \
   force-rpath.sh \
   plain-needed.sh \
   output-flag.sh \
+  too-many-strtab.sh \
+  no-rpath-pie-powerpc.sh \
   build-id.sh \
-  too-many-strtab.sh
+  invalid-elf.sh \
+  endianness.sh \
+  contiguous_note_sections.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)
 
 TESTS = $(src_TESTS) $(build_TESTS)
 
-EXTRA_DIST = no-rpath-prebuild $(src_TESTS) no-rpath-prebuild.sh
+EXTRA_DIST = no-rpath-prebuild $(src_TESTS) no-rpath-prebuild.sh invalid-elf endianness
 
 TESTS_ENVIRONMENT = PATCHELF_DEBUG=1
 
@@ -108,3 +112,7 @@ libtoomanystrtab_so_LDFLAGS = $(LDFLAGS_sharedlib)
 no_rpath_SOURCES = no-rpath.c
 # no -fpic for no-rpath.o
 no_rpath_CFLAGS =
+
+contiguous_note_sections_SOURCES = contiguous_note_sections.s contiguous_note_sections.ld
+contiguous_note_sections_LDFLAGS = -nostdlib -T contiguous_note_sections.ld
+contiguous_note_sections_CFLAGS = -pie
