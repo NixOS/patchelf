@@ -1,6 +1,6 @@
 LIBS =
 
-check_PROGRAMS = simple main main-scoped big-dynstr no-rpath contiguous_note_sections
+check_PROGRAMS = simple main too-many-strtab main-scoped big-dynstr no-rpath contiguous_note_sections
 
 no_rpath_arch_TESTS = \
   no-rpath-amd64.sh \
@@ -25,6 +25,7 @@ src_TESTS = \
   force-rpath.sh \
   plain-needed.sh \
   output-flag.sh \
+  too-many-strtab.sh \
   no-rpath-pie-powerpc.sh \
   build-id.sh \
   invalid-elf.sh \
@@ -81,7 +82,7 @@ big_dynstr_LDFLAGS = $(LDFLAGS_local)
 # - without libtool, only archives (static libraries) can be built by automake
 # - with libtool, it is difficult to control options
 # - with libtool, it is not possible to compile convenience *dynamic* libraries :-(
-check_PROGRAMS += libfoo.so libfoo-scoped.so libbar.so libbar-scoped.so libsimple.so libbuildid.so
+check_PROGRAMS += libfoo.so libfoo-scoped.so libbar.so libbar-scoped.so libsimple.so libbuildid.so libtoomanystrtab.so
 
 libbuildid_so_SOURCES = simple.c
 libbuildid_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-build-id
@@ -104,6 +105,9 @@ libbar_scoped_so_LDFLAGS = $(LDFLAGS_sharedlib)
 
 libsimple_so_SOURCES = simple.c
 libsimple_so_LDFLAGS = $(LDFLAGS_sharedlib)
+
+libtoomanystrtab_so_SOURCES = too-many-strtab.c
+libtoomanystrtab_so_LDFLAGS = $(LDFLAGS_sharedlib)
 
 no_rpath_SOURCES = no-rpath.c
 # no -fpic for no-rpath.o

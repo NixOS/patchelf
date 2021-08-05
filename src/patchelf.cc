@@ -501,7 +501,7 @@ void ElfFile<ElfFileParamNames>::sortShdrs()
             info[getSectionName(shdrs[i])] = getSectionName(shdrs[rdi(shdrs[i].sh_info)]);
 
     /* Idem for the index of the .shstrtab section in the ELF header. */
-    SectionName shstrtabName = getSectionName(shdrs[rdi(hdr->e_shstrndx)]);
+    Elf_Shdr shstrtab = shdrs[rdi(hdr->e_shstrndx)];
 
     /* Sort the sections by offset. */
     CompShdr comp;
@@ -521,8 +521,14 @@ void ElfFile<ElfFileParamNames>::sortShdrs()
             wri(shdrs[i].sh_info,
                 findSection3(info[getSectionName(shdrs[i])]));
 
-    /* And the .shstrtab index. */
-    wri(hdr->e_shstrndx, findSection3(shstrtabName));
+    /* And the .shstrtab index. Note: the match here is done by checking the offset as searching
+     * by name can yield incorrect results in case there are multiple sections with the same
+     * name as the one initially pointed by hdr->e_shstrndx */
+    for (unsigned int i = 1; i < rdi(hdr->e_shnum); ++i) {
+        if (shdrs[i].sh_offset == shstrtab.sh_offset) {
+            wri(hdr->e_shstrndx, i);
+        }
+    }
 }
 
 static void writeFile(const std::string & fileName, const FileContents & contents)
