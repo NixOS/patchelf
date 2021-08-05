@@ -197,7 +197,7 @@ public:
 
     void setInterpreter(const std::string & newInterpreter);
 
-    typedef enum { rpPrint, rpShrink, rpSet, rpRemove } RPathOp;
+    typedef enum { rpPrint, rpShrink, rpSet, rpAdd, rpRemove } RPathOp;
 
     void modifyRPath(RPathOp op, const std::vector<std::string> & allowedRpathPrefixes, std::string newRPath);
 
@@ -1408,6 +1408,10 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
         return;
     }
 
+    if (op == rpAdd) {
+        newRPath = std::string(rpath ? rpath : "") + ":" + newRPath; 
+    }
+
     changed = true;
 
     /* Zero out the previous rpath to prevent retained dependencies in
@@ -1730,6 +1734,7 @@ static bool shrinkRPath = false;
 static std::vector<std::string> allowedRpathPrefixes;
 static bool removeRPath = false;
 static bool setRPath = false;
+static bool addRPath = false;
 static bool printRPath = false;
 static std::string newRPath;
 static std::set<std::string> neededLibsToRemove;
@@ -1763,6 +1768,8 @@ static void patchElf2(ElfFile && elfFile, const FileContents & fileContents, con
         elfFile.modifyRPath(elfFile.rpRemove, {}, "");
     else if (setRPath)
         elfFile.modifyRPath(elfFile.rpSet, {}, newRPath);
+    else if (addRPath)
+        elfFile.modifyRPath(elfFile.rpAdd, {}, newRPath);
 
     if (printNeeded) elfFile.printNeededLibs();
 
@@ -1810,6 +1817,7 @@ void showHelp(const std::string & progName)
   [--print-soname]\t\tPrints 'DT_SONAME' entry of .dynamic section. Raises an error if DT_SONAME doesn't exist\n\
   [--set-soname SONAME]\t\tSets 'DT_SONAME' entry to SONAME.\n\
   [--set-rpath RPATH]\n\
+  [--add-rpath RPATH]\n\
   [--remove-rpath]\n\
   [--shrink-rpath]\n\
   [--allowed-rpath-prefixes PREFIXES]\t\tWith '--shrink-rpath', reject rpath entries not starting with the allowed prefix\n\
@@ -1874,6 +1882,11 @@ int mainWrapped(int argc, char * * argv)
         else if (arg == "--set-rpath") {
             if (++i == argc) error("missing argument");
             setRPath = true;
+            newRPath = argv[i];
+        }
+        else if (arg == "--add-rpath") {
+            if (++i == argc) error("missing argument");
+            addRPath = true;
             newRPath = argv[i];
         }
         else if (arg == "--print-rpath") {
@@ -1941,6 +1954,9 @@ int mainWrapped(int argc, char * * argv)
 
     if (!outputFileName.empty() && fileNames.size() != 1)
         error("--output option only allowed with single input file");
+
+    if (setRPath && addRPath)
+        error("--set-rpath option not allowed with --add-rpath");
 
     patchElf();
 
