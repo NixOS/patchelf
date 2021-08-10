@@ -23,3 +23,9 @@ Makefile
 /tests/no-rpath
 /tests/no-rpath-*.sh
 /tests/*.so
+/tests/scratch
+/tests/main
+/tests/simple
+/tests/too-many-strtab
+/tests/big-dynstr*
+/tests/main-scoped
