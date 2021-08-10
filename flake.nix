@@ -27,6 +27,7 @@
         patchelf-new = final.stdenv.mkDerivation {
           name = "patchelf-${self.hydraJobs.tarball.version}";
           src = "${self.hydraJobs.tarball}/tarballs/*.tar.bz2";
+          nativeBuildInputs = [ pkgs.autoreconfHook ];
           doCheck = true;
         };
 
