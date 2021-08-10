@@ -40,6 +40,9 @@
 
 #include "elf.h"
 
+#ifndef PACKAGE_STRING                          \
+#define PACKAGE_STRING "patchelf"
+#endif
 
 static bool debugMode = false;
 
