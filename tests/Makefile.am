@@ -29,7 +29,8 @@ src_TESTS = \
   build-id.sh \
   invalid-elf.sh \
   endianness.sh \
-  contiguous_note_sections.sh
+  contiguous_note_sections.sh \
+  no-gnu-hash.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)

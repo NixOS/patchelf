@@ -1100,9 +1100,12 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                 dyn->d_un.d_ptr = findSection(".dynsym").sh_addr;
             else if (d_tag == DT_HASH)
                 dyn->d_un.d_ptr = findSection(".hash").sh_addr;
-            else if (d_tag == DT_GNU_HASH)
-                dyn->d_un.d_ptr = findSection(".gnu.hash").sh_addr;
-            else if (d_tag == DT_JMPREL) {
+            else if (d_tag == DT_GNU_HASH) {
+                auto shdr = findSection2(".gnu.hash");
+                // some binaries might this section stripped
+                // in which case we just ignore the value.
+                if (shdr) dyn->d_un.d_ptr = shdr->sh_addr;
+            } else if (d_tag == DT_JMPREL) {
                 auto shdr = findSection2(".rel.plt");
                 if (!shdr) shdr = findSection2(".rela.plt"); /* 64-bit Linux, x86-64 */
                 if (!shdr) shdr = findSection2(".rela.IA_64.pltoff"); /* 64-bit Linux, IA-64 */
