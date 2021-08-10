@@ -1,6 +1,6 @@
 LIBS =
 
-check_PROGRAMS = simple main too-many-strtab main-scoped big-dynstr no-rpath contiguous_note_sections
+check_PROGRAMS = simple main too-many-strtab main-scoped big-dynstr no-rpath contiguous-note-sections
 
 no_rpath_arch_TESTS = \
   no-rpath-amd64.sh \
@@ -30,7 +30,7 @@ src_TESTS = \
   build-id.sh \
   invalid-elf.sh \
   endianness.sh \
-  contiguous_note_sections.sh \
+  contiguous-note-sections.sh \
   no-gnu-hash.sh
 
 build_TESTS = \
@@ -114,6 +114,6 @@ no_rpath_SOURCES = no-rpath.c
 # no -fpic for no-rpath.o
 no_rpath_CFLAGS =
 
-contiguous_note_sections_SOURCES = contiguous_note_sections.s contiguous_note_sections.ld
-contiguous_note_sections_LDFLAGS = -nostdlib -T contiguous_note_sections.ld
+contiguous_note_sections_SOURCES = contiguous-note-sections.s contiguous-note-sections.ld
+contiguous_note_sections_LDFLAGS = -nostdlib -T contiguous-note-sections.ld
 contiguous_note_sections_CFLAGS = -pie
