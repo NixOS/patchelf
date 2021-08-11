@@ -1574,9 +1574,10 @@ typedef struct
 
 /* Legal values for p_type field of Elf32_Phdr.  */
 
-#define PT_MIPS_REGINFO	0x70000000	/* Register usage information */
-#define PT_MIPS_RTPROC  0x70000001	/* Runtime procedure table. */
-#define PT_MIPS_OPTIONS 0x70000002
+#define PT_MIPS_REGINFO	  0x70000000	/* Register usage information. */
+#define PT_MIPS_RTPROC	  0x70000001	/* Runtime procedure table. */
+#define PT_MIPS_OPTIONS	  0x70000002
+#define PT_MIPS_ABIFLAGS  0x70000003	/* FP mode requirement. */
 
 /* Special program header types.  */
 
@@ -1642,7 +1643,11 @@ typedef struct
    PLT is writable.  For a non-writable PLT, this is omitted or has a zero
    value.  */
 #define DT_MIPS_RWPLT        0x70000034
-#define DT_MIPS_NUM	     0x35
+/* An alternative description of the classic MIPS RLD_MAP that is usable
+   in a PIE as it stores a relative offset from the address of the tag
+   rather than an absolute address.  */
+#define DT_MIPS_RLD_MAP_REL  0x70000035
+#define DT_MIPS_NUM          0x36
 
 /* Legal values for DT_MIPS_FLAGS Elf32_Dyn entry.  */
 
