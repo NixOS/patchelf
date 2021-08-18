@@ -1457,7 +1457,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
 
     /* Zero out the previous rpath to prevent retained dependencies in
        Nix. */
-    unsigned int rpathSize = 0;
+    size_t rpathSize = 0;
     if (rpath) {
         rpathSize = strlen(rpath);
         memset(rpath, 'X', rpathSize);
@@ -1467,7 +1467,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
 
 
     if (newRPath.size() <= rpathSize) {
-        strcpy(rpath, newRPath.c_str());
+        memcpy(rpath, newRPath.c_str(), newRPath.size() + 1);
         return;
     }
 
