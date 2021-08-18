@@ -1011,6 +1011,7 @@ void ElfFile<ElfFileParamNames>::normalizeNoteSegments()
         [this](std::pair<const std::string, std::string> & i) { return rdi(findSection(i.first).sh_type) == SHT_NOTE; });
     if (!replaced_note) return;
 
+    std::vector<Elf_Phdr> newPhdrs;
     for (auto & phdr : phdrs) {
         if (rdi(phdr.p_type) != PT_NOTE) continue;
 
@@ -1047,11 +1048,13 @@ void ElfFile<ElfFileParamNames>::normalizeNoteSegments()
             if (curr_off == start_off)
                 phdr = new_phdr;
             else
-                phdrs.push_back(new_phdr);
+                newPhdrs.push_back(new_phdr);
 
             curr_off += size;
         }
     }
+    phdrs.insert(phdrs.end(), newPhdrs.begin(), newPhdrs.end());
+
     wri(hdr->e_phnum, phdrs.size());
 }
 
