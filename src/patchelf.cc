@@ -1321,6 +1321,11 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
 {
     auto shdrDynamic = findSection(".dynamic");
 
+    if (rdi(shdrDynamic.sh_type) == SHT_NOBITS) {
+            debug("no dynamic section\n");
+            return;
+    }
+
     /* !!! We assume that the virtual address in the DT_STRTAB entry
        of the dynamic section corresponds to the .dynstr section. */
     auto shdrDynStr = findSection(".dynstr");
