@@ -40,7 +40,7 @@
 
 #include "elf.h"
 
-#ifndef PACKAGE_STRING                          \
+#ifndef PACKAGE_STRING
 #define PACKAGE_STRING "patchelf"
 #endif
 
