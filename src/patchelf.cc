@@ -40,7 +40,7 @@
 
 #include "elf.h"
 
-#ifndef PACKAGE_STRING                          \
+#ifndef PACKAGE_STRING
 #define PACKAGE_STRING "patchelf"
 #endif
 
@@ -544,14 +544,28 @@ static void writeFile(const std::string & fileName, const FileContents & content
 
     size_t bytesWritten = 0;
     ssize_t portion;
-    while ((portion = write(fd, contents->data() + bytesWritten, contents->size() - bytesWritten)) > 0)
+    while (bytesWritten < contents->size()) {
+        if ((portion = write(fd, contents->data() + bytesWritten, contents->size() - bytesWritten)) < 0) {
+            if (errno == EINTR)
+                continue;
+            error("write");
+        }
         bytesWritten += portion;
+    }
 
-    if (bytesWritten != contents->size())
-        error("write");
-
-    if (close(fd) != 0)
-        error("close");
+    if (close(fd) >= 0)
+        return;
+    /*
+     * Just ignore EINTR; a retry loop is the wrong thing to do.
+     *
+     * http://lkml.indiana.edu/hypermail/linux/kernel/0509.1/0877.html
+     * https://bugzilla.gnome.org/show_bug.cgi?id=682819
+     * http://utcc.utoronto.ca/~cks/space/blog/unix/CloseEINTR
+     * https://sites.google.com/site/michaelsafyan/software-engineering/checkforeintrwheninvokingclosethinkagain
+     */
+    if (errno == EINTR)
+        return;
+    error("close");
 }
 
 
