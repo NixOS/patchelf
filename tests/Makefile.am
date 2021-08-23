@@ -1,5 +1,7 @@
 LIBS =
 
+STRIP ?= strip
+
 check_PROGRAMS = simple main too-many-strtab main-scoped big-dynstr no-rpath contiguous-note-sections
 
 no_rpath_arch_TESTS = \
@@ -32,7 +34,8 @@ src_TESTS = \
   invalid-elf.sh \
   endianness.sh \
   contiguous-note-sections.sh \
-  no-gnu-hash.sh
+  no-gnu-hash.sh \
+  no-dynamic-section.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)
@@ -73,12 +76,22 @@ main_scoped_LDFLAGS = $(LDFLAGS_local)
 
 big-dynstr.c: main.c
 	cat $< > big-dynstr.c
-	for i in $$(seq 1 2000); do echo "void f$$i(void) { };" >> big-dynstr.c; done
+	for i in $$(seq 1 2000); do echo "void f$$i(void) { };"; done >> big-dynstr.c
 
 nodist_big_dynstr_SOURCES = big-dynstr.c
 big_dynstr_LDADD = -lfoo $(AM_LDADD)
 big_dynstr_DEPENDENCIES = libfoo.so
 big_dynstr_LDFLAGS = $(LDFLAGS_local)
+
+# somehow bug does not trigger if we use
+# normal autotools rules to build the program:
+# https://github.com/NixOS/patchelf/pull/303
+libbig-dynstr.so: big-dynstr.c
+	$(CC) -fPIC -shared -o $@ $<
+libbig-dynstr.debug: libbig-dynstr.so
+	$(STRIP) --only-keep-debug libbig-dynstr.so -o libbig-dynstr.debug
+check_DATA = libbig-dynstr.debug
+
 
 # declare local shared libraries as programs as:
 # - without libtool, only archives (static libraries) can be built by automake

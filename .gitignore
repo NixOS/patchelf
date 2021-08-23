@@ -29,3 +29,4 @@ Makefile
 /tests/too-many-strtab
 /tests/big-dynstr*
 /tests/main-scoped
+/tests/libbig-dynstr.debug
