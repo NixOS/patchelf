@@ -15,19 +15,19 @@
           overlays = [ self.overlay ];
         }
       );
-
+      version = builtins.readFile ./version
+                + "." + builtins.substring 0 8 self.lastModifiedDate
+                + "." + (self.shortRev or "dirty");
       pkgs = nixpkgsFor.${"x86_64-linux"};
-
     in
 
     {
-
       overlay = final: prev: {
-
         patchelf-new = final.stdenv.mkDerivation {
-          name = "patchelf-${self.hydraJobs.tarball.version}";
-          src = "${self.hydraJobs.tarball}/tarballs/*.tar.bz2";
-          nativeBuildInputs = [ pkgs.autoreconfHook ];
+          pname = "patchelf";
+          inherit version;
+          src = self;
+          nativeBuildInputs = [ final.autoreconfHook ];
           doCheck = true;
         };
 
@@ -38,9 +38,7 @@
         tarball =
           pkgs.releaseTools.sourceTarball rec {
             name = "patchelf-tarball";
-            version = builtins.readFile ./version
-                      + "." + builtins.substring 0 8 self.lastModifiedDate
-                      + "." + (self.shortRev or "dirty");
+            inherit version;
             versionSuffix = ""; # obsolete
             src = self;
             preAutoconf = "echo ${version} > version";
