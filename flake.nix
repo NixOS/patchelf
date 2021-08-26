@@ -58,6 +58,9 @@
           };
 
         build = forAllSystems (system: nixpkgsFor.${system}.patchelf-new);
+        build-sanitized = forAllSystems (system: nixpkgsFor.${system}.patchelf-new.overrideAttrs (old: {
+          configureFlags = [ "--with-asan " "--with-ubsan" ];
+        }));
 
         release = pkgs.releaseTools.aggregate
           { name = "patchelf-${self.hydraJobs.tarball.version}";
@@ -65,6 +68,8 @@
               [ self.hydraJobs.tarball
                 self.hydraJobs.build.x86_64-linux
                 self.hydraJobs.build.i686-linux
+                self.hydraJobs.build-sanitized.x86_64-linux
+                self.hydraJobs.build-sanitized.i686-linux
               ];
             meta.description = "Release-critical builds";
           };
