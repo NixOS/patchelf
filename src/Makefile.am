@@ -1,7 +1,20 @@
 AM_CXXFLAGS = -Wall -std=c++11 -D_FILE_OFFSET_BITS=64
 
 if WITH_ASAN
-AM_CXXFLAGS += -fsanitize=address -fno-optimize-sibling-calls -fsanitize-address-use-after-scope -fno-omit-frame-pointer -g -O1
+AM_CXXFLAGS += -fsanitize=address -fsanitize-address-use-after-scope
+endif
+
+if WITH_UBSAN
+AM_CXXFLAGS += -fsanitize=undefined
+endif
+
+SAN_FLAGS = -fno-optimize-sibling-calls -fno-omit-frame-pointer
+if WITH_ASAN
+AM_CXXFLAGS += $(SAN_FLAGS)
+else
+if WITH_UBSAN
+AM_CXXFLAGS += $(SAN_FLAGS)
+endif
 endif
 
 bin_PROGRAMS = patchelf

@@ -20,9 +20,14 @@ if test "$DEFAULT_PAGESIZE" != auto; then
 fi
 
 AC_ARG_WITH([asan],
-   AS_HELP_STRING([--with-asan], [Link with libasan])
+   AS_HELP_STRING([--with-asan], [Build with address sanitizer])
 )
 AM_CONDITIONAL([WITH_ASAN], [test x"$with_asan" = xyes])
+
+AC_ARG_WITH([ubsan],
+   AS_HELP_STRING([--with-ubsan], [Build with undefined behavior sanitizer])
+)
+AM_CONDITIONAL([WITH_UBSAN], [test x"$with_ubsan" = xyes])
 
 AC_CONFIG_FILES([Makefile src/Makefile tests/Makefile patchelf.spec])
 AC_OUTPUT
