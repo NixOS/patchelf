@@ -35,7 +35,8 @@ src_TESTS = \
   endianness.sh \
   contiguous-note-sections.sh \
   no-gnu-hash.sh \
-  no-dynamic-section.sh
+  no-dynamic-section.sh \
+  basic-flags.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)
