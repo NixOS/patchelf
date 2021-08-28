@@ -1459,12 +1459,14 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
             if (!rpath) {
                 debug("no RPATH to shrink\n");
                 return;
-            }
+            ;}
             newRPath = shrinkRPath(rpath, neededLibs, allowedRpathPrefixes);
             break;
         }
         case rpAdd: {
-            newRPath = std::string(rpath ? rpath : "") + ":" + newRPath;
+            auto temp = std::string(rpath ? rpath : "");
+            appendRPath(temp, newRPath);
+            newRPath = temp;
             break;
         }
         case rpSet: { break; } /* new rpath was provied as input to this function */
