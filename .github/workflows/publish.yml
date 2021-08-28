@@ -1,0 +1,27 @@
+name: Publish
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build:
+    name: Publish tarballs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - uses: cachix/install-nix-action@v13
+      - name: Build tarballs
+        run: |
+          nix-build -A hydraJobs.tarball
+          install -D ./result/tarballs/*.tar.bz2 ./dist/patchelf-$(cat version).tar.bz
+          install -D ./result/tarballs/*.tar.gz ./dist/patchelf-$(cat version).tar.gz
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: dist/*
+          tag: ${{ github.ref }}
+          overwrite: true
+          file_glob: true
