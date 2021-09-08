@@ -203,6 +203,8 @@ public:
     typedef enum { rpPrint, rpShrink, rpSet, rpAdd, rpRemove } RPathOp;
 
     void modifyRPath(RPathOp op, const std::vector<std::string> & allowedRpathPrefixes, std::string newRPath);
+    std::string shrinkRPath(char* rpath, std::vector<std::string> &neededLibs, const std::vector<std::string> & allowedRpathPrefixes);
+    void removeRPath(Elf_Shdr & shdrDynamic);
 
     void addNeeded(const std::set<std::string> & libs);
 
@@ -1317,12 +1319,80 @@ void ElfFile<ElfFileParamNames>::setInterpreter(const std::string & newInterpret
 }
 
 
-static void concatToRPath(std::string & rpath, const std::string & path)
+static void appendRPath(std::string & rpath, const std::string & path)
 {
     if (!rpath.empty()) rpath += ":";
     rpath += path;
 }
 
+/* For each directory in the RPATH, check if it contains any
+   needed library. */
+template<ElfFileParams>
+std::string ElfFile<ElfFileParamNames>::shrinkRPath(char* rpath, std::vector<std::string> &neededLibs, const std::vector<std::string> & allowedRpathPrefixes) {
+    std::vector<bool> neededLibFound(neededLibs.size(), false);
+
+    std::string newRPath = "";
+
+    for (auto & dirName : splitColonDelimitedString(rpath)) {
+
+        /* Non-absolute entries are allowed (e.g., the special
+           "$ORIGIN" hack). */
+        if (dirName[0] != '/') {
+            appendRPath(newRPath, dirName);
+            continue;
+        }
+
+        /* If --allowed-rpath-prefixes was given, reject directories
+           not starting with any of the (colon-delimited) prefixes. */
+        if (!allowedRpathPrefixes.empty() && !hasAllowedPrefix(dirName, allowedRpathPrefixes)) {
+            debug("removing directory '%s' from RPATH because of non-allowed prefix\n", dirName.c_str());
+            continue;
+        }
+
+        /* For each library that we haven't found yet, see if it
+           exists in this directory. */
+        bool libFound = false;
+        for (unsigned int j = 0; j < neededLibs.size(); ++j)
+            if (!neededLibFound[j]) {
+                std::string libName = dirName + "/" + neededLibs[j];
+                try {
+                    Elf32_Half library_e_machine = getElfType(readFile(libName, sizeof(Elf32_Ehdr))).machine;
+                    if (rdi(library_e_machine) == rdi(hdr->e_machine)) {
+                        neededLibFound[j] = true;
+                        libFound = true;
+                    } else
+                        debug("ignoring library '%s' because its machine type differs\n", libName.c_str());
+                } catch (SysError & e) {
+                    if (e.errNo != ENOENT) throw;
+                }
+            }
+
+        if (!libFound)
+            debug("removing directory '%s' from RPATH\n", dirName.c_str());
+        else
+            appendRPath(newRPath, dirName);
+    }
+
+    return newRPath;
+}
+
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::removeRPath(Elf_Shdr & shdrDynamic) {
+    auto dyn = (Elf_Dyn *)(contents + rdi(shdrDynamic.sh_offset));
+    Elf_Dyn * last = dyn;
+    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+        if (rdi(dyn->d_tag) == DT_RPATH) {
+            debug("removing DT_RPATH entry\n");
+            changed = true;
+        } else if (rdi(dyn->d_tag) == DT_RUNPATH) {
+            debug("removing DT_RUNPATH entry\n");
+            changed = true;
+        } else {
+            *last++ = *dyn;
+        }
+    }
+    memset(last, 0, sizeof(Elf_Dyn) * (dyn - last));
+}
 
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
@@ -1372,88 +1442,35 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
             neededLibs.push_back(std::string(strTab + rdi(dyn->d_un.d_val)));
     }
 
-    if (op == rpPrint) {
-        printf("%s\n", rpath ? rpath : "");
-        return;
-    }
-
-    if (op == rpShrink && !rpath) {
-        debug("no RPATH to shrink\n");
-        return;
-    }
-
-
-    /* For each directory in the RPATH, check if it contains any
-       needed library. */
-    if (op == rpShrink) {
-        std::vector<bool> neededLibFound(neededLibs.size(), false);
-
-        newRPath = "";
-
-        for (auto & dirName : splitColonDelimitedString(rpath)) {
-
-            /* Non-absolute entries are allowed (e.g., the special
-               "$ORIGIN" hack). */
-            if (dirName[0] != '/') {
-                concatToRPath(newRPath, dirName);
-                continue;
+    switch (op) {
+        case rpPrint: {
+            printf("%s\n", rpath ? rpath : "");
+            return;
+        };
+        case rpRemove: {
+            if (!rpath) {
+                debug("no RPATH to delete\n");
+                return;
             }
-
-            /* If --allowed-rpath-prefixes was given, reject directories
-               not starting with any of the (colon-delimited) prefixes. */
-            if (!allowedRpathPrefixes.empty() && !hasAllowedPrefix(dirName, allowedRpathPrefixes)) {
-                debug("removing directory '%s' from RPATH because of non-allowed prefix\n", dirName.c_str());
-                continue;
-            }
-
-            /* For each library that we haven't found yet, see if it
-               exists in this directory. */
-            bool libFound = false;
-            for (unsigned int j = 0; j < neededLibs.size(); ++j)
-                if (!neededLibFound[j]) {
-                    std::string libName = dirName + "/" + neededLibs[j];
-                    try {
-                        Elf32_Half library_e_machine = getElfType(readFile(libName, sizeof(Elf32_Ehdr))).machine;
-                        if (rdi(library_e_machine) == rdi(hdr->e_machine)) {
-                            neededLibFound[j] = true;
-                            libFound = true;
-                        } else
-                            debug("ignoring library '%s' because its machine type differs\n", libName.c_str());
-                    } catch (SysError & e) {
-                        if (e.errNo != ENOENT) throw;
-                    }
-                }
-
-            if (!libFound)
-                debug("removing directory '%s' from RPATH\n", dirName.c_str());
-            else
-                concatToRPath(newRPath, dirName);
-        }
-    }
-
-    if (op == rpRemove) {
-        if (!rpath) {
-            debug("no RPATH to delete\n");
+            removeRPath(shdrDynamic);
             return;
         }
-
-        dyn = (Elf_Dyn *)(contents + rdi(shdrDynamic.sh_offset));
-        Elf_Dyn * last = dyn;
-        for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
-            if (rdi(dyn->d_tag) == DT_RPATH) {
-                debug("removing DT_RPATH entry\n");
-                changed = true;
-            } else if (rdi(dyn->d_tag) == DT_RUNPATH) {
-                debug("removing DT_RUNPATH entry\n");
-                changed = true;
-            } else {
-                *last++ = *dyn;
-            }
+        case rpShrink: {
+            if (!rpath) {
+                debug("no RPATH to shrink\n");
+                return;
+            ;}
+            newRPath = shrinkRPath(rpath, neededLibs, allowedRpathPrefixes);
+            break;
         }
-        memset(last, 0, sizeof(Elf_Dyn) * (dyn - last));
-        return;
+        case rpAdd: {
+            auto temp = std::string(rpath ? rpath : "");
+            appendRPath(temp, newRPath);
+            newRPath = temp;
+            break;
+        }
+        case rpSet: { break; } /* new rpath was provied as input to this function */
     }
-
 
     if (!forceRPath && dynRPath && !dynRunPath) { /* convert DT_RPATH to DT_RUNPATH */
         wri(dynRPath->d_tag, DT_RUNPATH);
@@ -1470,11 +1487,6 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
     if (rpath && rpath == newRPath) {
         return;
     }
-
-    if (op == rpAdd) {
-        newRPath = std::string(rpath ? rpath : "") + ":" + newRPath; 
-    }
-
     changed = true;
 
     /* Zero out the previous rpath to prevent retained dependencies in
