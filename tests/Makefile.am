@@ -36,6 +36,7 @@ src_TESTS = \
   contiguous-note-sections.sh \
   no-gnu-hash.sh \
   no-dynamic-section.sh \
+  external.sh \
   basic-flags.sh
 
 build_TESTS = \

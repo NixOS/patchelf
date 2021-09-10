@@ -23,6 +23,9 @@ of executables and change the RPATH of executables and libraries.
 
 The single option given operates on each FILE, editing in place.
 
+Any option taking a string argument can also take a file by prefixing the
+argument with the @ symbol. See EXAMPLES
+
 .IP "--page-size SIZE"
 Uses the given page size instead of the default.
 
@@ -72,11 +75,11 @@ DT_RUNPATH. By default DT_RPATH is converted to DT_RUNPATH.
 
 .IP "--add-needed LIBRARY"
 Adds a declared dependency on a dynamic library (DT_NEEDED).
-This option can be give multiple times.
+This option can be given multiple times.
 
 .IP "--replace-needed LIB_ORIG LIB_NEW"
 Replaces a declared dependency on a dynamic library with another one (DT_NEEDED).
-This option can be give multiple times.
+This option can be given multiple times.
 
 .IP "--remove-needed LIBRARY"
 Removes a declared dependency on LIBRARY (DT_NEEDED entry). This
@@ -94,6 +97,23 @@ Prints details of the changes made to the input file.
 
 .IP --version
 Shows the version of patchelf.
+
+.SH EXAMPLES
+
+To use the contents on an external file as a parameter:
+
+.RS
+$ patchelf a.out --add-rpath @/tmp/generated-rpath.bin
+.RE
+
+To change the RPATH of a binary. Note that
+.BR $ORIGIN
+is a special symbol used by the loader, so must be quoted.
+
+.RS
+patchelf --set-rpath '$ORIGIN/../lib64' a.out
+.RE
+
 
 .SH AUTHOR
 Eelco Dolstra <e.dolstra@tudelft.nl>

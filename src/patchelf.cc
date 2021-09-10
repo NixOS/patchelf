@@ -1870,6 +1870,15 @@ static void patchElf()
     }
 }
 
+std::string resolveArgument(const char *arg) {
+  if (strlen(arg) > 0 && arg[0] == '@') {
+    FileContents cnts = readFile(arg + 1);
+    return std::string((char *)cnts->data(), cnts->size());
+  }
+
+  return std::string(arg);
+}
+
 
 void showHelp(const std::string & progName)
 {
@@ -1914,7 +1923,7 @@ int mainWrapped(int argc, char * * argv)
         std::string arg(argv[i]);
         if (arg == "--set-interpreter" || arg == "--interpreter") {
             if (++i == argc) error("missing argument");
-            newInterpreter = argv[i];
+            newInterpreter = resolveArgument(argv[i]);
         }
         else if (arg == "--page-size") {
             if (++i == argc) error("missing argument");
@@ -1930,7 +1939,7 @@ int mainWrapped(int argc, char * * argv)
         else if (arg == "--set-soname") {
             if (++i == argc) error("missing argument");
             setSoname = true;
-            newSoname = argv[i];
+            newSoname = resolveArgument(argv[i]);
         }
         else if (arg == "--remove-rpath") {
             removeRPath = true;
@@ -1945,12 +1954,12 @@ int mainWrapped(int argc, char * * argv)
         else if (arg == "--set-rpath") {
             if (++i == argc) error("missing argument");
             setRPath = true;
-            newRPath = argv[i];
+            newRPath = resolveArgument(argv[i]);
         }
         else if (arg == "--add-rpath") {
             if (++i == argc) error("missing argument");
             addRPath = true;
-            newRPath = argv[i];
+            newRPath = resolveArgument(argv[i]);
         }
         else if (arg == "--print-rpath") {
             printRPath = true;
@@ -1974,11 +1983,11 @@ int mainWrapped(int argc, char * * argv)
         }
         else if (arg == "--add-needed") {
             if (++i == argc) error("missing argument");
-            neededLibsToAdd.insert(argv[i]);
+            neededLibsToAdd.insert(resolveArgument(argv[i]));
         }
         else if (arg == "--remove-needed") {
             if (++i == argc) error("missing argument");
-            neededLibsToRemove.insert(argv[i]);
+            neededLibsToRemove.insert(resolveArgument(argv[i]));
         }
         else if (arg == "--replace-needed") {
             if (i+2 >= argc) error("missing argument(s)");
@@ -1987,11 +1996,11 @@ int mainWrapped(int argc, char * * argv)
         }
         else if (arg == "--clear-symbol-version") {
             if (++i == argc) error("missing argument");
-            symbolsToClearVersion.insert(argv[i]);
+            symbolsToClearVersion.insert(resolveArgument(argv[i]));
         }
         else if (arg == "--output") {
             if (++i == argc) error("missing argument");
-            outputFileName = argv[i];
+            outputFileName = resolveArgument(argv[i]);
             alwaysWrite = true;
         }
         else if (arg == "--debug") {
