@@ -35,6 +35,7 @@ src_TESTS = \
   endianness.sh \
   contiguous-note-sections.sh \
   no-gnu-hash.sh \
+  grow-file.sh \
   no-dynamic-section.sh \
   args-from-file.sh \
   basic-flags.sh \
