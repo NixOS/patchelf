@@ -1149,7 +1149,10 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                 auto shdr = findSection2(".rel.plt");
                 if (!shdr) shdr = findSection2(".rela.plt"); /* 64-bit Linux, x86-64 */
                 if (!shdr) shdr = findSection2(".rela.IA_64.pltoff"); /* 64-bit Linux, IA-64 */
-                if (!shdr) error("cannot find section corresponding to DT_JMPREL");
+                // there have been cases where this section was not present
+                // see https://github.com/NixOS/patchelf/pull/131
+                // It seems that sometimes binaries put this plt relocations in .rela.dyn instead
+                if (!shdr) continue;
                 dyn->d_un.d_ptr = shdr->sh_addr;
             }
             else if (d_tag == DT_REL) { /* !!! hack! */
