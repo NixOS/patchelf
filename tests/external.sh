@@ -11,3 +11,6 @@ echo -n ${RANDOM_PATH} >> ${SCRATCH}/add-rpath
 ! ../src/patchelf --print-rpath ${SCRATCH}/main | grep $RANDOM_PATH
 ../src/patchelf --add-rpath @${SCRATCH}/add-rpath ${SCRATCH}/main
 ../src/patchelf --print-rpath ${SCRATCH}/main | grep $RANDOM_PATH
+
+# should print error message and fail
+../src/patchelf --set-rpath @${SCRATCH}/does-not-exist ${SCRATCH}/main 2>&1 | grep "getting info about"
