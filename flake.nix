@@ -23,18 +23,13 @@
 
     {
       overlay = final: prev: {
-        patchelf-new = final.stdenv.mkDerivation {
-          pname = "patchelf";
+        patchelf-new = final.callPackage ./patchelf.nix {
           inherit version;
           src = self;
-          nativeBuildInputs = [ final.autoreconfHook ];
-          doCheck = true;
         };
-
       };
 
       hydraJobs = {
-
         tarball =
           pkgs.releaseTools.sourceTarball rec {
             name = "patchelf-tarball";
@@ -58,7 +53,13 @@
         build = forAllSystems (system: nixpkgsFor.${system}.patchelf-new);
         build-sanitized = forAllSystems (system: nixpkgsFor.${system}.patchelf-new.overrideAttrs (old: {
           configureFlags = [ "--with-asan " "--with-ubsan" ];
+          # -Wno-unused-command-line-argument is for clang, which does not like
+          # our cc wrapper arguments
+          CFLAGS = "-Werror -Wno-unused-command-line-argument";
         }));
+        build-sanitized-clang = forAllSystems (system: self.hydraJobs.build-sanitized.${system}.override {
+          stdenv = pkgs.libcxxStdenv;
+        });
 
         release = pkgs.releaseTools.aggregate
           { name = "patchelf-${self.hydraJobs.tarball.version}";
@@ -68,6 +69,8 @@
                 self.hydraJobs.build.i686-linux
                 self.hydraJobs.build-sanitized.x86_64-linux
                 self.hydraJobs.build-sanitized.i686-linux
+                self.hydraJobs.build-sanitized-clang.x86_64-linux
+                self.hydraJobs.build-sanitized-clang.i686-linux
               ];
             meta.description = "Release-critical builds";
           };
