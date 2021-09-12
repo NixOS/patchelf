@@ -31,7 +31,8 @@ src_TESTS = \
   invalid-elf.sh \
   endianness.sh \
   contiguous_note_sections.sh \
-  no-gnu-hash.sh
+  no-gnu-hash.sh \
+  set-empty-rpath.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)
