@@ -37,7 +37,8 @@ src_TESTS = \
   no-gnu-hash.sh \
   no-dynamic-section.sh \
   args-from-file.sh \
-  basic-flags.sh
+  basic-flags.sh \
+  set-empty-rpath.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)

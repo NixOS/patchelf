@@ -1500,7 +1500,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
     debug("new rpath is '%s'\n", newRPath.c_str());
 
 
-    if (newRPath.size() <= rpathSize) {
+    if (rpath && newRPath.size() <= rpathSize) {
         memcpy(rpath, newRPath.c_str(), newRPath.size() + 1);
         return;
     }
