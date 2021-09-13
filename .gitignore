@@ -31,3 +31,4 @@ Makefile
 /tests/main-scoped
 /tests/libbig-dynstr.debug
 /tests/contiguous-note-sections
+/tests/simple-pie
