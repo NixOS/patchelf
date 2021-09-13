@@ -2,7 +2,7 @@ LIBS =
 
 STRIP ?= strip
 
-check_PROGRAMS = simple main too-many-strtab main-scoped big-dynstr no-rpath contiguous-note-sections
+check_PROGRAMS = simple-pie simple main too-many-strtab main-scoped big-dynstr no-rpath contiguous-note-sections
 
 no_rpath_arch_TESTS = \
   no-rpath-amd64.sh \
@@ -67,6 +67,9 @@ export NIX_LDFLAGS=
 simple_SOURCES = simple.c
 # no -fpic for simple.o
 simple_CFLAGS =
+
+simple_pie_SOURCES = simple.c
+simple_pie_CFLAGS = -fPIC -pie
 
 main_SOURCES = main.c
 main_LDADD = -lfoo $(AM_LDADD)
