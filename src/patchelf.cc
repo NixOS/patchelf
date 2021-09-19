@@ -600,7 +600,7 @@ void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, Elf_Addr sta
        PT_INTERP segment into memory.  Otherwise glibc will choke. */
     phdrs.resize(rdi(hdr()->e_phnum) + 1);
     wri(hdr()->e_phnum, rdi(hdr()->e_phnum) + 1);
-    Elf_Phdr & phdr = phdrs[rdi(hdr()->e_phnum) - 1];
+    Elf_Phdr & phdr = phdrs.at(rdi(hdr()->e_phnum) - 1);
     wri(phdr.p_type, PT_LOAD);
     wri(phdr.p_offset, 0);
     wri(phdr.p_vaddr, wri(phdr.p_paddr, startPage));
@@ -641,7 +641,7 @@ std::optional<std::reference_wrapper<Elf_Shdr>> ElfFile<ElfFileParamNames>::find
 {
     auto i = findSection3(sectionName);
     if (i)
-        return shdrs[i];
+        return shdrs.at(i);
     return {};
 }
 
@@ -863,7 +863,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
     wri(hdr()->e_phoff, sizeof(Elf_Ehdr));
     phdrs.resize(rdi(hdr()->e_phnum) + 1);
     wri(hdr()->e_phnum, rdi(hdr()->e_phnum) + 1);
-    Elf_Phdr & phdr = phdrs[rdi(hdr()->e_phnum) - 1];
+    Elf_Phdr & phdr = phdrs.at(rdi(hdr()->e_phnum) - 1);
     wri(phdr.p_type, PT_LOAD);
     wri(phdr.p_offset, startOffset);
     wri(phdr.p_vaddr, wri(phdr.p_paddr, startPage));
@@ -916,7 +916,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
     Elf_Addr startAddr = rdi(shdrs.at(lastReplaced + 1).sh_addr);
     std::string prevSection;
     for (unsigned int i = 1; i <= lastReplaced; ++i) {
-        Elf_Shdr & shdr(shdrs[i]);
+        Elf_Shdr & shdr(shdrs.at(i));
         std::string sectionName = getSectionName(shdr);
         debug("looking at section '%s'\n", sectionName.c_str());
         /* !!! Why do we stop after a .dynstr section? I can't
@@ -957,7 +957,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
         assert(rdi(hdr()->e_shnum) == shdrs.size());
         sortShdrs();
         for (unsigned int i = 1; i < rdi(hdr()->e_shnum); ++i)
-            * ((Elf_Shdr *) (fileContents->data() + rdi(hdr()->e_shoff)) + i) = shdrs[i];
+            * ((Elf_Shdr *) (fileContents->data() + rdi(hdr()->e_shoff)) + i) = shdrs.at(i);
     }
 
 
@@ -1349,12 +1349,12 @@ std::string ElfFile<ElfFileParamNames>::shrinkRPath(char* rpath, std::vector<std
            exists in this directory. */
         bool libFound = false;
         for (unsigned int j = 0; j < neededLibs.size(); ++j)
-            if (!neededLibFound[j]) {
-                std::string libName = dirName + "/" + neededLibs[j];
+            if (!neededLibFound.at(j)) {
+                std::string libName = dirName + "/" + neededLibs.at(j);
                 try {
                     Elf32_Half library_e_machine = getElfType(readFile(libName, sizeof(Elf32_Ehdr))).machine;
                     if (rdi(library_e_machine) == rdi(hdr()->e_machine)) {
-                        neededLibFound[j] = true;
+                        neededLibFound.at(j) = true;
                         libFound = true;
                     } else
                         debug("ignoring library '%s' because its machine type differs\n", libName.c_str());
