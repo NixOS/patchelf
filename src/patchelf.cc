@@ -160,7 +160,7 @@ private:
 
     Elf_Shdr & findSection(const SectionName & sectionName);
 
-    Elf_Shdr * findSection2(const SectionName & sectionName);
+    std::optional<std::reference_wrapper<Elf_Shdr>> findSection2(const SectionName & sectionName);
 
     unsigned int findSection3(const SectionName & sectionName);
 
@@ -637,10 +637,12 @@ Elf_Shdr & ElfFile<ElfFileParamNames>::findSection(const SectionName & sectionNa
 
 
 template<ElfFileParams>
-Elf_Shdr * ElfFile<ElfFileParamNames>::findSection2(const SectionName & sectionName)
+std::optional<std::reference_wrapper<Elf_Shdr>> ElfFile<ElfFileParamNames>::findSection2(const SectionName & sectionName)
 {
     auto i = findSection3(sectionName);
-    return i ? &shdrs[i] : nullptr;
+    if (i)
+        return shdrs[i];
+    return {};
 }
 
 
@@ -1121,7 +1123,7 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
        (e.g., those produced by klibc's klcc). */
     auto shdrDynamic = findSection2(".dynamic");
     if (shdrDynamic) {
-        auto dyn_table = (Elf_Dyn *) (fileContents->data() + rdi(shdrDynamic->sh_offset));
+        auto dyn_table = (Elf_Dyn *) (fileContents->data() + rdi((*shdrDynamic).get().sh_offset));
         unsigned int d_tag;
         for (auto dyn = dyn_table; (d_tag = rdi(dyn->d_tag)) != DT_NULL; dyn++)
             if (d_tag == DT_STRTAB)
@@ -1136,13 +1138,14 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                 auto shdr = findSection2(".gnu.hash");
                 // some binaries might this section stripped
                 // in which case we just ignore the value.
-                if (shdr) dyn->d_un.d_ptr = shdr->sh_addr;
+                if (shdr) dyn->d_un.d_ptr = (*shdr).get().sh_addr;
             } else if (d_tag == DT_JMPREL) {
                 auto shdr = findSection2(".rel.plt");
-                if (!shdr) shdr = findSection2(".rela.plt"); /* 64-bit Linux, x86-64 */
+                if (!shdr) shdr = findSection2(".rela.plt");
+                /* 64-bit Linux, x86-64 */
                 if (!shdr) shdr = findSection2(".rela.IA_64.pltoff"); /* 64-bit Linux, IA-64 */
                 if (!shdr) error("cannot find section corresponding to DT_JMPREL");
-                dyn->d_un.d_ptr = shdr->sh_addr;
+                dyn->d_un.d_ptr = (*shdr).get().sh_addr;
             }
             else if (d_tag == DT_REL) { /* !!! hack! */
                 auto shdr = findSection2(".rel.dyn");
@@ -1152,14 +1155,14 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                 /* some programs have neither section, but this doesn't seem
                    to be a problem */
                 if (!shdr) continue;
-                dyn->d_un.d_ptr = shdr->sh_addr;
+                dyn->d_un.d_ptr = (*shdr).get().sh_addr;
             }
             else if (d_tag == DT_RELA) {
                 auto shdr = findSection2(".rela.dyn");
                 /* some programs lack this section, but it doesn't seem to
                    be a problem */
                 if (!shdr) continue;
-                dyn->d_un.d_ptr = shdr->sh_addr;
+                dyn->d_un.d_ptr = (*shdr).get().sh_addr;
             }
             else if (d_tag == DT_VERNEED)
                 dyn->d_un.d_ptr = findSection(".gnu.version_r").sh_addr;
@@ -1172,7 +1175,7 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                 if (shdr) {
                     auto rld_map_addr = findSection(".rld_map").sh_addr;
                     auto dyn_offset = ((char*)dyn) - ((char*)dyn_table);
-                    dyn->d_un.d_ptr = rld_map_addr + dyn_offset - shdrDynamic->sh_addr;
+                    dyn->d_un.d_ptr = rld_map_addr + dyn_offset - (*shdrDynamic).get().sh_addr;
                 } else {
                     /* ELF file with DT_MIPS_RLD_MAP_REL but without .rld_map
                        is broken, and it's not our job to fix it; yet, we have
