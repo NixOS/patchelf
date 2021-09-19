@@ -65,16 +65,11 @@ using FileContents = std::shared_ptr<std::vector<unsigned char>>;
 
 static std::vector<std::string> splitColonDelimitedString(const char * s)
 {
+    std::string item;
     std::vector<std::string> parts;
-    const char * pos = s;
-    while (*pos) {
-        const char * end = strchr(pos, ':');
-        if (!end) end = strchr(pos, 0);
-
-        parts.push_back(std::string(pos, end - pos));
-        if (*end == ':') ++end;
-        pos = end;
-    }
+    std::stringstream ss(s);
+    while (std::getline(ss, item, ':'))
+        parts.push_back(item);
 
     return parts;
 }
