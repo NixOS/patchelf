@@ -1,7 +1,5 @@
 LIBS =
 
-STRIP ?= strip
-
 check_PROGRAMS = simple-pie simple main too-many-strtab main-scoped big-dynstr no-rpath contiguous-note-sections
 
 no_rpath_arch_TESTS = \
