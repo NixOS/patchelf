@@ -39,7 +39,8 @@ src_TESTS = \
   no-dynamic-section.sh \
   args-from-file.sh \
   basic-flags.sh \
-  set-empty-rpath.sh
+  set-empty-rpath.sh \
+  phdr-corruption.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)
@@ -104,7 +105,8 @@ check_DATA = libbig-dynstr.debug
 # - without libtool, only archives (static libraries) can be built by automake
 # - with libtool, it is difficult to control options
 # - with libtool, it is not possible to compile convenience *dynamic* libraries :-(
-check_PROGRAMS += libfoo.so libfoo-scoped.so libbar.so libbar-scoped.so libsimple.so libbuildid.so libtoomanystrtab.so
+check_PROGRAMS += libfoo.so libfoo-scoped.so libbar.so libbar-scoped.so libsimple.so libbuildid.so libtoomanystrtab.so \
+                  phdr-corruption.so
 
 libbuildid_so_SOURCES = simple.c
 libbuildid_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-build-id
@@ -138,3 +140,7 @@ no_rpath_CFLAGS =
 contiguous_note_sections_SOURCES = contiguous-note-sections.s contiguous-note-sections.ld
 contiguous_note_sections_LDFLAGS = -nostdlib -T contiguous-note-sections.ld
 contiguous_note_sections_CFLAGS = -pie
+
+phdr_corruption_so_SOURCES = void.c phdr-corruption.ld
+phdr_corruption_so_LDFLAGS = -nostdlib -shared -Wl,-Tphdr-corruption.ld
+phdr_corruption_so_CFLAGS =
