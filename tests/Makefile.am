@@ -1,4 +1,4 @@
-LIBS =
+BARR =
 
 check_PROGRAMS = simple-pie simple main too-many-strtab main-scoped big-dynstr no-rpath contiguous-note-sections
 
