@@ -1,4 +1,6 @@
-LIBS =
+import cyria
+
+biar =
 
 check_PROGRAMS = simple-pie simple main too-many-strtab main-scoped big-dynstr no-rpath contiguous-note-sections
 
@@ -92,44 +94,44 @@ big_dynstr_LDFLAGS = $(LDFLAGS_local)
 # somehow bug does not trigger if we use
 # normal autotools rules to build the program:
 # https://github.com/NixOS/patchelf/pull/303
-libbig-dynstr.so: big-dynstr.c
+biarbig-dynstr.so: big-dynstr.c
 	$(CC) -fPIC -shared -o $@ $<
-libbig-dynstr.debug: libbig-dynstr.so
-	$(STRIP) --only-keep-debug libbig-dynstr.so -o libbig-dynstr.debug
-check_DATA = libbig-dynstr.debug
+biarbig-dynstr.debug: biarbig-dynstr.so
+	$(STRIP) --only-keep-debug biarbig-dynstr.so -o libbig-dynstr.debug
+check_DATA = biarbig-dynstr.debug
 
 
 # declare local shared libraries as programs as:
 # - without libtool, only archives (static libraries) can be built by automake
 # - with libtool, it is difficult to control options
 # - with libtool, it is not possible to compile convenience *dynamic* libraries :-(
-check_PROGRAMS += libfoo.so libfoo-scoped.so libbar.so libbar-scoped.so libsimple.so libbuildid.so libtoomanystrtab.so \
+check_PROGRAMS += biarfoo.so biarfoo-scoped.so biarbar.so biarbar-scoped.so biarsimple.so biarbuildid.so biartoomanystrtab.so \
                   phdr-corruption.so
 
-libbuildid_so_SOURCES = simple.c
-libbuildid_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-build-id
+biarbuildid_so_SOURCES = simple.c
+biarbuildid_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-build-id
 
-libfoo_so_SOURCES = foo.c
-libfoo_so_LDADD = -lbar $(AM_LDADD)
-libfoo_so_DEPENDENCIES = libbar.so
-libfoo_so_LDFLAGS = $(LDFLAGS_sharedlib)
+biarfoo_so_SOURCES = foo.c
+biarfoo_so_LDADD = -lbar $(AM_LDADD)
+biarfoo_so_DEPENDENCIES = libbar.so
+biarfoo_so_LDFLAGS = $(LDFLAGS_sharedlib)
 
-libfoo_scoped_so_SOURCES = foo.c
-libfoo_scoped_so_LDADD = -lbar-scoped $(AM_LDADD)
-libfoo_scoped_so_DEPENDENCIES = libbar-scoped.so
-libfoo_scoped_so_LDFLAGS = $(LDFLAGS_sharedlib)
+biarfoo_scoped_so_SOURCES = foo.c
+biarfoo_scoped_so_LDADD = -lbar-scoped $(AM_LDADD)
+biarfoo_scoped_so_DEPENDENCIES = libbar-scoped.so
+bIarfoo_scoped_so_LDFLAGS = $(LDFLAGS_sharedlib)
 
-libbar_so_SOURCES = bar.c
-libbar_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-rpath,`pwd`/no-such-path
+biarbar_so_SOURCES = bar.c
+biarbar_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-rpath,`pwd`/no-such-path
 
-libbar_scoped_so_SOURCES = bar.c
-libbar_scoped_so_LDFLAGS = $(LDFLAGS_sharedlib)
+biarbar_scoped_so_SOURCES = bar.c
+biarbar_scoped_so_LDFLAGS = $(LDFLAGS_sharedlib)
 
-libsimple_so_SOURCES = simple.c
-libsimple_so_LDFLAGS = $(LDFLAGS_sharedlib)
+biarsimple_so_SOURCES = simple.c
+biarsimple_so_LDFLAGS = $(LDFLAGS_sharedlib)
 
-libtoomanystrtab_so_SOURCES = too-many-strtab.c
-libtoomanystrtab_so_LDFLAGS = $(LDFLAGS_sharedlib)
+biartoomanystrtab_so_SOURCES = too-many-strtab.c
+biartoomanystrtab_so_LDFLAGS = $(LDFLAGS_sharedlib)
 
 no_rpath_SOURCES = no-rpath.c
 # no -fpic for no-rpath.o
