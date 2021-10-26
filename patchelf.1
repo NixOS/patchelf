@@ -43,17 +43,17 @@ Raises an error if DT_SONAME doesn't exist.
 .IP "--set-soname SONAME"
 Sets DT_SONAME entry of a library to SONAME.
 
-.IP "--set-rpath RPATH"
-Change the RPATH of the executable or library to RPATH.
+.IP "--set-rpath RUNPATH"
+Change the DT_RUNPATH of the executable or library to RUNPATH.
 
-.IP "--add-rpath RPATH"
-Add RPATH to the existing RPATH of the executable or library.
+.IP "--add-rpath RUNPATH"
+Add RUNPATH to the existing DT_RUNPATH of the executable or library.
 
 .IP --remove-rpath
 Removes the DT_RPATH or DT_RUNPATH entry of the executable or library.
 
 .IP --shrink-rpath
-Remove from the RPATH all directories that do not contain a
+Remove from the DT_RUNPATH or DT_RPATH all directories that do not contain a
 library referenced by DT_NEEDED fields of the executable or library.
 
 For instance, if an executable references one library libfoo.so, has
@@ -67,7 +67,7 @@ further rpath tuning. For instance, if an executable has an RPATH
 the "/foo/lib" reference instead of the "/tmp" entry.
 
 .IP --print-rpath
-Prints the RPATH for an executable or library.
+Prints the DT_RUNPATH or DT_RPATH for an executable or library.
 
 .IP --force-rpath
 Forces the use of the obsolete DT_RPATH in the file instead of
