@@ -160,7 +160,7 @@ private:
 
     Elf_Shdr & findSection(const SectionName & sectionName);
 
-    Elf_Shdr * findSection2(const SectionName & sectionName);
+    std::optional<std::reference_wrapper<Elf_Shdr>> findSection2(const SectionName & sectionName);
 
     unsigned int findSection3(const SectionName & sectionName);
 
@@ -600,7 +600,7 @@ void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, Elf_Addr sta
        PT_INTERP segment into memory.  Otherwise glibc will choke. */
     phdrs.resize(rdi(hdr()->e_phnum) + 1);
     wri(hdr()->e_phnum, rdi(hdr()->e_phnum) + 1);
-    Elf_Phdr & phdr = phdrs[rdi(hdr()->e_phnum) - 1];
+    Elf_Phdr & phdr = phdrs.at(rdi(hdr()->e_phnum) - 1);
     wri(phdr.p_type, PT_LOAD);
     wri(phdr.p_offset, 0);
     wri(phdr.p_vaddr, wri(phdr.p_paddr, startPage));
@@ -637,10 +637,12 @@ Elf_Shdr & ElfFile<ElfFileParamNames>::findSection(const SectionName & sectionNa
 
 
 template<ElfFileParams>
-Elf_Shdr * ElfFile<ElfFileParamNames>::findSection2(const SectionName & sectionName)
+std::optional<std::reference_wrapper<Elf_Shdr>> ElfFile<ElfFileParamNames>::findSection2(const SectionName & sectionName)
 {
     auto i = findSection3(sectionName);
-    return i ? &shdrs[i] : nullptr;
+    if (i)
+        return shdrs.at(i);
+    return {};
 }
 
 
@@ -861,7 +863,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
     wri(hdr()->e_phoff, sizeof(Elf_Ehdr));
     phdrs.resize(rdi(hdr()->e_phnum) + 1);
     wri(hdr()->e_phnum, rdi(hdr()->e_phnum) + 1);
-    Elf_Phdr & phdr = phdrs[rdi(hdr()->e_phnum) - 1];
+    Elf_Phdr & phdr = phdrs.at(rdi(hdr()->e_phnum) - 1);
     wri(phdr.p_type, PT_LOAD);
     wri(phdr.p_offset, startOffset);
     wri(phdr.p_vaddr, wri(phdr.p_paddr, startPage));
@@ -914,7 +916,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
     Elf_Addr startAddr = rdi(shdrs.at(lastReplaced + 1).sh_addr);
     std::string prevSection;
     for (unsigned int i = 1; i <= lastReplaced; ++i) {
-        Elf_Shdr & shdr(shdrs[i]);
+        Elf_Shdr & shdr(shdrs.at(i));
         std::string sectionName = getSectionName(shdr);
         debug("looking at section '%s'\n", sectionName.c_str());
         /* !!! Why do we stop after a .dynstr section? I can't
@@ -955,7 +957,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
         assert(rdi(hdr()->e_shnum) == shdrs.size());
         sortShdrs();
         for (unsigned int i = 1; i < rdi(hdr()->e_shnum); ++i)
-            * ((Elf_Shdr *) (fileContents->data() + rdi(hdr()->e_shoff)) + i) = shdrs[i];
+            * ((Elf_Shdr *) (fileContents->data() + rdi(hdr()->e_shoff)) + i) = shdrs.at(i);
     }
 
 
@@ -1121,7 +1123,7 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
        (e.g., those produced by klibc's klcc). */
     auto shdrDynamic = findSection2(".dynamic");
     if (shdrDynamic) {
-        auto dyn_table = (Elf_Dyn *) (fileContents->data() + rdi(shdrDynamic->sh_offset));
+        auto dyn_table = (Elf_Dyn *) (fileContents->data() + rdi((*shdrDynamic).get().sh_offset));
         unsigned int d_tag;
         for (auto dyn = dyn_table; (d_tag = rdi(dyn->d_tag)) != DT_NULL; dyn++)
             if (d_tag == DT_STRTAB)
@@ -1136,13 +1138,14 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                 auto shdr = findSection2(".gnu.hash");
                 // some binaries might this section stripped
                 // in which case we just ignore the value.
-                if (shdr) dyn->d_un.d_ptr = shdr->sh_addr;
+                if (shdr) dyn->d_un.d_ptr = (*shdr).get().sh_addr;
             } else if (d_tag == DT_JMPREL) {
                 auto shdr = findSection2(".rel.plt");
-                if (!shdr) shdr = findSection2(".rela.plt"); /* 64-bit Linux, x86-64 */
+                if (!shdr) shdr = findSection2(".rela.plt");
+                /* 64-bit Linux, x86-64 */
                 if (!shdr) shdr = findSection2(".rela.IA_64.pltoff"); /* 64-bit Linux, IA-64 */
                 if (!shdr) error("cannot find section corresponding to DT_JMPREL");
-                dyn->d_un.d_ptr = shdr->sh_addr;
+                dyn->d_un.d_ptr = (*shdr).get().sh_addr;
             }
             else if (d_tag == DT_REL) { /* !!! hack! */
                 auto shdr = findSection2(".rel.dyn");
@@ -1152,14 +1155,14 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                 /* some programs have neither section, but this doesn't seem
                    to be a problem */
                 if (!shdr) continue;
-                dyn->d_un.d_ptr = shdr->sh_addr;
+                dyn->d_un.d_ptr = (*shdr).get().sh_addr;
             }
             else if (d_tag == DT_RELA) {
                 auto shdr = findSection2(".rela.dyn");
                 /* some programs lack this section, but it doesn't seem to
                    be a problem */
                 if (!shdr) continue;
-                dyn->d_un.d_ptr = shdr->sh_addr;
+                dyn->d_un.d_ptr = (*shdr).get().sh_addr;
             }
             else if (d_tag == DT_VERNEED)
                 dyn->d_un.d_ptr = findSection(".gnu.version_r").sh_addr;
@@ -1172,7 +1175,7 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                 if (shdr) {
                     auto rld_map_addr = findSection(".rld_map").sh_addr;
                     auto dyn_offset = ((char*)dyn) - ((char*)dyn_table);
-                    dyn->d_un.d_ptr = rld_map_addr + dyn_offset - shdrDynamic->sh_addr;
+                    dyn->d_un.d_ptr = rld_map_addr + dyn_offset - (*shdrDynamic).get().sh_addr;
                 } else {
                     /* ELF file with DT_MIPS_RLD_MAP_REL but without .rld_map
                        is broken, and it's not our job to fix it; yet, we have
@@ -1346,12 +1349,12 @@ std::string ElfFile<ElfFileParamNames>::shrinkRPath(char* rpath, std::vector<std
            exists in this directory. */
         bool libFound = false;
         for (unsigned int j = 0; j < neededLibs.size(); ++j)
-            if (!neededLibFound[j]) {
-                std::string libName = dirName + "/" + neededLibs[j];
+            if (!neededLibFound.at(j)) {
+                std::string libName = dirName + "/" + neededLibs.at(j);
                 try {
                     Elf32_Half library_e_machine = getElfType(readFile(libName, sizeof(Elf32_Ehdr))).machine;
                     if (rdi(library_e_machine) == rdi(hdr()->e_machine)) {
-                        neededLibFound[j] = true;
+                        neededLibFound.at(j) = true;
                         libFound = true;
                     } else
                         debug("ignoring library '%s' because its machine type differs\n", libName.c_str());

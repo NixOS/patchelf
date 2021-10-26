@@ -1,4 +1,4 @@
-AM_CXXFLAGS = -Wall -std=c++11 -D_FILE_OFFSET_BITS=64
+AM_CXXFLAGS = -Wall -std=c++17 -D_FILE_OFFSET_BITS=64
 
 if WITH_ASAN
 AM_CXXFLAGS += -fsanitize=address -fsanitize-address-use-after-scope
