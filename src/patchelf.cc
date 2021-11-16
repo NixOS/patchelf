@@ -57,6 +57,10 @@ static int forcedPageSize = DEFAULT_PAGESIZE;
 static int forcedPageSize = -1;
 #endif
 
+#ifndef EM_LOONGARCH
+#define EM_LOONGARCH    258
+#endif
+
 using FileContents = std::shared_ptr<std::vector<unsigned char>>;
 
 #define ElfFileParams class Elf_Ehdr, class Elf_Phdr, class Elf_Shdr, class Elf_Addr, class Elf_Off, class Elf_Dyn, class Elf_Sym, class Elf_Verneed, class Elf_Versym
@@ -460,6 +464,7 @@ unsigned int ElfFile<ElfFileParamNames>::getPageSize() const
       case EM_PPC64:
       case EM_AARCH64:
       case EM_TILEGX:
+      case EM_LOONGARCH:
         return 0x10000;
       default:
         return 0x1000;
