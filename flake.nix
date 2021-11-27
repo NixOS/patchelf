@@ -44,11 +44,16 @@
           };
 
         coverage =
-          pkgs.releaseTools.coverageAnalysis {
+          (pkgs.releaseTools.coverageAnalysis {
             name = "patchelf-coverage";
             src = self.hydraJobs.tarball;
             lcovFilter = ["*/tests/*"];
-          };
+          }).overrideAttrs (old: {
+            preCheck = ''
+              # coverage cflag breaks this target
+              NIX_CFLAGS_COMPILE=''${NIX_CFLAGS_COMPILE//--coverage} make -C tests phdr-corruption.so
+            '';
+          });
 
         build = forAllSystems (system: nixpkgsFor.${system}.patchelf-new);
         build-sanitized = forAllSystems (system: nixpkgsFor.${system}.patchelf-new.overrideAttrs (old: {
