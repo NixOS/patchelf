@@ -58,7 +58,7 @@
           CFLAGS = "-Werror -Wno-unused-command-line-argument";
         }));
         build-sanitized-clang = forAllSystems (system: self.hydraJobs.build-sanitized.${system}.override {
-          stdenv = pkgs.libcxxStdenv;
+          stdenv = nixpkgsFor.${system}.libcxxStdenv;
         });
 
         release = pkgs.releaseTools.aggregate
