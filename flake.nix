@@ -44,11 +44,16 @@
           };
 
         coverage =
-          pkgs.releaseTools.coverageAnalysis {
+          (pkgs.releaseTools.coverageAnalysis {
             name = "patchelf-coverage";
             src = self.hydraJobs.tarball;
             lcovFilter = ["*/tests/*"];
-          };
+          }).overrideAttrs (old: {
+            preCheck = ''
+              # coverage cflag breaks this target
+              NIX_CFLAGS_COMPILE=''${NIX_CFLAGS_COMPILE//--coverage} make -C tests phdr-corruption.so
+            '';
+          });
 
         build = forAllSystems (system: nixpkgsFor.${system}.patchelf-new);
         build-sanitized = forAllSystems (system: nixpkgsFor.${system}.patchelf-new.overrideAttrs (old: {
@@ -57,8 +62,9 @@
           # our cc wrapper arguments
           CFLAGS = "-Werror -Wno-unused-command-line-argument";
         }));
-        build-sanitized-clang = forAllSystems (system: self.hydraJobs.build-sanitized.${system}.override {
-          stdenv = pkgs.libcxxStdenv;
+        # 32-bit clangStdenv seems broken in nixpkgs
+        build-sanitized-clang = nixpkgs.lib.genAttrs [ "x86_64-linux" "aarch64-linux" ] (system: self.hydraJobs.build-sanitized.${system}.override {
+          stdenv = nixpkgsFor.${system}.libcxxStdenv;
         });
 
         release = pkgs.releaseTools.aggregate
@@ -70,7 +76,6 @@
                 self.hydraJobs.build-sanitized.x86_64-linux
                 self.hydraJobs.build-sanitized.i686-linux
                 self.hydraJobs.build-sanitized-clang.x86_64-linux
-                self.hydraJobs.build-sanitized-clang.i686-linux
               ];
             meta.description = "Release-critical builds";
           };
