@@ -24,6 +24,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <cassert>
@@ -1584,6 +1585,7 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
     unsigned int verNeedNum = 0;
 
     unsigned int dynStrAddedBytes = 0;
+    std::unordered_map<std::string, Elf_Off> addedStrings;
 
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_NEEDED) {
@@ -1594,15 +1596,25 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
 
                 debug("replacing DT_NEEDED entry '%s' with '%s'\n", name, replacement.c_str());
 
+                auto a = addedStrings.find(replacement);
+                // the same replacement string has already been added, reuse it
+                if (a != addedStrings.end()) {
+                    wri(dyn->d_un.d_val, a->second);
+                    continue;
+                }
+
                 // technically, the string referred by d_val could be used otherwise, too (although unlikely)
                 // we'll therefore add a new string
                 debug("resizing .dynstr ...\n");
 
+                // relative location of the new string
+                Elf_Off strOffset = rdi(shdrDynStr.sh_size) + dynStrAddedBytes;
                 std::string & newDynStr = replaceSection(".dynstr",
-                    rdi(shdrDynStr.sh_size) + replacement.size() + 1 + dynStrAddedBytes);
-                setSubstr(newDynStr, rdi(shdrDynStr.sh_size) + dynStrAddedBytes, replacement + '\0');
+                    strOffset + replacement.size() + 1);
+                setSubstr(newDynStr, strOffset, replacement + '\0');
 
-                wri(dyn->d_un.d_val, rdi(shdrDynStr.sh_size) + dynStrAddedBytes);
+                wri(dyn->d_un.d_val, strOffset);
+                addedStrings[replacement] = strOffset;
 
                 dynStrAddedBytes += replacement.size() + 1;
 
@@ -1636,6 +1648,13 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
         debug("found .gnu.version_r with %i entries, strings in %s\n", verNeedNum, versionRStringsSName.c_str());
 
         unsigned int verStrAddedBytes = 0;
+        // It may be that it is .dynstr again, in which case we must take the already
+        // added bytes into account.
+        if (versionRStringsSName == ".dynstr")
+            verStrAddedBytes += dynStrAddedBytes;
+        else
+            // otherwise the already added strings can't be reused
+            addedStrings.clear();
 
         auto need = (Elf_Verneed *)(fileContents->data() + rdi(shdrVersionR.sh_offset));
         while (verNeedNum > 0) {
@@ -1645,15 +1664,24 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
                 auto replacement = i->second;
 
                 debug("replacing .gnu.version_r entry '%s' with '%s'\n", file, replacement.c_str());
-                debug("resizing string section %s ...\n", versionRStringsSName.c_str());
 
-                std::string & newVerDynStr = replaceSection(versionRStringsSName,
-                    rdi(shdrVersionRStrings.sh_size) + replacement.size() + 1 + verStrAddedBytes);
-                setSubstr(newVerDynStr, rdi(shdrVersionRStrings.sh_size) + verStrAddedBytes, replacement + '\0');
+                auto a = addedStrings.find(replacement);
+                // the same replacement string has already been added, reuse it
+                if (a != addedStrings.end()) {
+                    wri(need->vn_file, a->second);
+                } else {
+                    debug("resizing string section %s ...\n", versionRStringsSName.c_str());
 
-                wri(need->vn_file, rdi(shdrVersionRStrings.sh_size) + verStrAddedBytes);
+                    Elf_Off strOffset = rdi(shdrVersionRStrings.sh_size) + verStrAddedBytes;
+                    std::string & newVerDynStr = replaceSection(versionRStringsSName,
+                        strOffset + replacement.size() + 1);
+                    setSubstr(newVerDynStr, strOffset, replacement + '\0');
 
-                verStrAddedBytes += replacement.size() + 1;
+                    wri(need->vn_file, strOffset);
+                    addedStrings[replacement] = strOffset;
+
+                    verStrAddedBytes += replacement.size() + 1;
+                }
 
                 changed = true;
             } else {
