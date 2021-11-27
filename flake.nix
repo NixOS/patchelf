@@ -62,7 +62,8 @@
           # our cc wrapper arguments
           CFLAGS = "-Werror -Wno-unused-command-line-argument";
         }));
-        build-sanitized-clang = forAllSystems (system: self.hydraJobs.build-sanitized.${system}.override {
+        # 32-bit clangStdenv seems broken in nixpkgs
+        build-sanitized-clang = nixpkgs.lib.genAttrs [ "x86_64-linux" "aarch64-linux" ] (system: self.hydraJobs.build-sanitized.${system}.override {
           stdenv = nixpkgsFor.${system}.libcxxStdenv;
         });
 
@@ -75,7 +76,6 @@
                 self.hydraJobs.build-sanitized.x86_64-linux
                 self.hydraJobs.build-sanitized.i686-linux
                 self.hydraJobs.build-sanitized-clang.x86_64-linux
-                self.hydraJobs.build-sanitized-clang.i686-linux
               ];
             meta.description = "Release-critical builds";
           };
