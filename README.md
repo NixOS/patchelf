@@ -99,6 +99,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ## Release History
 
+0.13.1 (...):
+
+* Bug fixes:
+  - fix setting empty rpath
+  - use memcpy instead of strcpy to set rpath
+  - Don't try to parse .dynamic section of type NOBITS
+  - fix use-after-free in normalizeNoteSegments
+  - correct EINTR handling in writeFile
+  - Adjust PT_MIPS_ABIFLAGS segment if present
+  - Adjust DT_MIPS_RLD_MAP_REL dynamic section entry if present
+  - fix binaries without .gnu.hash section
+
 0.13 (August 5, 2021):
 
 * New `--add-rpath` flag.
