@@ -64,7 +64,7 @@
         }));
         # 32-bit clangStdenv seems broken in nixpkgs
         build-sanitized-clang = nixpkgs.lib.genAttrs [ "x86_64-linux" "aarch64-linux" ] (system: self.hydraJobs.build-sanitized.${system}.override {
-          stdenv = nixpkgsFor.${system}.libcxxStdenv;
+          stdenv = nixpkgsFor.${system}.llvmPackages_latest.libcxxStdenv;
         });
 
         release = pkgs.releaseTools.aggregate
