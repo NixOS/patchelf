@@ -99,6 +99,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ## Release History
 
+0.14.1 (November 28, 2021):
+
+* build fix: add missing include
+
 0.14 (November 27, 2021):
 
 Changes compared to 0.13:
