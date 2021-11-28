@@ -62,9 +62,10 @@
           # our cc wrapper arguments
           CFLAGS = "-Werror -Wno-unused-command-line-argument";
         }));
-        # 32-bit clangStdenv seems broken in nixpkgs
-        build-sanitized-clang = nixpkgs.lib.genAttrs [ "x86_64-linux" "aarch64-linux" ] (system: self.hydraJobs.build-sanitized.${system}.override {
-          stdenv = nixpkgsFor.${system}.libcxxStdenv;
+
+        # x86_64-linux seems to be only working clangStdenv at the moment
+        build-sanitized-clang = nixpkgs.lib.genAttrs [ "x86_64-linux" ] (system: self.hydraJobs.build-sanitized.${system}.override {
+          stdenv = nixpkgsFor.${system}.llvmPackages_latest.libcxxStdenv;
         });
 
         release = pkgs.releaseTools.aggregate
