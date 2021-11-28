@@ -3,9 +3,22 @@ on:
   pull_request:
   push:
 jobs:
-  tests:
+  nix:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - uses: cachix/install-nix-action@v13
     - run: nix-build -A hydraJobs.release
+  ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: get toolchain version
+      run: |
+        c++ --version
+        ld --version
+        autoconf --version
+    - run: |
+        ./bootstrap.sh
+        ./configure --with-asan --with-ubsan
+        make -j$(nproc) check
