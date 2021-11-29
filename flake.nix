@@ -15,9 +15,7 @@
           overlays = [ self.overlay ];
         }
       );
-      version = builtins.readFile ./version
-                + "." + builtins.substring 0 8 self.lastModifiedDate
-                + "." + (self.shortRev or "dirty");
+      version = builtins.readFile ./version;
       pkgs = nixpkgsFor.${"x86_64-linux"};
     in
 
