@@ -99,6 +99,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ## Release History
 
+0.14.3 (December 05, 2021):
+
+* this release adds support for static, pre-compiled patchelf binaries
+
 0.14.2 (November 29, 2021):
 
 * make version number in tarball easier to use for packagers
