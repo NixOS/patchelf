@@ -108,7 +108,7 @@ check_PROGRAMS += libfoo.so libfoo-scoped.so libbar.so libbar-scoped.so libsimpl
                   phdr-corruption.so
 
 libbuildid_so_SOURCES = simple.c
-libbuildid_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-build-id
+libbuildid_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,--build-id
 
 libfoo_so_SOURCES = foo.c
 libfoo_so_LDADD = -lbar $(AM_LDADD)
