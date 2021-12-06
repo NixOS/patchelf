@@ -16,4 +16,5 @@ long_rpath="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 ../src/patchelf \
   --set-rpath "$long_rpath" "${SCRATCH}/libbuildid.so"
 
-readelf -n "${SCRATCH}/libbuildid.so" | grep -q "Build ID"
+# older readelf versions do not recognize build id, but we can grep by constant
+readelf -n "${SCRATCH}/libbuildid.so" |  grep -q -F -e 'Build ID' -e 'Unknown note type: (0x00000003)'
