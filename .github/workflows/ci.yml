@@ -20,5 +20,6 @@ jobs:
         autoconf --version
     - run: |
         ./bootstrap.sh
-        ./configure --with-asan --with-ubsan
+        mkdir build && cd build
+        ../configure --with-asan --with-ubsan
         make -j$(nproc) check
