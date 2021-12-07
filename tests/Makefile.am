@@ -129,7 +129,8 @@ libbar_scoped_so_LDFLAGS = $(LDFLAGS_sharedlib)
 libsimple_so_SOURCES = simple.c
 libsimple_so_LDFLAGS = $(LDFLAGS_sharedlib)
 
-libtoomanystrtab_so_SOURCES = too-many-strtab.c
+too_many_strtab_SOURCES = too-many-strtab.c too-many-strtab2.s
+libtoomanystrtab_so_SOURCES = too-many-strtab.c too-many-strtab2.s
 libtoomanystrtab_so_LDFLAGS = $(LDFLAGS_sharedlib)
 
 no_rpath_SOURCES = no-rpath.c
