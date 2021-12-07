@@ -83,7 +83,7 @@ main_scoped_LDFLAGS = $(LDFLAGS_local)
 
 big-dynstr.c: main.c
 	cat $< > big-dynstr.c
-	for i in $$(seq 1 2000); do echo "void f$$i(void) { };"; done >> big-dynstr.c
+	i=1; while [ $$i -le 2000 ]; do echo "void f$$i(void) { };"; i=$$(($$i + 1)); done >> big-dynstr.c
 
 nodist_big_dynstr_SOURCES = big-dynstr.c
 big_dynstr_LDADD = -lfoo $(AM_LDADD)
