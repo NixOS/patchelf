@@ -137,9 +137,9 @@ no_rpath_SOURCES = no-rpath.c
 no_rpath_CFLAGS =
 
 contiguous_note_sections_SOURCES = contiguous-note-sections.s contiguous-note-sections.ld
-contiguous_note_sections_LDFLAGS = -nostdlib -T contiguous-note-sections.ld
+contiguous_note_sections_LDFLAGS = -nostdlib -T $(srcdir)/contiguous-note-sections.ld
 contiguous_note_sections_CFLAGS = -pie
 
 phdr_corruption_so_SOURCES = void.c phdr-corruption.ld
-phdr_corruption_so_LDFLAGS = -nostdlib -shared -Wl,-Tphdr-corruption.ld
+phdr_corruption_so_LDFLAGS = -nostdlib -shared -Wl,-T$(srcdir)/phdr-corruption.ld
 phdr_corruption_so_CFLAGS =
