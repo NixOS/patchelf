@@ -8,7 +8,7 @@ mkdir -p ${SCRATCH}
 cp simple-pie ${SCRATCH}/simple-pie
 
 # Add a 40MB rpath
-head -c 40000000 /dev/urandom > ${SCRATCH}/foo.bin
+tr -cd 'a-z0-9' < /dev/urandom | dd count=40 bs=1000000 > ${SCRATCH}/foo.bin
 
 # Grow the file
 ../src/patchelf --add-rpath @${SCRATCH}/foo.bin ${SCRATCH}/simple-pie
