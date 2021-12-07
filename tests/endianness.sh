@@ -6,7 +6,7 @@ for arch in ppc64 ppc64le; do
     rm -rf ${SCRATCH}
     mkdir -p ${SCRATCH}
 
-    cp endianness/${arch}/main endianness/${arch}/libtest.so ${SCRATCH}/
+    cp ${srcdir}/endianness/${arch}/main ${srcdir}/endianness/${arch}/libtest.so ${SCRATCH}/
 
     rpath="${PWD}/${SCRATCH}"
 
@@ -19,6 +19,6 @@ for arch in ppc64 ppc64le; do
     # check whether rpath is still present
     if ! ${PATCHELF} --print-rpath ${SCRATCH}/main-shrunk | grep -q "$rpath"; then
         echo "rpath was removed for ${arch}"
-	exit 1
+        exit 1
     fi
 done
