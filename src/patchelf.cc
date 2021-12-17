@@ -36,9 +36,12 @@
 #include <cstring>
 
 #include <fcntl.h>
+#include <dlfcn.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <regex>
+#include <array>
 
 #include "elf.h"
 
@@ -93,6 +96,8 @@ public:
 
     const FileContents fileContents;
 
+    const std::string fileName;
+
 private:
 
     std::vector<Elf_Phdr> phdrs;
@@ -118,7 +123,7 @@ private:
     std::vector<SectionName> sectionsByOldIndex;
 
 public:
-    explicit ElfFile(FileContents fileContents);
+    explicit ElfFile(FileContents fileContents, std::string fileName);
 
     bool isChanged()
     {
@@ -209,6 +214,10 @@ public:
     void removeNeeded(const std::set<std::string> & libs);
 
     void replaceNeeded(const std::map<std::string, std::string> & libs);
+
+    void shrinkWrap(std::map<std::string, std::string> & neededLibsToReplace, std::set<std::string> & neededLibsToAdd);
+
+    std::vector<std::string> getNeededLibs();
 
     void printNeededLibs() /* should be const */;
 
@@ -382,8 +391,8 @@ static void checkPointer(const FileContents & contents, void * p, unsigned int s
 
 
 template<ElfFileParams>
-ElfFile<ElfFileParamNames>::ElfFile(FileContents fContents)
-    : fileContents(fContents)
+ElfFile<ElfFileParamNames>::ElfFile(FileContents fContents, std::string fileName)
+    : fileContents(fContents), fileName(fileName)
 {
     /* Check the ELF header for basic validity. */
     if (fileContents->size() < (off_t) sizeof(Elf_Ehdr)) error("missing ELF header");
@@ -1745,8 +1754,59 @@ void ElfFile<ElfFileParamNames>::addNeeded(const std::set<std::string> & libs)
     changed = true;
 }
 
+// https://stackoverflow.com/a/54738358/143733
+// https://stackoverflow.com/a/478960/143733
+std::pair<std::string, int> exec(const std::string & cmd) {
+    std::array<char, 128> buffer;
+    std::string result;
+    // overwrite the destructor to capture also the return code
+    int return_code = -1;
+    auto pclose_wrapper = [&return_code](FILE* cmd){ return_code = pclose(cmd); };
+    {
+        std::unique_ptr<FILE, decltype(pclose_wrapper)> pipe(popen(cmd.c_str(), "r"), pclose_wrapper);
+        if (pipe) {
+            while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
+                result += buffer.data();
+            }
+        }
+    }
+    return make_pair(result, return_code);
+}
+
 template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::printNeededLibs() // const
+void ElfFile<ElfFileParamNames>::shrinkWrap(std::map<std::string, std::string> & neededLibsToReplace, std::set<std::string> & neededLibsToAdd)
+{
+    const std::string interpreter = getInterpreter();
+    const std::vector<std::string> needed = getNeededLibs();
+    const std::string cmd = fmt(interpreter, " --list ", this->fileName);
+    const std::pair<std::string, int> result = exec(cmd);
+    if (result.second) {
+        error(fmt("ldd failed. ", result.second, "-", result.first));
+    }
+    std::istringstream iss(result.first);
+    std::string line;
+    std::regex r("\\s*([^ ]+) => ([^ ]+)");
+    while (std::getline(iss, line)) {
+        std::smatch matches;
+        if (!std::regex_search(line, matches, r)) {
+            continue;
+        }
+
+        std::string soname = matches.str(1);
+        std::string location = matches.str(2);
+        debug("Found %s => %s\n", soname.c_str(), location.c_str());
+
+        // if the ELF file has this soname, then merely replace it
+        if (std::find(needed.begin(), needed.end(), soname) != needed.end()) {
+            neededLibsToReplace.insert({soname, location});  
+        } else {
+            neededLibsToAdd.insert(location);
+        }        
+    }
+}
+
+template<ElfFileParams>
+std::vector<std::string> ElfFile<ElfFileParamNames>::getNeededLibs() // const
 {
     const auto shdrDynamic = findSection(".dynamic");
     const auto shdrDynStr = findSection(".dynstr");
@@ -1754,11 +1814,25 @@ void ElfFile<ElfFileParamNames>::printNeededLibs() // const
 
     const Elf_Dyn *dyn = (Elf_Dyn *) (fileContents->data() + rdi(shdrDynamic.sh_offset));
 
+    std::vector<std::string> results;
+
     for (; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_NEEDED) {
             const char *name = strTab + rdi(dyn->d_un.d_val);
-            printf("%s\n", name);
+            results.push_back(std::string(name));
         }
+    }
+
+    return results;
+}
+
+
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::printNeededLibs() // const
+{
+    const std::vector<std::string> needed = getNeededLibs();
+    for (std::string soname : needed) {
+        printf("%s\n", soname.c_str());
     }
 }
 
@@ -1832,6 +1906,7 @@ void ElfFile<ElfFileParamNames>::clearSymbolVersions(const std::set<std::string>
 
 static bool printInterpreter = false;
 static bool printSoname = false;
+static bool shrinkWrap = false;
 static bool setSoname = false;
 static std::string newSoname;
 static std::string newInterpreter;
@@ -1854,6 +1929,9 @@ static void patchElf2(ElfFile && elfFile, const FileContents & fileContents, con
 {
     if (printInterpreter)
         printf("%s\n", elfFile.getInterpreter().c_str());
+
+    if (shrinkWrap)
+        elfFile.shrinkWrap(neededLibsToReplace, neededLibsToAdd);
 
     if (printSoname)
         elfFile.modifySoname(elfFile.printSoname, "");
@@ -1906,9 +1984,9 @@ static void patchElf()
         const std::string & outputFileName2 = outputFileName.empty() ? fileName : outputFileName;
 
         if (getElfType(fileContents).is32Bit)
-            patchElf2(ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym, Elf32_Verneed, Elf32_Versym>(fileContents), fileContents, outputFileName2);
+            patchElf2(ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym, Elf32_Verneed, Elf32_Versym>(fileContents, fileName), fileContents, outputFileName2);
         else
-            patchElf2(ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym, Elf64_Verneed, Elf64_Versym>(fileContents), fileContents, outputFileName2);
+            patchElf2(ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym, Elf64_Verneed, Elf64_Versym>(fileContents, fileName), fileContents, outputFileName2);
     }
 }
 
@@ -1927,6 +2005,7 @@ void showHelp(const std::string & progName)
         fprintf(stderr, "syntax: %s\n\
   [--set-interpreter FILENAME]\n\
   [--page-size SIZE]\n\
+  [--shrink-wrap]\n\
   [--print-interpreter]\n\
   [--print-soname]\t\tPrints 'DT_SONAME' entry of .dynamic section. Raises an error if DT_SONAME doesn't exist\n\
   [--set-soname SONAME]\t\tSets 'DT_SONAME' entry to SONAME.\n\
@@ -1977,6 +2056,9 @@ int mainWrapped(int argc, char * * argv)
         }
         else if (arg == "--print-soname") {
             printSoname = true;
+        }
+        else if (arg == "--shrink-wrap") {
+            shrinkWrap = true;
         }
         else if (arg == "--set-soname") {
             if (++i == argc) error("missing argument");
