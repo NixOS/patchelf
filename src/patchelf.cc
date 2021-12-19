@@ -1237,7 +1237,7 @@ template<ElfFileParams>
 std::string ElfFile<ElfFileParamNames>::getInterpreter()
 {
     auto shdr = findSection(".interp");
-    return std::string((char *) fileContents->data() + rdi(shdr.sh_offset), rdi(shdr.sh_size));
+    return std::string((char *) fileContents->data() + rdi(shdr.sh_offset), rdi(shdr.sh_size) - 1);
 }
 
 template<ElfFileParams>
