@@ -6,27 +6,6 @@ using FileContents = std::shared_ptr<std::vector<unsigned char>>;
 template<ElfFileParams>
 class ElfFile
 {
-    
-    /**
-     * @brief The ELF section header
-     * 
-     */
-    class Section {
-        public:
-            const std::string & getName() {
-                return name;
-            }
-            const Elf_Shdr * toStruct() {
-                return (Elf_Shdr *) this->data.data();
-            }
-            void resize(unsigned int size) {
-                data.resize(size, '\0');
-            }
-        private:
-            std::string name;
-            std::vector<unsigned char> data;
-    };
-
 public:
 
     const FileContents fileContents;
@@ -104,7 +83,7 @@ private:
 
     Elf_Shdr & findSectionHeader(const SectionName & sectionName);
 
-    std::optional<std::reference_wrapper<Elf_Shdr>> findSection2(const SectionName & sectionName);
+    std::optional<std::reference_wrapper<Elf_Shdr>> tryFindSectionHeader(const SectionName & sectionName);
 
     unsigned int getSectionIndex(const SectionName & sectionName);
 

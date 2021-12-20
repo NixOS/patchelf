@@ -471,7 +471,7 @@ std::string ElfFile<ElfFileParamNames>::getSectionName(const Elf_Shdr & shdr) co
 template<ElfFileParams>
 Elf_Shdr & ElfFile<ElfFileParamNames>::findSectionHeader(const SectionName & sectionName)
 {
-    auto shdr = findSection2(sectionName);
+    auto shdr = tryFindSectionHeader(sectionName);
     if (!shdr) {
         std::string extraMsg;
         if (sectionName == ".interp" || sectionName == ".dynamic" || sectionName == ".dynstr")
@@ -483,7 +483,7 @@ Elf_Shdr & ElfFile<ElfFileParamNames>::findSectionHeader(const SectionName & sec
 
 
 template<ElfFileParams>
-std::optional<std::reference_wrapper<Elf_Shdr>> ElfFile<ElfFileParamNames>::findSection2(const SectionName & sectionName)
+std::optional<std::reference_wrapper<Elf_Shdr>> ElfFile<ElfFileParamNames>::tryFindSectionHeader(const SectionName & sectionName)
 {
     auto i = getSectionIndex(sectionName);
     if (i)
@@ -967,7 +967,7 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
     /* Update all those nasty virtual addresses in the .dynamic
        section.  Note that not all executables have .dynamic sections
        (e.g., those produced by klibc's klcc). */
-    auto shdrDynamic = findSection2(".dynamic");
+    auto shdrDynamic = tryFindSectionHeader(".dynamic");
     if (shdrDynamic) {
         auto dyn_table = (Elf_Dyn *) (fileContents->data() + rdi((*shdrDynamic).get().sh_offset));
         unsigned int d_tag;
@@ -981,30 +981,30 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
             else if (d_tag == DT_HASH)
                 dyn->d_un.d_ptr = findSectionHeader(".hash").sh_addr;
             else if (d_tag == DT_GNU_HASH) {
-                auto shdr = findSection2(".gnu.hash");
+                auto shdr = tryFindSectionHeader(".gnu.hash");
                 // some binaries might this section stripped
                 // in which case we just ignore the value.
                 if (shdr) dyn->d_un.d_ptr = (*shdr).get().sh_addr;
             } else if (d_tag == DT_JMPREL) {
-                auto shdr = findSection2(".rel.plt");
-                if (!shdr) shdr = findSection2(".rela.plt");
+                auto shdr = tryFindSectionHeader(".rel.plt");
+                if (!shdr) shdr = tryFindSectionHeader(".rela.plt");
                 /* 64-bit Linux, x86-64 */
-                if (!shdr) shdr = findSection2(".rela.IA_64.pltoff"); /* 64-bit Linux, IA-64 */
+                if (!shdr) shdr = tryFindSectionHeader(".rela.IA_64.pltoff"); /* 64-bit Linux, IA-64 */
                 if (!shdr) error("cannot find section corresponding to DT_JMPREL");
                 dyn->d_un.d_ptr = (*shdr).get().sh_addr;
             }
             else if (d_tag == DT_REL) { /* !!! hack! */
-                auto shdr = findSection2(".rel.dyn");
+                auto shdr = tryFindSectionHeader(".rel.dyn");
                 /* no idea if this makes sense, but it was needed for some
                    program */
-                if (!shdr) shdr = findSection2(".rel.got");
+                if (!shdr) shdr = tryFindSectionHeader(".rel.got");
                 /* some programs have neither section, but this doesn't seem
                    to be a problem */
                 if (!shdr) continue;
                 dyn->d_un.d_ptr = (*shdr).get().sh_addr;
             }
             else if (d_tag == DT_RELA) {
-                auto shdr = findSection2(".rela.dyn");
+                auto shdr = tryFindSectionHeader(".rela.dyn");
                 /* some programs lack this section, but it doesn't seem to
                    be a problem */
                 if (!shdr) continue;
@@ -1017,7 +1017,7 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
             else if (d_tag == DT_MIPS_RLD_MAP_REL) {
                 /* the MIPS_RLD_MAP_REL tag stores the offset to the debug
                    pointer, relative to the address of the tag */
-                auto shdr = findSection2(".rld_map");
+                auto shdr = tryFindSectionHeader(".rld_map");
                 if (shdr) {
                     auto rld_map_addr = findSectionHeader(".rld_map").sh_addr;
                     auto dyn_offset = ((char*)dyn) - ((char*)dyn_table);
