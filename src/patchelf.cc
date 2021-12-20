@@ -352,14 +352,14 @@ void ElfFile<ElfFileParamNames>::sortShdrs()
     for (unsigned int i = 1; i < rdi(hdr()->e_shnum); ++i)
         if (rdi(shdrs[i].sh_link) != 0)
             wri(shdrs[i].sh_link,
-                findSection3(linkage[getSectionName(shdrs[i])]));
+                getSectionIndex(linkage[getSectionName(shdrs[i])]));
 
     /* And the st_info mappings. */
     for (unsigned int i = 1; i < rdi(hdr()->e_shnum); ++i)
         if (rdi(shdrs.at(i).sh_info) != 0 &&
             (rdi(shdrs.at(i).sh_type) == SHT_REL || rdi(shdrs.at(i).sh_type) == SHT_RELA))
             wri(shdrs.at(i).sh_info,
-                findSection3(info.at(getSectionName(shdrs.at(i)))));
+                getSectionIndex(info.at(getSectionName(shdrs.at(i)))));
 
     /* And the .shstrtab index. Note: the match here is done by checking the offset as searching
      * by name can yield incorrect results in case there are multiple sections with the same
@@ -485,7 +485,7 @@ Elf_Shdr & ElfFile<ElfFileParamNames>::findSectionHeader(const SectionName & sec
 template<ElfFileParams>
 std::optional<std::reference_wrapper<Elf_Shdr>> ElfFile<ElfFileParamNames>::findSection2(const SectionName & sectionName)
 {
-    auto i = findSection3(sectionName);
+    auto i = getSectionIndex(sectionName);
     if (i)
         return shdrs.at(i);
     return {};
@@ -1051,7 +1051,7 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                 }
                 const std::string & section = sectionsByOldIndex.at(shndx);
                 assert(!section.empty());
-                auto newIndex = findSection3(section); // inefficient
+                auto newIndex = getSectionIndex(section); // inefficient
                 //debug("rewriting symbol %d: index = %d (%s) -> %d\n", entry, shndx, section.c_str(), newIndex);
                 wri(sym->st_shndx, newIndex);
                 /* Rewrite st_value.  FIXME: we should do this for all
