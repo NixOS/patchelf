@@ -39,7 +39,8 @@ src_TESTS = \
   basic-flags.sh \
   set-empty-rpath.sh \
   phdr-corruption.sh \
-  replace-needed.sh
+  replace-needed.sh \
+  replace-add-needed.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)
