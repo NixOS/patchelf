@@ -12,7 +12,7 @@ cp libbar.so ${SCRATCH}/
 
 cd ${SCRATCH}
 
-libcldd=$(ldd ./simple | grep -oP "(?<=libc.so.6 => )[^ ]+")
+libcldd=$(ldd ./simple | awk '/ => / { print $3 }' | grep .so | head -n 1)
 
 # We have to set the soname on these libraries
 ${PATCHELF} --set-soname libbar.so ./libbar.so
