@@ -1878,10 +1878,22 @@ static void patchElf2(ElfFile && elfFile, const FileContents & fileContents, con
 
     if (printNeeded) elfFile.printNeededLibs();
 
-    elfFile.removeNeeded(neededLibsToRemove);
-    elfFile.replaceNeeded(neededLibsToReplace);
-    elfFile.addNeeded(neededLibsToAdd);
-    elfFile.clearSymbolVersions(symbolsToClearVersion);
+    if (!neededLibsToRemove.empty()) {
+        elfFile.removeNeeded(neededLibsToRemove);
+        elfFile.rewriteSections();
+    }
+    if (!neededLibsToReplace.empty()) {
+        elfFile.replaceNeeded(neededLibsToReplace);
+        elfFile.rewriteSections();
+    }
+    if (!neededLibsToAdd.empty()) {
+        elfFile.addNeeded(neededLibsToAdd);
+        elfFile.rewriteSections();
+    }
+    if (!symbolsToClearVersion.empty()) {
+        elfFile.clearSymbolVersions(symbolsToClearVersion);
+        elfFile.rewriteSections();
+    }
 
     if (noDefaultLib)
         elfFile.noDefaultLib();
