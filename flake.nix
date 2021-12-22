@@ -93,12 +93,8 @@
 
       devShells = forAllSystems (system:
         {
-          glibc = pkgs.mkShell {
-            buildInputs = [ self.packages.${system}.patchelf.inputDerivation];
-          };
-          musl = pkgs.pkgsMusl.mkShell {
-            buildInputs = [ self.packages.${system}.patchelf-musl.inputDerivation];
-          };
+          glibc = self.packages.${system}.patchelf;
+          musl = self.packages.${system}.patchelf-musl;
         });
 
       defaultPackage = forAllSystems (system:
