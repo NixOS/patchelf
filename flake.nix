@@ -89,9 +89,17 @@
         build = self.hydraJobs.build.${system};
       });
 
-      devShell = forAllSystems (system: pkgs.mkShell {
-          buildInputs = [ self.defaultPackage.${system}.inputDerivation];
-      });
+      devShell = forAllSystems (system: self.devShells.${system}.glibc);
+
+      devShells = forAllSystems (system:
+        {
+          glibc = pkgs.mkShell {
+            buildInputs = [ self.packages.${system}.patchelf.inputDerivation];
+          };
+          musl = pkgs.pkgsMusl.mkShell {
+            buildInputs = [ self.packages.${system}.patchelf-musl.inputDerivation];
+          };
+        });
 
       defaultPackage = forAllSystems (system:
         self.packages.${system}.patchelf
