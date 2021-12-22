@@ -1150,6 +1150,7 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string &
     }
 
     changed = true;
+    this->rewriteSections();
 }
 
 template<ElfFileParams>
@@ -1158,6 +1159,7 @@ void ElfFile<ElfFileParamNames>::setInterpreter(const std::string & newInterpret
     std::string & section = replaceSection(".interp", newInterpreter.size() + 1);
     setSubstr(section, 0, newInterpreter + '\0');
     changed = true;
+    this->rewriteSections();
 }
 
 
@@ -1234,6 +1236,7 @@ void ElfFile<ElfFileParamNames>::removeRPath(Elf_Shdr & shdrDynamic) {
         }
     }
     memset(last, 0, sizeof(Elf_Dyn) * (dyn - last));
+    this->rewriteSections();
 }
 
 template<ElfFileParams>
@@ -1380,6 +1383,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
         newDyn.d_un.d_val = shdrDynStr.sh_size;
         setSubstr(newDynamic, 0, std::string((char *) &newDyn, sizeof(Elf_Dyn)));
     }
+    this->rewriteSections();
 }
 
 
@@ -1409,6 +1413,8 @@ void ElfFile<ElfFileParamNames>::removeNeeded(const std::set<std::string> & libs
     }
 
     memset(last, 0, sizeof(Elf_Dyn) * (dyn - last));
+
+    this->rewriteSections();
 }
 
 template<ElfFileParams>
@@ -1532,6 +1538,8 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
             --verNeedNum;
         }
     }
+
+    this->rewriteSections();
 }
 
 template<ElfFileParams>
@@ -1582,6 +1590,8 @@ void ElfFile<ElfFileParamNames>::addNeeded(const std::set<std::string> & libs)
     }
 
     changed = true;
+
+    this->rewriteSections();
 }
 
 template<ElfFileParams>
@@ -1638,6 +1648,7 @@ void ElfFile<ElfFileParamNames>::noDefaultLib()
         setSubstr(newDynamic, 0, std::string((char *) &newDyn, sizeof(Elf_Dyn)));
     }
 
+    this->rewriteSections();
     changed = true;
 }
 
@@ -1667,6 +1678,7 @@ void ElfFile<ElfFileParamNames>::clearSymbolVersions(const std::set<std::string>
         }
     }
     changed = true;
+    this->rewriteSections();
 }
 
 static bool printInterpreter = false;
@@ -1726,7 +1738,6 @@ static void patchElf2(ElfFile && elfFile, const FileContents & fileContents, con
         elfFile.noDefaultLib();
 
     if (elfFile.isChanged()){
-        elfFile.rewriteSections();
         writeFile(fileName, elfFile.fileContents);
     } else if (alwaysWrite) {
         debug("not modified, but alwaysWrite=true\n");

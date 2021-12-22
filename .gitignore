@@ -36,3 +36,4 @@ Makefile
 .direnv/
 .vscode/
 .idea/
+result
