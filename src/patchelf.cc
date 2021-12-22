@@ -18,29 +18,20 @@
 
 #include <algorithm>
 #include <limits>
-#include <map>
-#include <memory>
-#include <set>
 #include <sstream>
 #include <stdexcept>
-#include <string>
 #include <unordered_map>
-#include <vector>
-#include <optional>
-
 #include <cassert>
 #include <cerrno>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "elf.h"
 #include "patchelf.h"
 
 #ifndef PACKAGE_STRING
@@ -1082,6 +1073,16 @@ std::string ElfFile<ElfFileParamNames>::getInterpreter()
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string & newSoname)
 {
+
+    bool soNameModified = false;
+
+    Finally finally([&]() {
+        if (soNameModified) {
+            this->rewriteSections();
+            changed = true;
+        }
+    });
+
     if (rdi(hdr()->e_type) != ET_DYN) {
         debug("this is not a dynamic library\n");
         return;
@@ -1149,17 +1150,24 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string &
         setSubstr(newDynamic, 0, std::string((char *)&newDyn, sizeof(Elf_Dyn)));
     }
 
-    changed = true;
-    this->rewriteSections();
+    soNameModified = true;
 }
 
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::setInterpreter(const std::string & newInterpreter)
 {
+    bool interpreterChanged = false;
+
+    Finally finally([&]() {
+        if (interpreterChanged) {
+            this->rewriteSections();
+            changed = true;
+        }
+    });
+
     std::string & section = replaceSection(".interp", newInterpreter.size() + 1);
     setSubstr(section, 0, newInterpreter + '\0');
-    changed = true;
-    this->rewriteSections();
+    interpreterChanged = true;
 }
 
 
@@ -1222,27 +1230,42 @@ std::string ElfFile<ElfFileParamNames>::shrinkRPath(char* rpath, std::vector<std
 
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::removeRPath(Elf_Shdr & shdrDynamic) {
+    bool rpathChanged = false;
+    Finally finally([&]() {
+        if (rpathChanged) {
+            this->rewriteSections();
+            changed = true;
+        }
+    });
+
     auto dyn = (Elf_Dyn *)(fileContents->data() + rdi(shdrDynamic.sh_offset));
     Elf_Dyn * last = dyn;
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_RPATH) {
             debug("removing DT_RPATH entry\n");
-            changed = true;
+            rpathChanged = true;
         } else if (rdi(dyn->d_tag) == DT_RUNPATH) {
             debug("removing DT_RUNPATH entry\n");
-            changed = true;
+            rpathChanged = true;
         } else {
             *last++ = *dyn;
         }
     }
     memset(last, 0, sizeof(Elf_Dyn) * (dyn - last));
-    this->rewriteSections();
 }
 
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
     const std::vector<std::string> & allowedRpathPrefixes, std::string newRPath)
 {
+    bool rpathChanged = false;
+    Finally finally([&]() {
+        if (rpathChanged) {
+            this->rewriteSections();
+            changed = true;
+        }
+    });
+
     auto shdrDynamic = findSectionHeader(".dynamic");
 
     if (rdi(shdrDynamic.sh_type) == SHT_NOBITS) {
@@ -1321,18 +1344,18 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
         wri(dynRPath->d_tag, DT_RUNPATH);
         dynRunPath = dynRPath;
         dynRPath = nullptr;
-        changed = true;
+        rpathChanged = true;
     } else if (forceRPath && dynRunPath) { /* convert DT_RUNPATH to DT_RPATH */
         wri(dynRunPath->d_tag, DT_RPATH);
         dynRPath = dynRunPath;
         dynRunPath = nullptr;
-        changed = true;
+        rpathChanged = true;
     }
 
     if (rpath && rpath == newRPath) {
         return;
     }
-    changed = true;
+    rpathChanged = true;
 
     /* Zero out the previous rpath to prevent retained dependencies in
        Nix. */
@@ -1383,7 +1406,6 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
         newDyn.d_un.d_val = shdrDynStr.sh_size;
         setSubstr(newDynamic, 0, std::string((char *) &newDyn, sizeof(Elf_Dyn)));
     }
-    this->rewriteSections();
 }
 
 
@@ -1391,6 +1413,14 @@ template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::removeNeeded(const std::set<std::string> & libs)
 {
     if (libs.empty()) return;
+
+    bool neededChanged = false;
+    Finally finally([&]() {
+        if (neededChanged) {
+            this->rewriteSections();
+            changed = true;
+        }
+    });
 
     auto shdrDynamic = findSectionHeader(".dynamic");
     auto shdrDynStr = findSectionHeader(".dynstr");
@@ -1403,7 +1433,7 @@ void ElfFile<ElfFileParamNames>::removeNeeded(const std::set<std::string> & libs
             char * name = strTab + rdi(dyn->d_un.d_val);
             if (libs.count(name)) {
                 debug("removing DT_NEEDED entry '%s'\n", name);
-                changed = true;
+                neededChanged = true;
             } else {
                 debug("keeping DT_NEEDED entry '%s'\n", name);
                 *last++ = *dyn;
@@ -1421,6 +1451,14 @@ template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::string> & libs)
 {
     if (libs.empty()) return;
+
+    bool neededChanged = false;
+    Finally finally([&]() {
+        if (neededChanged) {
+            this->rewriteSections();
+            changed = true;
+        }
+    });
 
     auto shdrDynamic = findSectionHeader(".dynamic");
     auto shdrDynStr = findSectionHeader(".dynstr");
@@ -1464,7 +1502,7 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
 
                 dynStrAddedBytes += replacement.size() + 1;
 
-                changed = true;
+                neededChanged = true;
             } else {
                 debug("keeping DT_NEEDED entry '%s'\n", name);
             }
@@ -1529,7 +1567,7 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
                     verStrAddedBytes += replacement.size() + 1;
                 }
 
-                changed = true;
+                neededChanged = true;
             } else {
                 debug("keeping .gnu.version_r entry '%s'\n", file);
             }
@@ -1538,14 +1576,20 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
             --verNeedNum;
         }
     }
-
-    this->rewriteSections();
 }
 
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::addNeeded(const std::set<std::string> & libs)
 {
     if (libs.empty()) return;
+
+    bool neededChanged = false;
+    Finally finally([&]() {
+        if (neededChanged) {
+            this->rewriteSections();
+            changed = true;
+        }
+    });
 
     auto shdrDynamic = findSectionHeader(".dynamic");
     auto shdrDynStr = findSectionHeader(".dynstr");
@@ -1589,9 +1633,7 @@ void ElfFile<ElfFileParamNames>::addNeeded(const std::set<std::string> & libs)
         i++;
     }
 
-    changed = true;
-
-    this->rewriteSections();
+    neededChanged = true;
 }
 
 template<ElfFileParams>
@@ -1615,6 +1657,14 @@ void ElfFile<ElfFileParamNames>::printNeededLibs() // const
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::noDefaultLib()
 {
+    bool defaultLibChanged = false;
+    Finally finally([&]() {
+        if (defaultLibChanged) {
+            this->rewriteSections();
+            changed = true;
+        }
+    });
+
     auto shdrDynamic = findSectionHeader(".dynamic");
 
     auto dyn = (Elf_Dyn *)(fileContents->data() + rdi(shdrDynamic.sh_offset));
@@ -1648,14 +1698,21 @@ void ElfFile<ElfFileParamNames>::noDefaultLib()
         setSubstr(newDynamic, 0, std::string((char *) &newDyn, sizeof(Elf_Dyn)));
     }
 
-    this->rewriteSections();
-    changed = true;
+    defaultLibChanged = true;
 }
 
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::clearSymbolVersions(const std::set<std::string> & syms)
 {
     if (syms.empty()) return;
+
+    bool symbolVersionsChanged = false;
+    Finally finally([&]() {
+        if (symbolVersionsChanged) {
+            this->rewriteSections();
+            changed = true;
+        }
+    });
 
     auto shdrDynStr = findSectionHeader(".dynstr");
     auto shdrDynsym = findSectionHeader(".dynsym");
@@ -1677,8 +1734,7 @@ void ElfFile<ElfFileParamNames>::clearSymbolVersions(const std::set<std::string>
             wri(versyms[i], 1);
         }
     }
-    changed = true;
-    this->rewriteSections();
+    symbolVersionsChanged = true;
 }
 
 static bool printInterpreter = false;
