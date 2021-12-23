@@ -21,6 +21,10 @@
 
     {
       overlay = final: prev: {
+        patchelf-new-musl = final.pkgsMusl.callPackage ./patchelf.nix {
+          inherit version;
+          src = self;
+        };
         patchelf-new = final.callPackage ./patchelf.nix {
           inherit version;
           src = self;
@@ -85,12 +89,23 @@
         build = self.hydraJobs.build.${system};
       });
 
+      devShell = forAllSystems (system: self.devShells.${system}.glibc);
+
+      devShells = forAllSystems (system:
+        {
+          glibc = self.packages.${system}.patchelf;
+          musl = self.packages.${system}.patchelf-musl;
+        });
+
       defaultPackage = forAllSystems (system:
-        (import nixpkgs {
-          inherit system;
-          overlays = [ self.overlay ];
-        }).patchelf-new
+        self.packages.${system}.patchelf
       );
+
+      packages = forAllSystems (system:
+        {
+          patchelf = nixpkgsFor.${system}.patchelf-new;
+          patchelf-musl = nixpkgsFor.${system}.patchelf-new-musl;
+        });
 
     };
 }
