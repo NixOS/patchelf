@@ -1021,7 +1021,7 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                 if (shdr) {
                     auto rld_map_addr = findSectionHeader(".rld_map").sh_addr;
                     auto dyn_offset = ((char*)dyn) - ((char*)dyn_table);
-                    dyn->d_un.d_ptr = rld_map_addr + dyn_offset - (*shdrDynamic).get().sh_addr;
+                    dyn->d_un.d_ptr = rld_map_addr - dyn_offset - (*shdrDynamic).get().sh_addr;
                 } else {
                     /* ELF file with DT_MIPS_RLD_MAP_REL but without .rld_map
                        is broken, and it's not our job to fix it; yet, we have
