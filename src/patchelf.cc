@@ -1653,6 +1653,38 @@ void ElfFile<ElfFileParamNames>::noDefaultLib()
 }
 
 template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::addDebug()
+{
+    auto shdrDynamic = findSectionHeader(".dynamic");
+
+    auto dyn = (Elf_Dyn *)(fileContents->data() + rdi(shdrDynamic.sh_offset));
+    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+        if (rdi(dyn->d_tag) == DT_DEBUG) {
+            return;
+        }
+    }
+    std::string & newDynamic = replaceSection(".dynamic",
+            rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn));
+
+    unsigned int idx = 0;
+    for ( ; rdi(((Elf_Dyn *) newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
+    debug("DT_NULL index is %d\n", idx);
+
+    /* Shift all entries down by one. */
+    setSubstr(newDynamic, sizeof(Elf_Dyn),
+            std::string(newDynamic, 0, sizeof(Elf_Dyn) * (idx + 1)));
+
+    /* Add the DT_DEBUG entry at the top. */
+    Elf_Dyn newDyn;
+    wri(newDyn.d_tag, DT_DEBUG);
+    newDyn.d_un.d_val = 0;
+    setSubstr(newDynamic, 0, std::string((char *) &newDyn, sizeof(Elf_Dyn)));
+
+    this->rewriteSections();
+    changed = true;
+}
+
+template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::clearSymbolVersions(const std::set<std::string> & syms)
 {
     if (syms.empty()) return;
@@ -1691,6 +1723,7 @@ static std::vector<std::string> allowedRpathPrefixes;
 static bool removeRPath = false;
 static bool setRPath = false;
 static bool addRPath = false;
+static bool addDebug = false;
 static bool printRPath = false;
 static std::string newRPath;
 static std::set<std::string> neededLibsToRemove;
@@ -1736,6 +1769,9 @@ static void patchElf2(ElfFile && elfFile, const FileContents & fileContents, con
 
     if (noDefaultLib)
         elfFile.noDefaultLib();
+
+    if (addDebug)
+        elfFile.addDebug();
 
     if (elfFile.isChanged()){
         writeFile(fileName, elfFile.fileContents);
@@ -1793,6 +1829,7 @@ void showHelp(const std::string & progName)
   [--print-needed]\n\
   [--no-default-lib]\n\
   [--clear-symbol-version SYMBOL]\n\
+  [--add-debug]\n\
   [--output FILE]\n\
   [--debug]\n\
   [--version]\n\
@@ -1900,6 +1937,9 @@ int mainWrapped(int argc, char * * argv)
         }
         else if (arg == "--no-default-lib") {
             noDefaultLib = true;
+        }
+        else if (arg == "--add-debug") {
+            addDebug = true;
         }
         else if (arg == "--help" || arg == "-h" ) {
             showHelp(argv[0]);
