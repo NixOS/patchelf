@@ -107,6 +107,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ## Release History
 
+0.14.5 (February 21, 2022):
+
+* fix faulty version in 0.14.4
+
 0.14.4 (February 21, 2022):
 
 * Several test fixes to fix patchelf test suite on openbsd by @klemensn
