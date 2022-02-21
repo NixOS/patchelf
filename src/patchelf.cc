@@ -1653,7 +1653,7 @@ void ElfFile<ElfFileParamNames>::noDefaultLib()
 }
 
 template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::addDebug()
+void ElfFile<ElfFileParamNames>::addDebugTag()
 {
     auto shdrDynamic = findSectionHeader(".dynamic");
 
@@ -1723,7 +1723,7 @@ static std::vector<std::string> allowedRpathPrefixes;
 static bool removeRPath = false;
 static bool setRPath = false;
 static bool addRPath = false;
-static bool addDebug = false;
+static bool addDebugTag = false;
 static bool printRPath = false;
 static std::string newRPath;
 static std::set<std::string> neededLibsToRemove;
@@ -1770,8 +1770,8 @@ static void patchElf2(ElfFile && elfFile, const FileContents & fileContents, con
     if (noDefaultLib)
         elfFile.noDefaultLib();
 
-    if (addDebug)
-        elfFile.addDebug();
+    if (addDebugTag)
+        elfFile.addDebugTag();
 
     if (elfFile.isChanged()){
         writeFile(fileName, elfFile.fileContents);
@@ -1829,7 +1829,7 @@ void showHelp(const std::string & progName)
   [--print-needed]\n\
   [--no-default-lib]\n\
   [--clear-symbol-version SYMBOL]\n\
-  [--add-debug]\n\
+  [--add-debug-tag]\n\
   [--output FILE]\n\
   [--debug]\n\
   [--version]\n\
@@ -1938,8 +1938,8 @@ int mainWrapped(int argc, char * * argv)
         else if (arg == "--no-default-lib") {
             noDefaultLib = true;
         }
-        else if (arg == "--add-debug") {
-            addDebug = true;
+        else if (arg == "--add-debug-tag") {
+            addDebugTag = true;
         }
         else if (arg == "--help" || arg == "-h" ) {
             showHelp(argv[0]);

@@ -131,7 +131,7 @@ public:
 
     void noDefaultLib();
 
-    void addDebug();
+    void addDebugTag();
 
     void clearSymbolVersions(const std::set<std::string> & syms);
 
