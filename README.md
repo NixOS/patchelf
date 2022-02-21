@@ -107,6 +107,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ## Release History
 
+0.14.4 (February 21, 2022):
+
+* Several test fixes to fix patchelf test suite on openbsd by @klemensn
+* Allow multiple modifications in same call by @fzakaria in https://github.com/NixOS/patchelf/pull/361
+* Add support to build with musl by @fzakaria in https://github.com/NixOS/patchelf/pull/362
+* Fix typo: s/folllow/follow/ by @bjornfor in https://github.com/NixOS/patchelf/pull/366
+* mips: fix incorrect polarity on dyn_offset; closes #364 by @a-m-joseph in https://github.com/NixOS/patchelf/pull/365
+
 0.14.3 (December 05, 2021):
 
 * this release adds support for static, pre-compiled patchelf binaries
