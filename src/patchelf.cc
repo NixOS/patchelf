@@ -1024,6 +1024,16 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                    pointer, relative to the address of the tag */
                 auto shdr = tryFindSectionHeader(".rld_map");
                 if (shdr) {
+                    /*
+                     * "When correct, (DT_MIPS_RLD_MAP_REL + tag offset + executable base address) equals DT_MIPS_RLD_MAP"
+                     * -- https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=820334#5
+                     *
+                     * Equivalently,
+                     *
+                     *   DT_MIPS_RLD_MAP_REL + tag offset + executable base address == DT_MIPS_RLD_MAP
+                     *   DT_MIPS_RLD_MAP_REL              + executable base address == DT_MIPS_RLD_MAP - tag_offset
+                     *   DT_MIPS_RLD_MAP_REL                                        == DT_MIPS_RLD_MAP - tag_offset - executable base address
+                     */
                     auto rld_map_addr = findSectionHeader(".rld_map").sh_addr;
                     auto dyn_offset = ((char*)dyn) - ((char*)dyn_table);
                     dyn->d_un.d_ptr = rld_map_addr - dyn_offset - (*shdrDynamic).get().sh_addr;
