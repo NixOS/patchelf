@@ -89,6 +89,13 @@ option can be given multiple times.
 Marks the object so that the search for dependencies of this object will ignore any
 default library search paths.
 
+.IP "--add-debug-tag"
+Adds DT_DEBUG tag to the .dynamic section if not yet present in an ELF
+object. A shared library (-shared) by default does not receive DT_DEBUG tag.
+This means that when a shared library has an entry point (so that it
+can be run as an executable), the debugger does not connect to it correctly and
+symbols are not resolved.
+
 .IP "--output FILE"
 Set the output file name.  If not specified, the input will be modified in place.
 

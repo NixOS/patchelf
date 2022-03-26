@@ -40,7 +40,8 @@ src_TESTS = \
   set-empty-rpath.sh \
   phdr-corruption.sh \
   replace-needed.sh \
-  replace-add-needed.sh
+  replace-add-needed.sh \
+  add-debug-tag.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)
