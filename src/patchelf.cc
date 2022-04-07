@@ -47,6 +47,7 @@
 #define PACKAGE_STRING "patchelf"
 #endif
 
+// This is needed for Windows/mingw
 #ifndef O_BINARY
 #define O_BINARY 0
 #endif
