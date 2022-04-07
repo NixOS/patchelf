@@ -47,6 +47,11 @@
 #define PACKAGE_STRING "patchelf"
 #endif
 
+// This is needed for Windows/mingw
+#ifndef O_BINARY
+#define O_BINARY 0
+#endif
+
 static bool debugMode = false;
 
 static bool forceRPath = false;
@@ -164,7 +169,7 @@ static FileContents readFile(const std::string & fileName,
 
     FileContents contents = std::make_shared<std::vector<unsigned char>>(size);
 
-    int fd = open(fileName.c_str(), O_RDONLY);
+    int fd = open(fileName.c_str(), O_RDONLY | O_BINARY);
     if (fd == -1) throw SysError(fmt("opening '", fileName, "'"));
 
     size_t bytesRead = 0;
@@ -375,7 +380,7 @@ static void writeFile(const std::string & fileName, const FileContents & content
 {
     debug("writing %s\n", fileName.c_str());
 
-    int fd = open(fileName.c_str(), O_CREAT | O_TRUNC | O_WRONLY, 0777);
+    int fd = open(fileName.c_str(), O_CREAT | O_TRUNC | O_WRONLY | O_BINARY, 0777);
     if (fd == -1)
         error("open");
 
