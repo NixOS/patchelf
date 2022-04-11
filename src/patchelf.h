@@ -1,7 +1,7 @@
 using FileContents = std::shared_ptr<std::vector<unsigned char>>;
 
-#define ElfFileParams class Elf_Ehdr, class Elf_Phdr, class Elf_Shdr, class Elf_Addr, class Elf_Off, class Elf_Dyn, class Elf_Sym, class Elf_Verneed, class Elf_Versym
-#define ElfFileParamNames Elf_Ehdr, Elf_Phdr, Elf_Shdr, Elf_Addr, Elf_Off, Elf_Dyn, Elf_Sym, Elf_Verneed, Elf_Versym
+#define ElfFileParams class Elf_Ehdr, class Elf_Phdr, class Elf_Shdr, class Elf_Addr, class Elf_Off, class Elf_Dyn, class Elf_Sym, class Elf_Verneed, class Elf_Vernaux, class Elf_Versym
+#define ElfFileParamNames Elf_Ehdr, Elf_Phdr, Elf_Shdr, Elf_Addr, Elf_Off, Elf_Dyn, Elf_Sym, Elf_Verneed, Elf_Vernaux, Elf_Versym
 
 template<ElfFileParams>
 class ElfFile
@@ -132,6 +132,8 @@ public:
     void noDefaultLib();
 
     void addDebugTag();
+
+    void cleanDependencySymbolVersions();
 
     void clearSymbolVersions(const std::set<std::string> & syms);
 

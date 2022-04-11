@@ -1709,6 +1709,73 @@ void ElfFile<ElfFileParamNames>::addDebugTag()
     changed = true;
 }
 
+/* Remove any unused dependency symbol versions from .gnu.version_r */
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::cleanDependencySymbolVersions()
+{
+    auto shdrVersym = findSectionHeader(".gnu.version");
+    auto shdrVersymR = findSectionHeader(".gnu.version_r");
+
+    auto versyms = (Elf_Versym *)(fileContents->data() + rdi(shdrVersym.sh_offset));
+    size_t count = rdi(shdrVersym.sh_size) / sizeof(Elf_Versym);
+
+    /* Set of versions actually used. */
+    std::set<Elf_Versym> allVersions;
+
+    for (size_t i = 0; i < count; i++) {
+        allVersions.insert(versyms[i]);
+    }
+
+    /* Strings associated with .gnu_version_r section: used for debug only. */
+    Elf_Shdr & shdrVersionRStrings = shdrs.at(rdi(shdrVersymR.sh_link));
+    char * verStrTab = (char *) fileContents->data() + rdi(shdrVersionRStrings.sh_offset);
+
+
+    auto ver_r = (Elf_Verneed *)(fileContents->data() + rdi(shdrVersymR.sh_offset));
+    while (true) {
+        auto prev = (Elf_Vernaux *)nullptr;
+        auto vern_aux = (Elf_Vernaux *)((char *)ver_r + rdi(ver_r->vn_aux));
+        char * file = verStrTab + rdi(ver_r->vn_file);
+        for (size_t j = 0; j < ver_r->vn_cnt ; j++) {
+            char * ver_name = verStrTab + rdi(vern_aux->vna_name);
+            auto next = (Elf_Vernaux *)((char *)vern_aux + rdi(vern_aux->vna_next));
+            
+            if (!allVersions.count(rdi(vern_aux->vna_other) & ~0x8000)) {
+                debug("Removing version identifier %d %s@%s\n", rdi(vern_aux->vna_other), file, ver_name);
+                /* Symbol version is no longer used, unlink it. */
+                if (!prev) {
+                    auto next_off = (intptr_t)(vern_aux) + rdi(vern_aux->vna_next) - (intptr_t)(ver_r);
+                    wri(ver_r->vn_aux, next_off);
+                } else {
+                    auto next_off = (intptr_t)(vern_aux) + rdi(vern_aux->vna_next) - (intptr_t)(prev);
+                    wri(prev->vna_next, next_off);
+                }
+                wri(ver_r->vn_cnt, rdi(ver_r->vn_cnt) - 1);
+            } else {
+                prev = vern_aux;
+            }
+
+            if (vern_aux == next) {
+                if (j != rdi(ver_r->vn_cnt)) {
+                    debug("Section missing elements! Ended on element %d, expected %d\n", j, rdi(ver_r->vn_cnt));
+                }
+                break;
+            }
+            vern_aux = next;
+        }
+        
+        /* If this was the last entry, we're done. */
+        if (!rdi(ver_r->vn_next)) {
+            break;
+        }
+
+        ver_r = (Elf_Verneed *) (((char *) ver_r) + rdi(ver_r->vn_next));
+    }
+
+    changed = true;
+    this->rewriteSections();
+}
+
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::clearSymbolVersions(const std::set<std::string> & syms)
 {
@@ -1734,6 +1801,10 @@ void ElfFile<ElfFileParamNames>::clearSymbolVersions(const std::set<std::string>
             wri(versyms[i], 1);
         }
     }
+
+    /* Remove entries in the .gnu.versions_r table which are no;-longer required. */
+    cleanDependencySymbolVersions();
+
     changed = true;
     this->rewriteSections();
 }
@@ -1817,9 +1888,9 @@ static void patchElf()
         const std::string & outputFileName2 = outputFileName.empty() ? fileName : outputFileName;
 
         if (getElfType(fileContents).is32Bit)
-            patchElf2(ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym, Elf32_Verneed, Elf32_Versym>(fileContents), fileContents, outputFileName2);
+            patchElf2(ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym, Elf32_Verneed, Elf32_Vernaux, Elf32_Versym>(fileContents), fileContents, outputFileName2);
         else
-            patchElf2(ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym, Elf64_Verneed, Elf64_Versym>(fileContents), fileContents, outputFileName2);
+            patchElf2(ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym, Elf64_Verneed, Elf64_Vernaux, Elf64_Versym>(fileContents), fileContents, outputFileName2);
     }
 }
 
