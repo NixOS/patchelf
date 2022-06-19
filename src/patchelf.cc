@@ -990,7 +990,7 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                 // some binaries might this section stripped
                 // in which case we just ignore the value.
                 if (shdr) dyn->d_un.d_ptr = (*shdr).get().sh_addr;
-	    } else if (d_tag == DT_MIPS_XHASH) {
+            } else if (d_tag == DT_MIPS_XHASH) {
                 // the .MIPS.xhash section was added to the glibc-ABI
                 // in commit 23c1c256ae7b0f010d0fcaff60682b620887b164
                 dyn->d_un.d_ptr = findSectionHeader(".MIPS.xhash").sh_addr;
