@@ -1400,6 +1400,7 @@ typedef struct
 #define SHT_MIPS_EH_REGION	0x70000027
 #define SHT_MIPS_XLATE_OLD	0x70000028
 #define SHT_MIPS_PDR_EXCEPTION	0x70000029
+#define SHT_MIPS_XHASH          0x7000002b
 
 /* Legal values for sh_flags field of Elf32_Shdr.  */
 
@@ -1647,7 +1648,9 @@ typedef struct
    in a PIE as it stores a relative offset from the address of the tag
    rather than an absolute address.  */
 #define DT_MIPS_RLD_MAP_REL  0x70000035
-#define DT_MIPS_NUM          0x36
+/* GNU-style hash table with xlat.  */
+#define DT_MIPS_XHASH        0x70000036
+#define DT_MIPS_NUM          0x37
 
 /* Legal values for DT_MIPS_FLAGS Elf32_Dyn entry.  */
 
