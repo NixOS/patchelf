@@ -735,14 +735,16 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
     rewriteHeaders(firstPage + rdi(hdr()->e_phoff));
 }
 
+static bool noSort = false;
 
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
 {
-    /* Sort the sections by offset, otherwise we won't correctly find
-       all the sections before the last replaced section. */
-    sortShdrs();
-
+    if (!noSort) {
+        /* Sort the sections by offset, otherwise we won't correctly find
+           all the sections before the last replaced section. */
+        sortShdrs();
+    }
 
     /* What is the index of the last replaced section? */
     unsigned int lastReplaced = 0;
@@ -955,7 +957,9 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
         }
     }
 
-    sortPhdrs();
+    if (!noSort) {
+        sortPhdrs();
+    }
 
     for (unsigned int i = 0; i < phdrs.size(); ++i)
         * ((Elf_Phdr *) (fileContents->data() + rdi(hdr()->e_phoff)) + i) = phdrs.at(i);
@@ -964,7 +968,9 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
     /* Rewrite the section header table.  For neatness, keep the
        sections sorted. */
     assert(rdi(hdr()->e_shnum) == shdrs.size());
-    sortShdrs();
+    if (!noSort) {
+        sortShdrs();
+    }
     for (unsigned int i = 1; i < rdi(hdr()->e_shnum); ++i)
         * ((Elf_Shdr *) (fileContents->data() + rdi(hdr()->e_shoff)) + i) = shdrs.at(i);
 
@@ -1843,6 +1849,7 @@ void showHelp(const std::string & progName)
   [--replace-needed LIBRARY NEW_LIBRARY]\n\
   [--print-needed]\n\
   [--no-default-lib]\n\
+  [--no-sort]\t\tDo not sort program+section headers; useful for debugging patchelf.\n\
   [--clear-symbol-version SYMBOL]\n\
   [--add-debug-tag]\n\
   [--output FILE]\n\
@@ -1924,6 +1931,9 @@ int mainWrapped(int argc, char * * argv)
         }
         else if (arg == "--print-needed") {
             printNeeded = true;
+        }
+        else if (arg == "--no-sort") {
+            noSort = true;
         }
         else if (arg == "--add-needed") {
             if (++i == argc) error("missing argument");

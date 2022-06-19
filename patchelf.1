@@ -92,6 +92,11 @@ Prints all DT_NEEDED entries of the executable.
 Marks the object so that the search for dependencies of this object will ignore any
 default library search paths.
 
+.IP "--no-sort"
+Do not sort program headers or section headers.  This is useful when
+debugging patchelf, because it makes it easier to read diffs of the
+output of "readelf -a".
+
 .IP "--add-debug-tag"
 Adds DT_DEBUG tag to the .dynamic section if not yet present in an ELF
 object. A shared library (-shared) by default does not receive DT_DEBUG tag.
