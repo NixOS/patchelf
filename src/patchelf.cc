@@ -1176,6 +1176,11 @@ void ElfFile<ElfFileParamNames>::modifyOsAbi(osAbiMode op, const std::string & n
     else
         error("unrecognized OS ABI");
 
+    if (newAbi == abi) {
+        debug("current and requested OS ABIs are equal\n");
+        return;
+    }
+
     hdr()->e_ident[EI_OSABI] = newAbi;
     changed = true;
 }
