@@ -1121,11 +1121,6 @@ std::string ElfFile<ElfFileParamNames>::getInterpreter()
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::modifyOsAbi(osAbiMode op, const std::string & newOsAbi)
 {
-    if (rdi(hdr()->e_type) != ET_EXEC && rdi(hdr()->e_type) != ET_DYN) {
-        debug("this is not an executable and not a dynamic library\n");
-        return;
-    }
-
     unsigned char abi = hdr()->e_ident[EI_OSABI];
 
     if (op == printOsAbi) {
