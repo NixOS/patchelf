@@ -9,6 +9,7 @@ class ElfFile
 public:
 
     const FileContents fileContents;
+    const std::string fileName;
 
 private:
 
@@ -35,7 +36,7 @@ private:
     std::vector<SectionName> sectionsByOldIndex;
 
 public:
-    explicit ElfFile(FileContents fileContents);
+    explicit ElfFile(FileContents fileContents, std::string filename);
 
     bool isChanged()
     {
@@ -126,6 +127,10 @@ public:
     void removeNeeded(const std::set<std::string> & libs);
 
     void replaceNeeded(const std::map<std::string, std::string> & libs);
+
+    void shrinkWrap(std::map<std::string, std::string> & neededLibsToReplace, std::set<std::string> & neededLibsToAdd);
+
+    std::vector<std::string> getNeededLibs();
 
     void printNeededLibs() /* should be const */;
 
