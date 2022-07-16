@@ -65,7 +65,7 @@ jobs:
           else
               ENTRYPOINT=
           fi
-          docker run -e CXXFLAGS -v $(pwd):/gha ${{ matrix.platform }}/alpine:3.15 ${ENTRYPOINT} sh -ec "cd /gha && sh ./build.sh"
+          docker run -e CXXFLAGS -v $(pwd):/gha ${{ matrix.platform }}/alpine:3.16 ${ENTRYPOINT} sh -ec "cd /gha && sh ./build.sh"
       - name: Check binaries
         run: |
           cat <<EOF > check.sh
