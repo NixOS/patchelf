@@ -1716,7 +1716,8 @@ void ElfFile<ElfFileParamNames>::cleanDependencySymbolVersions()
     auto shdrVersym = findSectionHeader(".gnu.version");
     auto shdrVersymR = findSectionHeader(".gnu.version_r");
 
-    auto versyms = (Elf_Versym *)(fileContents->data() + rdi(shdrVersym.sh_offset));
+    auto versyms = reinterpret_cast<Elf_Versym *>(fileContents->data() + rdi(shdrVersym.sh_offset));
+    checkPointer(fileContents, versyms, sizeof(Elf_Versym));
     size_t count = rdi(shdrVersym.sh_size) / sizeof(Elf_Versym);
 
     /* Set of versions actually used. */
@@ -1728,17 +1729,24 @@ void ElfFile<ElfFileParamNames>::cleanDependencySymbolVersions()
 
     /* Strings associated with .gnu_version_r section: used for debug only. */
     Elf_Shdr & shdrVersionRStrings = shdrs.at(rdi(shdrVersymR.sh_link));
-    char * verStrTab = (char *) fileContents->data() + rdi(shdrVersionRStrings.sh_offset);
+    char * verStrTab = reinterpret_cast<char *>(fileContents->data() + rdi(shdrVersionRStrings.sh_offset));
 
+    auto ver_r = reinterpret_cast<Elf_Verneed *>(fileContents->data() + rdi(shdrVersymR.sh_offset));
+    checkPointer(fileContents, ver_r, sizeof(Elf_Verneed));
 
-    auto ver_r = (Elf_Verneed *)(fileContents->data() + rdi(shdrVersymR.sh_offset));
     while (true) {
         auto prev = (Elf_Vernaux *)nullptr;
-        auto vern_aux = (Elf_Vernaux *)((char *)ver_r + rdi(ver_r->vn_aux));
+        auto vern_aux = reinterpret_cast<Elf_Vernaux *>((char *)ver_r + rdi(ver_r->vn_aux));
+        checkPointer(fileContents, vern_aux, sizeof(Elf_Vernaux));
+
         char * file = verStrTab + rdi(ver_r->vn_file);
         for (size_t j = 0; j < ver_r->vn_cnt ; j++) {
             char * ver_name = verStrTab + rdi(vern_aux->vna_name);
-            auto next = (Elf_Vernaux *)((char *)vern_aux + rdi(vern_aux->vna_next));
+            // FIXME: add proper check for null-terminated string
+            checkPointer(fileContents, ver_name, sizeof(char));
+
+            auto next = reinterpret_cast<Elf_Vernaux *>((char *)vern_aux + rdi(vern_aux->vna_next));
+            checkPointer(fileContents, next, sizeof(Elf_Vernaux));
             
             if (!allVersions.count(rdi(vern_aux->vna_other) & ~0x8000)) {
                 debug("Removing version identifier %d %s@%s\n", rdi(vern_aux->vna_other), file, ver_name);
@@ -1769,7 +1777,8 @@ void ElfFile<ElfFileParamNames>::cleanDependencySymbolVersions()
             break;
         }
 
-        ver_r = (Elf_Verneed *) (((char *) ver_r) + rdi(ver_r->vn_next));
+        ver_r = reinterpret_cast<Elf_Verneed *>(((char *) ver_r) + rdi(ver_r->vn_next));
+        checkPointer(fileContents, ver_r, sizeof(Elf_Verneed));
     }
 
     changed = true;
