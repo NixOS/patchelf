@@ -266,6 +266,10 @@ ElfFile<ElfFileParamNames>::ElfFile(FileContents fContents)
         Elf_Shdr *shdr = (Elf_Shdr *) (fileContents->data() + rdi(hdr()->e_shoff)) + i;
 
         checkPointer(fileContents, shdr, sizeof(*shdr));
+
+        if (rdi(shdr->sh_offset) + rdi(shdr->sh_size) > fileContents->size())
+            error("section out of bounds");
+
         shdrs.push_back(*shdr);
     }
 
