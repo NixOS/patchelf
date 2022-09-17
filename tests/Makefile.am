@@ -33,6 +33,7 @@ src_TESTS = \
   endianness.sh \
   contiguous-note-sections.sh \
   no-gnu-hash.sh \
+  change-abi.sh \
   grow-file.sh \
   no-dynamic-section.sh \
   args-from-file.sh \
