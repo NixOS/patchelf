@@ -3,11 +3,13 @@ AC_INIT([patchelf], m4_esyscmd([printf $(cat ./version)]))
 AC_CONFIG_SRCDIR([src/patchelf.cc])
 AC_CONFIG_AUX_DIR([build-aux])
 AM_INIT_AUTOMAKE([1.11.1 -Wall -Werror dist-bzip2 foreign color-tests parallel-tests])
+AC_CONFIG_MACRO_DIR([m4])
 
 AC_CHECK_TOOL([STRIP], [strip])
 
 AM_PROG_CC_C_O
 AC_PROG_CXX
+AC_LANG([C++])
 AM_PROG_AS
 
 DEFAULT_PAGESIZE=auto
@@ -30,6 +32,13 @@ AC_ARG_WITH([ubsan],
    AS_HELP_STRING([--with-ubsan], [Build with undefined behavior sanitizer])
 )
 AM_CONDITIONAL([WITH_UBSAN], [test x"$with_ubsan" = xyes])
+
+CPLUSPLUS=
+AX_CHECK_COMPILE_FLAG([-std=c++17], [CPLUSPLUS=17], [], [$WERROR])
+
+if test -z "$CPLUSPLUS"; then
+  AC_MSG_ERROR([Your compiler does not have the necessary C++17 support! Cannot proceed.])
+fi
 
 AC_CONFIG_FILES([Makefile src/Makefile tests/Makefile patchelf.spec])
 AC_OUTPUT

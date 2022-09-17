@@ -13,14 +13,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
-      - uses: cachix/install-nix-action@v13
+        uses: actions/checkout@v3
+      - uses: cachix/install-nix-action@v17
       - name: Build tarballs
         run: |
           nix-build -A hydraJobs.tarball
           install -D ./result/tarballs/*.tar.bz2 ./dist/patchelf-$(cat version).tar.bz2
           install -D ./result/tarballs/*.tar.gz ./dist/patchelf-$(cat version).tar.gz
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: patchelf
           path: dist/*
@@ -36,9 +36,9 @@ jobs:
     steps:
       - name: Set up QEMU
         if: matrix.platform != 'amd64'
-        uses: docker/setup-qemu-action@v1
+        uses: docker/setup-qemu-action@v2
 
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: patchelf
           path: dist
@@ -65,7 +65,7 @@ jobs:
           else
               ENTRYPOINT=
           fi
-          docker run -e CXXFLAGS -v $(pwd):/gha ${{ matrix.platform }}/alpine:3.15 ${ENTRYPOINT} sh -ec "cd /gha && sh ./build.sh"
+          docker run -e CXXFLAGS -v $(pwd):/gha ${{ matrix.platform }}/alpine:3.16 ${ENTRYPOINT} sh -ec "cd /gha && sh ./build.sh"
       - name: Check binaries
         run: |
           cat <<EOF > check.sh
@@ -75,7 +75,7 @@ jobs:
           ./bin/patchelf --version
           EOF
           docker run -v $(pwd):/gha ${{ matrix.platform }}/debian:stable-slim sh -ec "cd /gha && sh ./check.sh"
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: patchelf
           path: dist/*
@@ -86,7 +86,7 @@ jobs:
     if: github.event_name == 'push' && github.repository == 'NixOS/patchelf' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: patchelf
           path: dist
