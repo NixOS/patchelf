@@ -86,6 +86,20 @@ static bool hasAllowedPrefix(const std::string & s, const std::vector<std::strin
     return std::any_of(allowedPrefixes.begin(), allowedPrefixes.end(), [&](const std::string & i) { return !s.compare(0, i.size(), i); });
 }
 
+static std::string trim(std::string s)
+{
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](unsigned char ch) { return !std::isspace(ch); }));
+    s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) { return !std::isspace(ch); }).base(), s.end());
+
+    return s;
+}
+
+static std::string downcase(std::string s)
+{
+    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return std::tolower(c); });
+    return s;
+}
+
 /* !!! G++ creates broken code if this function is inlined, don't know
    why... */
 template<ElfFileParams>
@@ -1105,6 +1119,68 @@ std::string ElfFile<ElfFileParamNames>::getInterpreter()
 }
 
 template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::modifyOsAbi(osAbiMode op, const std::string & newOsAbi)
+{
+    unsigned char abi = hdr()->e_ident[EI_OSABI];
+
+    if (op == printOsAbi) {
+        switch (abi) {
+            case 0:  printf("System V\n"); break;
+            case 1:  printf("HP-UX\n"); break;
+            case 2:  printf("NetBSD\n"); break;
+            case 3:  printf("Linux\n"); break;
+            case 4:  printf("GNU Hurd\n"); break;
+            case 6:  printf("Solaris\n"); break;
+            case 7:  printf("AIX\n"); break;
+            case 8:  printf("IRIX\n"); break;
+            case 9:  printf("FreeBSD\n"); break;
+            case 10: printf("Tru64\n"); break;
+            case 12: printf("OpenBSD\n"); break;
+            case 13: printf("OpenVMS\n"); break;
+            default: printf("0x%02X\n", (unsigned int) abi);
+        }
+        return;
+    }
+
+    unsigned char newAbi;
+    std::string nabi = downcase(trim(newOsAbi));
+    if (nabi == "system v" || nabi == "system-v" || nabi == "sysv")
+        newAbi = 0;
+    else if (nabi == "hp-ux")
+        newAbi = 1;
+    else if (nabi == "netbsd")
+        newAbi = 2;
+    else if (nabi == "linux" || nabi == "gnu")
+        newAbi = 3;
+    else if (nabi == "gnu hurd" || nabi == "gnu-hurd" || nabi == "hurd")
+        newAbi = 4;
+    else if (nabi == "solaris")
+        newAbi = 6;
+    else if (nabi == "aix")
+        newAbi = 7;
+    else if (nabi == "irix")
+        newAbi = 8;
+    else if (nabi == "freebsd")
+        newAbi = 9;
+    else if (nabi == "tru64")
+        newAbi = 10;
+    else if (nabi == "openbsd")
+        newAbi = 12;
+    else if (nabi == "openvms")
+        newAbi = 13;
+    else
+        error("unrecognized OS ABI");
+
+    if (newAbi == abi) {
+        debug("current and requested OS ABIs are equal\n");
+        return;
+    }
+
+    hdr()->e_ident[EI_OSABI] = newAbi;
+    changed = true;
+}
+
+template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string & newSoname)
 {
     if (rdi(hdr()->e_type) != ET_DYN) {
@@ -1739,6 +1815,9 @@ void ElfFile<ElfFileParamNames>::clearSymbolVersions(const std::set<std::string>
 }
 
 static bool printInterpreter = false;
+static bool printOsAbi = false;
+static bool setOsAbi = false;
+static std::string newOsAbi;
 static bool printSoname = false;
 static bool setSoname = false;
 static std::string newSoname;
@@ -1763,6 +1842,12 @@ static void patchElf2(ElfFile && elfFile, const FileContents & fileContents, con
 {
     if (printInterpreter)
         printf("%s\n", elfFile.getInterpreter().c_str());
+
+    if (printOsAbi)
+        elfFile.modifyOsAbi(elfFile.printOsAbi, "");
+
+    if (setOsAbi)
+        elfFile.modifyOsAbi(elfFile.replaceOsAbi, newOsAbi);
 
     if (printSoname)
         elfFile.modifySoname(elfFile.printSoname, "");
@@ -1839,6 +1924,8 @@ void showHelp(const std::string & progName)
   [--set-interpreter FILENAME]\n\
   [--page-size SIZE]\n\
   [--print-interpreter]\n\
+  [--print-os-abi]\t\tPrints 'EI_OSABI' field of ELF header\n\
+  [--set-os-abi ABI]\t\tSets 'EI_OSABI' field of ELF header to ABI.\n\
   [--print-soname]\t\tPrints 'DT_SONAME' entry of .dynamic section. Raises an error if DT_SONAME doesn't exist\n\
   [--set-soname SONAME]\t\tSets 'DT_SONAME' entry to SONAME.\n\
   [--set-rpath RPATH]\n\
@@ -1887,6 +1974,14 @@ int mainWrapped(int argc, char * * argv)
         }
         else if (arg == "--print-interpreter") {
             printInterpreter = true;
+        }
+        else if (arg == "--print-os-abi") {
+            printOsAbi = true;
+        }
+        else if (arg == "--set-os-abi") {
+            if (++i == argc) error("missing argument");
+            setOsAbi = true;
+            newOsAbi = resolveArgument(argv[i]);
         }
         else if (arg == "--print-soname") {
             printSoname = true;

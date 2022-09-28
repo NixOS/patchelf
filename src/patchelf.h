@@ -109,6 +109,10 @@ public:
 
     std::string getInterpreter();
 
+    typedef enum { printOsAbi, replaceOsAbi } osAbiMode;
+
+    void modifyOsAbi(osAbiMode op, const std::string & newOsAbi);
+
     typedef enum { printSoname, replaceSoname } sonameMode;
 
     void modifySoname(sonameMode op, const std::string & newSoname);

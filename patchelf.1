@@ -36,6 +36,16 @@ INTERPRETER.
 .IP --print-interpreter
 Prints the ELF interpreter of the executable.
 
+.IP --print-os-abi
+Prints the OS ABI of the executable (EI_OSABI field of an ELF file).
+
+.IP "--set-os-abi ABI"
+Changes the OS ABI of the executable (EI_OSABI field of an ELF file).
+The ABI parameter is pretty flexible. For example, you can specify it
+as a "Linux", "linux", or even "lInUx" - all those names will set EI_OSABI
+field of the ELF header to the value "3", which corresponds to Linux OS ABI.
+The same applies to other ABI names - System V, FreeBSD, Solaris, etc.
+
 .IP --print-soname
 Prints DT_SONAME entry of .dynamic section.
 Raises an error if DT_SONAME doesn't exist.
