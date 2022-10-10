@@ -42,14 +42,15 @@ src_TESTS = \
   phdr-corruption.sh \
   replace-needed.sh \
   replace-add-needed.sh \
-  add-debug-tag.sh
+  add-debug-tag.sh \
+  empty-note.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)
 
 TESTS = $(src_TESTS) $(build_TESTS)
 
-EXTRA_DIST = no-rpath-prebuild $(src_TESTS) no-rpath-prebuild.sh invalid-elf endianness
+EXTRA_DIST = no-rpath-prebuild $(src_TESTS) no-rpath-prebuild.sh invalid-elf endianness empty-note
 
 TESTS_ENVIRONMENT = PATCHELF_DEBUG=1
 
