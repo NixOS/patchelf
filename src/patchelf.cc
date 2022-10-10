@@ -906,6 +906,14 @@ void ElfFile<ElfFileParamNames>::normalizeNoteSegments()
         size_t start_off = rdi(phdr.p_offset);
         size_t curr_off = start_off;
         size_t end_off = start_off + rdi(phdr.p_filesz);
+
+        /* Binaries produced by older patchelf versions may contain empty PT_NOTE segments.
+           For backwards compatibility, if we find one we should ignore it. */
+        bool empty = std::none_of(shdrs.begin(), shdrs.end(),
+            [&](auto & shdr) { return rdi(shdr.sh_offset) >= start_off && rdi(shdr.sh_offset) < end_off; });
+        if (empty)
+            continue;
+
         while (curr_off < end_off) {
             /* Find a section that starts at the current offset. If we can't
                find one, it means the SHT_NOTE sections weren't contiguous
