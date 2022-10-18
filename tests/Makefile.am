@@ -42,7 +42,8 @@ src_TESTS = \
   phdr-corruption.sh \
   replace-needed.sh \
   replace-add-needed.sh \
-  add-debug-tag.sh
+  add-debug-tag.sh \
+  clear-symver.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)
