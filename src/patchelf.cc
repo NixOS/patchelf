@@ -1371,6 +1371,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
        string. */
     std::vector<std::string> neededLibs;
     auto dyn = (Elf_Dyn *)(fileContents->data() + rdi(shdrDynamic.sh_offset));
+    checkPointer(fileContents, dyn, sizeof(*dyn));
     Elf_Dyn *dynRPath = nullptr, *dynRunPath = nullptr;
     char * rpath = nullptr;
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
