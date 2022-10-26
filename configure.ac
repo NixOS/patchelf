@@ -28,17 +28,12 @@ AC_ARG_WITH([asan],
 )
 AM_CONDITIONAL([WITH_ASAN], [test x"$with_asan" = xyes])
 
+AX_CXX_COMPILE_STDCXX([17], [noext], [])
+
 AC_ARG_WITH([ubsan],
    AS_HELP_STRING([--with-ubsan], [Build with undefined behavior sanitizer])
 )
 AM_CONDITIONAL([WITH_UBSAN], [test x"$with_ubsan" = xyes])
-
-CPLUSPLUS=
-AX_CHECK_COMPILE_FLAG([-std=c++17], [CPLUSPLUS=17], [], [$WERROR])
-
-if test -z "$CPLUSPLUS"; then
-  AC_MSG_ERROR([Your compiler does not have the necessary C++17 support! Cannot proceed.])
-fi
 
 AC_CONFIG_FILES([Makefile src/Makefile tests/Makefile patchelf.spec])
 AC_OUTPUT
