@@ -652,6 +652,18 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
             }
         }
 
+        /* If there is .note.gnu.property section, then the PT_GNU_PROPERTY
+           segment must be sync'ed with it. */
+        if (sectionName == ".note.gnu.property") {
+            for (auto & phdr : phdrs) {
+                if (rdi(phdr.p_type) == PT_GNU_PROPERTY) {
+                    phdr.p_offset = shdr.sh_offset;
+                    phdr.p_vaddr = phdr.p_paddr = shdr.sh_addr;
+                    phdr.p_filesz = phdr.p_memsz = shdr.sh_size;
+                }
+            }
+        }
+
         curOff += roundUp(i.second.size(), sectionAlignment);
     }
 
