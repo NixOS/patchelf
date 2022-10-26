@@ -432,34 +432,72 @@ static uint64_t roundUp(uint64_t n, uint64_t m)
 
 
 template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, Elf_Addr startPage)
+void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, size_t startOffset)
 {
-    /* Move the entire contents of the file 'extraPages' pages
-       further. */
+    assert(startOffset >= sizeof(Elf_Ehdr));
+
     unsigned int oldSize = fileContents->size();
+    assert(oldSize > startOffset);
+
+    /* Move the entire contents of the file after 'startOffset' by 'extraPages' pages further. */
     unsigned int shift = extraPages * getPageSize();
     fileContents->resize(oldSize + shift, 0);
-    memmove(fileContents->data() + shift, fileContents->data(), oldSize);
-    memset(fileContents->data() + sizeof(Elf_Ehdr), 0, shift - sizeof(Elf_Ehdr));
+    memmove(fileContents->data() + startOffset + shift, fileContents->data() + startOffset, oldSize - startOffset);
+    memset(fileContents->data() + startOffset, 0, shift);
 
     /* Adjust the ELF header. */
     wri(hdr()->e_phoff, sizeof(Elf_Ehdr));
-    wri(hdr()->e_shoff, rdi(hdr()->e_shoff) + shift);
+    if (rdi(hdr()->e_shoff) >= startOffset)
+        wri(hdr()->e_shoff, rdi(hdr()->e_shoff) + shift);
 
     /* Update the offsets in the section headers. */
-    for (int i = 1; i < rdi(hdr()->e_shnum); ++i)
-        wri(shdrs.at(i).sh_offset, rdi(shdrs.at(i).sh_offset) + shift);
+    for (int i = 1; i < rdi(hdr()->e_shnum); ++i) {
+        size_t sh_offset = rdi(shdrs.at(i).sh_offset);
+        if (sh_offset >= startOffset)
+            wri(shdrs.at(i).sh_offset, sh_offset + shift);
+    }
+
+    int splitIndex = -1;
+    size_t splitShift = 0;
 
     /* Update the offsets in the program headers. */
     for (int i = 0; i < rdi(hdr()->e_phnum); ++i) {
-        wri(phdrs.at(i).p_offset, rdi(phdrs.at(i).p_offset) + shift);
-        if (rdi(phdrs.at(i).p_align) != 0 &&
-            (rdi(phdrs.at(i).p_vaddr) - rdi(phdrs.at(i).p_offset)) % rdi(phdrs.at(i).p_align) != 0) {
-            debug("changing alignment of program header %d from %d to %d\n", i,
-                rdi(phdrs.at(i).p_align), getPageSize());
-            wri(phdrs.at(i).p_align, getPageSize());
+        Elf_Off p_start = rdi(phdrs.at(i).p_offset);
+
+        if (p_start <= startOffset && p_start + rdi(phdrs.at(i).p_filesz) > startOffset && rdi(phdrs.at(i).p_type) == PT_LOAD) {
+            assert(splitIndex == -1);
+
+            splitIndex = i;
+            splitShift = startOffset - p_start;
+
+            /* This is the load segment we're currently extending within, so we split it. */
+            wri(phdrs.at(i).p_offset, startOffset);
+            wri(phdrs.at(i).p_memsz, rdi(phdrs.at(i).p_memsz) - splitShift);
+            wri(phdrs.at(i).p_filesz, rdi(phdrs.at(i).p_filesz) - splitShift);
+            wri(phdrs.at(i).p_paddr, rdi(phdrs.at(i).p_paddr) + splitShift);
+            wri(phdrs.at(i).p_vaddr, rdi(phdrs.at(i).p_vaddr) + splitShift);
+
+            p_start = startOffset;
+        }
+
+        if (p_start >= startOffset) {
+            wri(phdrs.at(i).p_offset, p_start + shift);
+            if (rdi(phdrs.at(i).p_align) != 0 &&
+                (rdi(phdrs.at(i).p_vaddr) - rdi(phdrs.at(i).p_offset)) % rdi(phdrs.at(i).p_align) != 0) {
+                debug("changing alignment of program header %d from %d to %d\n", i,
+                    rdi(phdrs.at(i).p_align), getPageSize());
+                wri(phdrs.at(i).p_align, getPageSize());
+            }
+        } else {
+            /* If we're not physically shifting, shift back virtual memory. */
+            if (rdi(phdrs.at(i).p_paddr) >= shift)
+                wri(phdrs.at(i).p_paddr, rdi(phdrs.at(i).p_paddr) - shift);
+            if (rdi(phdrs.at(i).p_vaddr) >= shift)
+                wri(phdrs.at(i).p_vaddr, rdi(phdrs.at(i).p_vaddr) - shift);
         }
     }
+
+    assert(splitIndex != -1);
 
     /* Add a segment that maps the new program/section headers and
        PT_INTERP segment into memory.  Otherwise glibc will choke. */
@@ -467,9 +505,10 @@ void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, Elf_Addr sta
     wri(hdr()->e_phnum, rdi(hdr()->e_phnum) + 1);
     Elf_Phdr & phdr = phdrs.at(rdi(hdr()->e_phnum) - 1);
     wri(phdr.p_type, PT_LOAD);
-    wri(phdr.p_offset, 0);
-    wri(phdr.p_vaddr, wri(phdr.p_paddr, startPage));
-    wri(phdr.p_filesz, wri(phdr.p_memsz, shift));
+    wri(phdr.p_offset, phdrs.at(splitIndex).p_offset - splitShift - shift);
+    wri(phdr.p_paddr, phdrs.at(splitIndex).p_paddr - splitShift - shift);
+    wri(phdr.p_vaddr, phdrs.at(splitIndex).p_vaddr - splitShift - shift);
+    wri(phdr.p_filesz, wri(phdr.p_memsz, splitShift + shift));
     wri(phdr.p_flags, PF_R | PF_W);
     wri(phdr.p_align, getPageSize());
 }
@@ -855,7 +894,6 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
        file by the minimum number of pages and adjust internal
        offsets. */
     if (neededSpace > startOffset) {
-
         /* We also need an additional program header, so adjust for that. */
         neededSpace += sizeof(Elf_Phdr);
         debug("needed space is %d\n", neededSpace);
@@ -865,10 +903,10 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
         if (neededPages * getPageSize() > firstPage)
             error("virtual address space underrun!");
 
+        shiftFile(neededPages, startOffset);
+
         firstPage -= neededPages * getPageSize();
         startOffset += neededPages * getPageSize();
-
-        shiftFile(neededPages, firstPage);
     }
 
 
