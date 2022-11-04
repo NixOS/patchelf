@@ -15,7 +15,7 @@
           overlays = [ self.overlay ];
         }
       );
-      version = builtins.readFile ./version;
+      version = nixpkgs.lib.removeSuffix "\n" (builtins.readFile ./version);
       pkgs = nixpkgsFor.${"x86_64-linux"};
     in
 
