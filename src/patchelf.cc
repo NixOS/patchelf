@@ -308,6 +308,7 @@ unsigned int ElfFile<ElfFileParamNames>::getPageSize() const noexcept
     // requirements. There is no authoritative list of these values. The
     // current list is extracted from GNU gold's source code (abi_pagesize).
     switch (rdi(hdr()->e_machine)) {
+      case EM_IA_64:
       case EM_SPARC:
       case EM_MIPS:
       case EM_PPC:
