@@ -9,17 +9,30 @@ jobs:
     - uses: actions/checkout@v3
     - uses: cachix/install-nix-action@v18
     - run: nix-build -A hydraJobs.release
-  ubuntu:
+  qemu:
+    name: Test patchelf with glibc + qemu
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ["amd64", "i386", "ppc64le", "arm64v8", "arm32v7", "s390x", "riscv64"]
     steps:
-    - uses: actions/checkout@v3
-    - name: get toolchain version
-      run: |
-        c++ --version
-        ld --version
-        autoconf --version
-    - run: |
-        ./bootstrap.sh
-        mkdir build && cd build
-        ../configure --with-asan --with-ubsan
-        make -j$(nproc) check
+      - name: Set up QEMU
+        if: matrix.platform != 'amd64'
+        uses: docker/setup-qemu-action@v2
+      - uses: actions/checkout@v3
+      - name: Build binaries
+        run: |
+          cat <<EOF > check.sh
+          set -e
+          set -x
+          apt-get update
+          apt-get install -y binutils make csh g++ sed gawk autoconf automake autotools-dev
+
+          ./bootstrap.sh
+          mkdir build && cd build
+          ../configure --with-asan --with-ubsan
+          make -j$(nproc) check
+          EOF
+          docker run -v $(pwd):/gha ${{ matrix.platform }}/debian:unstable-slim \
+            sh -ec "cd /gha && sh ./check.sh"
