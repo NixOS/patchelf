@@ -601,20 +601,26 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
     }
 
     std::set<unsigned int> noted_phdrs = {};
-    for (auto & i : replacedSections) {
-        const std::string & sectionName = i.first;
-        auto & shdr = findSectionHeader(sectionName);
+
+    /* We iterate over the sorted section headers here, so that the relative
+       position between replaced sections stays the same.  */
+    for (auto & shdr : shdrs) {
+        std::string sectionName = getSectionName(shdr);
+        auto i = replacedSections.find(sectionName);
+        if (i == replacedSections.end())
+            continue;
+
         Elf_Shdr orig_shdr = shdr;
         debug("rewriting section '%s' from offset 0x%x (size %d) to offset 0x%x (size %d)\n",
-            sectionName.c_str(), rdi(shdr.sh_offset), rdi(shdr.sh_size), curOff, i.second.size());
+            sectionName.c_str(), rdi(shdr.sh_offset), rdi(shdr.sh_size), curOff, i->second.size());
 
-        memcpy(fileContents->data() + curOff, (unsigned char *) i.second.c_str(),
-            i.second.size());
+        memcpy(fileContents->data() + curOff, (unsigned char *) i->second.c_str(),
+            i->second.size());
 
         /* Update the section header for this section. */
         wri(shdr.sh_offset, curOff);
         wri(shdr.sh_addr, startAddr + (curOff - startOffset));
-        wri(shdr.sh_size, i.second.size());
+        wri(shdr.sh_size, i->second.size());
         wri(shdr.sh_addralign, sectionAlignment);
 
         /* If this is the .interp section, then the PT_INTERP segment
@@ -704,7 +710,7 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
             }
         }
 
-        curOff += roundUp(i.second.size(), sectionAlignment);
+        curOff += roundUp(i->second.size(), sectionAlignment);
     }
 
     replacedSections.clear();
