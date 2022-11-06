@@ -7,28 +7,21 @@
 
     let
       supportedSystems = [ "x86_64-linux" "i686-linux" "aarch64-linux" ];
-      forAllSystems = f: nixpkgs.lib.genAttrs supportedSystems (system: f system);
+      forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
 
-      nixpkgsFor = forAllSystems (system:
-        import nixpkgs {
-          inherit system;
-          overlays = [ self.overlays.default ];
-        }
-      );
       version = nixpkgs.lib.removeSuffix "\n" (builtins.readFile ./version);
-      pkgs = nixpkgsFor.${"x86_64-linux"};
+      pkgs = nixpkgs.legacyPackages.x86_64-linux;
+
+      patchelfFor = pkgs: pkgs.callPackage ./patchelf.nix {
+        inherit version;
+        src = self;
+      };
     in
 
     {
       overlays.default = final: prev: {
-        #patchelf-new-musl = final.pkgsMusl.callPackage ./patchelf.nix {
-        #  inherit version;
-        #  src = self;
-        #};
-        patchelf-new = final.callPackage ./patchelf.nix {
-          inherit version;
-          src = self;
-        };
+        patchelf-new-musl = patchelfFor final.pkgsMusl;
+        patchelf-new = patchelfFor final;
       };
 
       hydraJobs = {
@@ -57,8 +50,8 @@
             '';
           });
 
-        build = forAllSystems (system: nixpkgsFor.${system}.patchelf-new);
-        build-sanitized = forAllSystems (system: nixpkgsFor.${system}.patchelf-new.overrideAttrs (old: {
+        build = forAllSystems (system: self.packages.${system}.patchelf);
+        build-sanitized = forAllSystems (system: self.packages.${system}.patchelf.overrideAttrs (old: {
           configureFlags = [ "--with-asan " "--with-ubsan" ];
           # -Wno-unused-command-line-argument is for clang, which does not like
           # our cc wrapper arguments
@@ -67,7 +60,7 @@
 
         # x86_64-linux seems to be only working clangStdenv at the moment
         build-sanitized-clang = nixpkgs.lib.genAttrs [ "x86_64-linux" ] (system: self.hydraJobs.build-sanitized.${system}.override {
-          stdenv = nixpkgsFor.${system}.llvmPackages_latest.libcxxStdenv;
+          stdenv = nixpkgs.legacyPackages.${system}.llvmPackages_latest.libcxxStdenv;
         });
 
         release = pkgs.releaseTools.aggregate
@@ -91,19 +84,17 @@
         build = self.hydraJobs.build.${system};
       });
 
-      devShells = forAllSystems (system:
-        {
-          glibc = self.packages.${system}.patchelf;
-          default = self.devShells.${system}.glibc;
-          #musl = self.packages.${system}.patchelf-musl;
-        });
+      devShells = forAllSystems (system: {
+        glibc = self.packages.${system}.patchelf;
+        default = self.devShells.${system}.glibc;
+        musl = self.packages.${system}.patchelf-musl;
+      });
 
-      packages = forAllSystems (system:
-        {
-          patchelf = nixpkgsFor.${system}.patchelf-new;
-          default = self.packages.${system}.patchelf;
-          #patchelf-musl = nixpkgsFor.${system}.patchelf-new-musl;
-        });
+      packages = forAllSystems (system: {
+        patchelf = patchelfFor nixpkgs.legacyPackages.${system};
+        default = self.packages.${system}.patchelf;
+        patchelf-musl = patchelfFor nixpkgs.legacyPackages.${system}.pkgsMusl;
+      });
 
     };
 }
