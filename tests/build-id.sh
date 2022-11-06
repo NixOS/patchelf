@@ -13,4 +13,4 @@ long_rpath="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
   --set-rpath "$long_rpath" "${SCRATCH}/libbuildid.so"
 
 # older readelf versions do not recognize build id, but we can grep by constant
-readelf -n "${SCRATCH}/libbuildid.so" |  grep -q -F -e 'Build ID' -e 'Unknown note type: (0x00000003)'
+${READELF} -n "${SCRATCH}/libbuildid.so" |  grep -q -F -e 'Build ID' -e 'Unknown note type: (0x00000003)'
