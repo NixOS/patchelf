@@ -1,10 +1,6 @@
 #! /bin/sh -e
 SCRATCH=scratch/$(basename $0 .sh)
-
-if ! command -v readelf >/dev/null; then
-    echo "No readelf found; skip test"
-    exit 0
-fi
+READELF=${READELF:-readelf}
 
 rm -rf "${SCRATCH}"
 mkdir -p "${SCRATCH}"
