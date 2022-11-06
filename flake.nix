@@ -2,8 +2,9 @@
   description = "A tool for modifying ELF executables and libraries";
 
   inputs.nixpkgs.url = "nixpkgs/nixpkgs-unstable";
+  inputs.nixpkgs-mingw.url = "github:Mic92/nixpkgs/mingw";
 
-  outputs = { self, nixpkgs }:
+  outputs = { self, nixpkgs, nixpkgs-mingw }:
 
     let
       supportedSystems = [ "x86_64-linux" "i686-linux" "aarch64-linux" ];
@@ -16,6 +17,20 @@
         inherit version;
         src = self;
       };
+
+      # https://github.com/NixOS/nixpkgs/pull/199883
+      pkgsCrossForMingw = system: (import nixpkgs-mingw {
+        inherit system;
+        overlays = [
+          (final: prev: {
+            threadsCross = {
+              model = "win32";
+              package = null;
+            };
+          })
+        ];
+      }).pkgsCross;
+
     in
 
     {
@@ -63,6 +78,9 @@
           stdenv = nixpkgs.legacyPackages.${system}.llvmPackages_latest.libcxxStdenv;
         });
 
+        # To get mingw compiler from hydra cache
+        inherit (self.packages.x86_64-linux) patchelf-win32 patchelf-win64;
+
         release = pkgs.releaseTools.aggregate
           { name = "patchelf-${self.hydraJobs.tarball.version}";
             constituents =
@@ -95,6 +113,13 @@
       packages = forAllSystems (system: {
         patchelf = patchelfFor nixpkgs.legacyPackages.${system};
         default = self.packages.${system}.patchelf;
+
+        patchelf-win32 = (patchelfFor (pkgsCrossForMingw system).mingw32).overrideAttrs (old: {
+          NIX_CFLAGS_COMPILE = "-static";
+        });
+        patchelf-win64 = (patchelfFor (pkgsCrossForMingw system).mingwW64).overrideAttrs (old: {
+          NIX_CFLAGS_COMPILE = "-static";
+        });
       } // nixpkgs.lib.optionalAttrs (system != "i686-linux") {
         patchelf-musl = patchelfFor nixpkgs.legacyPackages.${system}.pkgsMusl;
       });
