@@ -1,7 +1,7 @@
 {
   description = "A tool for modifying ELF executables and libraries";
 
-  inputs.nixpkgs.url = "nixpkgs/nixos-21.05";
+  inputs.nixpkgs.url = "nixpkgs/nixpkgs-unstable";
 
   outputs = { self, nixpkgs }:
 
