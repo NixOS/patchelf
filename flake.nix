@@ -12,7 +12,7 @@
       nixpkgsFor = forAllSystems (system:
         import nixpkgs {
           inherit system;
-          overlays = [ self.overlay ];
+          overlays = [ self.overlays.default ];
         }
       );
       version = nixpkgs.lib.removeSuffix "\n" (builtins.readFile ./version);
@@ -20,11 +20,11 @@
     in
 
     {
-      overlay = final: prev: {
-        patchelf-new-musl = final.pkgsMusl.callPackage ./patchelf.nix {
-          inherit version;
-          src = self;
-        };
+      overlays.default = final: prev: {
+        #patchelf-new-musl = final.pkgsMusl.callPackage ./patchelf.nix {
+        #  inherit version;
+        #  src = self;
+        #};
         patchelf-new = final.callPackage ./patchelf.nix {
           inherit version;
           src = self;
@@ -76,7 +76,9 @@
               [ self.hydraJobs.tarball
                 self.hydraJobs.build.x86_64-linux
                 self.hydraJobs.build.i686-linux
+                self.hydraJobs.build.aarch64-linux
                 self.hydraJobs.build-sanitized.x86_64-linux
+                self.hydraJobs.build-sanitized.aarch64-linux
                 self.hydraJobs.build-sanitized.i686-linux
                 self.hydraJobs.build-sanitized-clang.x86_64-linux
               ];
@@ -89,22 +91,18 @@
         build = self.hydraJobs.build.${system};
       });
 
-      devShell = forAllSystems (system: self.devShells.${system}.glibc);
-
       devShells = forAllSystems (system:
         {
           glibc = self.packages.${system}.patchelf;
-          musl = self.packages.${system}.patchelf-musl;
+          default = self.devShells.${system}.glibc;
+          #musl = self.packages.${system}.patchelf-musl;
         });
-
-      defaultPackage = forAllSystems (system:
-        self.packages.${system}.patchelf
-      );
 
       packages = forAllSystems (system:
         {
           patchelf = nixpkgsFor.${system}.patchelf-new;
-          patchelf-musl = nixpkgsFor.${system}.patchelf-new-musl;
+          default = self.packages.${system}.patchelf;
+          #patchelf-musl = nixpkgsFor.${system}.patchelf-new-musl;
         });
 
     };
