@@ -1,6 +1,7 @@
 #! /bin/sh -e
 set -x
 SCRATCH=scratch/no-rpath-pie-powerpc
+READELF=${READELF:-readelf}
 
 no_rpath_bin="${srcdir}/no-rpath-prebuild/no-rpath-pie-powerpc"
 
@@ -27,7 +28,7 @@ if ! echo "$newRPath" | grep -q '/foo:/bar'; then
 fi
 
 # Tests for powerpc PIE endianness regressions
-readelfData=$(readelf -l ${SCRATCH}/no-rpath 2>&1)
+readelfData=$(${READELF} -l ${SCRATCH}/no-rpath 2>&1)
 
 if [ $(echo "$readelfData" | grep --count "PHDR") != 1 ]; then
   # Triggered if PHDR errors appear on stderr
