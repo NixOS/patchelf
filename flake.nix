@@ -78,6 +78,9 @@
           stdenv = nixpkgs.legacyPackages.${system}.llvmPackages_latest.libcxxStdenv;
         });
 
+        # To get mingw compiler from hydra cache
+        inherit (self.packages.x86_64-linux) patchelf-win32 patchelf-win64;
+
         release = pkgs.releaseTools.aggregate
           { name = "patchelf-${self.hydraJobs.tarball.version}";
             constituents =
