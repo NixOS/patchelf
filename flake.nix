@@ -69,9 +69,10 @@
               [ self.hydraJobs.tarball
                 self.hydraJobs.build.x86_64-linux
                 self.hydraJobs.build.i686-linux
-                self.hydraJobs.build.aarch64-linux
+                # FIXME: add aarch64 emulation to our github action...
+                #self.hydraJobs.build.aarch64-linux
                 self.hydraJobs.build-sanitized.x86_64-linux
-                self.hydraJobs.build-sanitized.aarch64-linux
+                #self.hydraJobs.build-sanitized.aarch64-linux
                 self.hydraJobs.build-sanitized.i686-linux
                 self.hydraJobs.build-sanitized-clang.x86_64-linux
               ];
