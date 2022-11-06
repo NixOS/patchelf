@@ -1,6 +1,6 @@
 #! /bin/sh -e
 SCRATCH=scratch/$(basename $0 .sh)
-OBJDUMP=${OBJDDUMP:-objdump}
+OBJDUMP=${OBJDUMP:-objdump}
 
 rm -rf ${SCRATCH}
 mkdir -p ${SCRATCH}
