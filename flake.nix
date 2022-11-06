@@ -87,12 +87,14 @@
       devShells = forAllSystems (system: {
         glibc = self.packages.${system}.patchelf;
         default = self.devShells.${system}.glibc;
+      } // nixpkgs.lib.optionalAttrs (system != "i686-linux") {
         musl = self.packages.${system}.patchelf-musl;
       });
 
       packages = forAllSystems (system: {
         patchelf = patchelfFor nixpkgs.legacyPackages.${system};
         default = self.packages.${system}.patchelf;
+      } // nixpkgs.lib.optionalAttrs (system != "i686-linux") {
         patchelf-musl = patchelfFor nixpkgs.legacyPackages.${system}.pkgsMusl;
       });
 
