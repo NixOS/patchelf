@@ -309,7 +309,6 @@ unsigned int ElfFile<ElfFileParamNames>::getPageSize() const noexcept
     // current list is extracted from GNU gold's source code (abi_pagesize).
     switch (rdi(hdr()->e_machine)) {
       case EM_IA_64:
-      case EM_SPARC:
       case EM_MIPS:
       case EM_PPC:
       case EM_PPC64:
@@ -317,6 +316,10 @@ unsigned int ElfFile<ElfFileParamNames>::getPageSize() const noexcept
       case EM_TILEGX:
       case EM_LOONGARCH:
         return 0x10000;
+      case EM_SPARC: // This should be sparc 32-bit. According to the linux
+                     // kernel 4KB should be also fine, but it seems that solaris is doing 8KB
+      case EM_SPARCV9: /* SPARC64 support */
+        return 0x2000;
       default:
         return 0x1000;
     }
