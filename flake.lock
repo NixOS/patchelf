@@ -15,9 +15,26 @@
         "type": "indirect"
       }
     },
+    "nixpkgs-mingw": {
+      "locked": {
+        "lastModified": 1667761825,
+        "narHash": "sha256-QpgLyjLoXJzAdLJCNpjYQy7A+varW5gwvEToqggf5D8=",
+        "owner": "Mic92",
+        "repo": "nixpkgs",
+        "rev": "cbcbadafec4f01ea21e905aad14a493cef5fad81",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Mic92",
+        "ref": "mingw",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs",
+        "nixpkgs-mingw": "nixpkgs-mingw"
       }
     }
   },
