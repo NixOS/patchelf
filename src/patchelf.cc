@@ -764,7 +764,11 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
 
     Elf_Off startOffset = roundUp(fileContents->size(), getPageSize());
 
-    fileContents->resize(startOffset + neededSpace, 0);
+    // In older version of binutils (2.30), readelf would check if the dynamic
+    // section segment is strictly smaller than the file (and not same size).
+    // By making it one byte larger, we don't break readelf.
+    off_t binutilsQuirkPadding = 1;
+    fileContents->resize(startOffset + neededSpace + binutilsQuirkPadding, 0);
 
     /* Even though this file is of type ET_DYN, it could actually be
        an executable.  For instance, Gold produces executables marked
