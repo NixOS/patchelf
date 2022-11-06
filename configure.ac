@@ -6,6 +6,10 @@ AM_INIT_AUTOMAKE([1.11.1 -Wall -Werror dist-bzip2 foreign color-tests parallel-t
 AC_CONFIG_MACRO_DIR([m4])
 
 AC_CHECK_TOOL([STRIP], [strip])
+# Those are only used in tests, hence we gracefully degrate if they are not found.
+AC_CHECK_TOOL([OBJDUMP], [objdump], [objdump])
+AC_CHECK_TOOL([OBJCOPY], [objcopy], [objcopy])
+AC_CHECK_TOOL([READELF], [readelf], [readelf])
 
 AM_PROG_CC_C_O
 AC_PROG_CXX

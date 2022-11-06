@@ -1,5 +1,6 @@
 #! /bin/sh -e
 SCRATCH=scratch/$(basename $0 .sh)
+OBJDUMP=${OBJDDUMP:-objdump}
 
 rm -rf ${SCRATCH}
 mkdir -p ${SCRATCH}
@@ -13,7 +14,7 @@ doit() {
 }
 
 expect() {
-    out=$(echo $(objdump -x $SCRATCHFILE | grep PATH))
+    out=$(echo $($OBJDUMP -x $SCRATCHFILE | grep PATH))
 
     if [ "$out" != "$*" ]; then
         echo "Expected '$*' but got '$out'"
