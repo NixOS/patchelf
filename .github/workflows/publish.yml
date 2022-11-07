@@ -35,8 +35,8 @@ jobs:
       - name: Build windows executable
         run: |
           nix build -L .#patchelf-win32 .#patchelf-win64
-          install -D ./result/bin/patchelf.exe ./dist/patchelf-win32.exe
-          install -D ./result-1/bin/patchelf.exe ./dist/patchelf-win64.exe
+          install -D ./result/bin/patchelf.exe ./dist/patchelf-win32-$(cat version).exe
+          install -D ./result-1/bin/patchelf.exe ./dist/patchelf-win64-$(cat version).exe
       - uses: actions/upload-artifact@v3
         with:
           name: patchelf
@@ -55,10 +55,10 @@ jobs:
       - name: Show binaries
         run: dir .\\dist
       - name: Test windows 64-bit binary
-        run: .\\dist\\patchelf-win32.exe --version
+        run: .\\dist\\patchelf-win32-*.exe --version
 
       - name: Test windows 32-bit binary
-        run: .\\dist\\patchelf-win64.exe --version
+        run: .\\dist\\patchelf-win64-*.exe --version
 
   build_musl:
     name: Build static musl binaries
