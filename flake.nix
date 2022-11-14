@@ -110,13 +110,16 @@
         musl = self.packages.${system}.patchelf-musl;
       });
 
-      packages = forAllSystems (system: {
-        patchelf = patchelfFor nixpkgs.legacyPackages.${system};
+      packages = forAllSystems (system: let
+        pkgs = nixpkgs.legacyPackages.${system};
+      in {
+        patchelf = patchelfFor pkgs;
         default = self.packages.${system}.patchelf;
 
         # This is a good test to see if packages can be cross-compiled. It also
         # tests if our testsuite uses target-prefixed executable names.
-        patchelf-musl-cross = patchelfFor nixpkgs.legacyPackages.${system}.pkgsCross.musl64;
+        patchelf-musl-cross = patchelfFor pkgs.pkgsCross.musl64;
+        patchelf-netbsd-cross = patchelfFor pkgs.pkgsCross.x86_64-netbsd;
 
         patchelf-win32 = (patchelfFor (pkgsCrossForMingw system).mingw32).overrideAttrs (old: {
           NIX_CFLAGS_COMPILE = "-static";
