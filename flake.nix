@@ -2,9 +2,8 @@
   description = "A tool for modifying ELF executables and libraries";
 
   inputs.nixpkgs.url = "nixpkgs/nixpkgs-unstable";
-  inputs.nixpkgs-mingw.url = "github:Mic92/nixpkgs/mingw";
 
-  outputs = { self, nixpkgs, nixpkgs-mingw }:
+  outputs = { self, nixpkgs }:
 
     let
       supportedSystems = [ "x86_64-linux" "i686-linux" "aarch64-linux" ];
@@ -13,23 +12,13 @@
       version = nixpkgs.lib.removeSuffix "\n" (builtins.readFile ./version);
       pkgs = nixpkgs.legacyPackages.x86_64-linux;
 
-      patchelfFor = pkgs: pkgs.callPackage ./patchelf.nix {
+
+      patchelfFor = pkgs: let
+        # this is only
+      in pkgs.callPackage ./patchelf.nix {
         inherit version;
         src = self;
       };
-
-      # https://github.com/NixOS/nixpkgs/pull/199883
-      pkgsCrossForMingw = system: (import nixpkgs-mingw {
-        inherit system;
-        overlays = [
-          (final: prev: {
-            threadsCross = {
-              model = "win32";
-              package = null;
-            };
-          })
-        ];
-      }).pkgsCross;
 
     in
 
@@ -121,10 +110,10 @@
         patchelf-musl-cross = patchelfFor pkgs.pkgsCross.musl64;
         patchelf-netbsd-cross = patchelfFor pkgs.pkgsCross.x86_64-netbsd;
 
-        patchelf-win32 = (patchelfFor (pkgsCrossForMingw system).mingw32).overrideAttrs (old: {
+        patchelf-win32 = (patchelfFor pkgs.pkgsCross.mingw32).overrideAttrs (old: {
           NIX_CFLAGS_COMPILE = "-static";
         });
-        patchelf-win64 = (patchelfFor (pkgsCrossForMingw system).mingwW64).overrideAttrs (old: {
+        patchelf-win64 = (patchelfFor pkgs.pkgsCross.mingwW64).overrideAttrs (old: {
           NIX_CFLAGS_COMPILE = "-static";
         });
       } // nixpkgs.lib.optionalAttrs (system != "i686-linux") {
