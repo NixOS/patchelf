@@ -2,11 +2,11 @@
   "nodes": {
     "nixpkgs": {
       "locked": {
-        "lastModified": 1667639549,
-        "narHash": "sha256-frqZKSG/933Ctwl9voSZnXDwo8CqddXcjQhnCzwNqaM=",
+        "lastModified": 1668650906,
+        "narHash": "sha256-JuiYfDO23O8oxUUOmhQflmOoJovyC5G4RjcYQMQjrRE=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "cae3751e9f74eea29c573d6c2f14523f41c2821a",
+        "rev": "3a86856a13c88c8c64ea32082a851fefc79aa700",
         "type": "github"
       },
       "original": {
@@ -15,26 +15,9 @@
         "type": "indirect"
       }
     },
-    "nixpkgs-mingw": {
-      "locked": {
-        "lastModified": 1667761825,
-        "narHash": "sha256-QpgLyjLoXJzAdLJCNpjYQy7A+varW5gwvEToqggf5D8=",
-        "owner": "Mic92",
-        "repo": "nixpkgs",
-        "rev": "cbcbadafec4f01ea21e905aad14a493cef5fad81",
-        "type": "github"
-      },
-      "original": {
-        "owner": "Mic92",
-        "ref": "mingw",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
     "root": {
       "inputs": {
-        "nixpkgs": "nixpkgs",
-        "nixpkgs-mingw": "nixpkgs-mingw"
+        "nixpkgs": "nixpkgs"
       }
     }
   },
