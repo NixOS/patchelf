@@ -77,7 +77,7 @@ private:
 
     void sortShdrs();
 
-    void shiftFile(unsigned int extraPages, size_t sizeOffset);
+    void shiftFile(unsigned int extraPages, size_t sizeOffset, size_t extraBytes);
 
     std::string getSectionName(const Elf_Shdr & shdr) const;
 
