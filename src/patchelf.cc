@@ -1132,6 +1132,7 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string &
         if (rdi(dyn->d_tag) == DT_SONAME) {
             dynSoname = dyn;
             soname = strTab + rdi(dyn->d_un.d_val);
+            checkPointer(fileContents, strTab, rdi(dyn->d_un.d_val));
         }
     }
 
