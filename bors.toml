@@ -1,0 +1,17 @@
+cut_body_after = "" # don't include text from the PR body in the merge commit message
+status = [
+       "Build windows executable",
+       "Build tarballs",
+       "Build static musl binaries (amd64)",
+       "Build static musl binaries (i386)",
+       "Build static musl binaries (ppc64le)",
+       "Build static musl binaries (arm64v8)",
+       "Build static musl binaries (arm32v7)",
+       "Build static musl binaries (s390x)",
+       "Build static musl binaries (riscv64)",
+       "Test windows binaries",
+       # this one is only run during release
+       #"Publish tarballs & binaries",
+       "nix",
+       "ubuntu"
+]
