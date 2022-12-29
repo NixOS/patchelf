@@ -463,9 +463,6 @@ void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, size_t start
 
     int splitIndex = -1;
     size_t splitShift = 0;
-    /* Save off the flags from the segment that we are splitting so we can apply the same value
-       to both of the resulting segments. */
-    decltype(phdrs.at(0).p_flags) splitFlags = 0;
 
     /* Update the offsets in the program headers. */
     for (int i = 0; i < rdi(hdr()->e_phnum); ++i) {
@@ -476,7 +473,6 @@ void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, size_t start
 
             splitIndex = i;
             splitShift = startOffset - p_start;
-            splitFlags = rdi(phdrs.at(i).p_flags);
 
             /* This is the load segment we're currently extending within, so we split it. */
             wri(phdrs.at(i).p_offset, startOffset);
@@ -517,7 +513,7 @@ void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, size_t start
     wri(phdr.p_paddr, phdrs.at(splitIndex).p_paddr - splitShift - shift);
     wri(phdr.p_vaddr, phdrs.at(splitIndex).p_vaddr - splitShift - shift);
     wri(phdr.p_filesz, wri(phdr.p_memsz, splitShift + extraBytes));
-    wri(phdr.p_flags, splitFlags);
+    wri(phdr.p_flags, PF_R | PF_W);
     wri(phdr.p_align, getPageSize());
 }
 
