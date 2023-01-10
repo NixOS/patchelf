@@ -436,7 +436,7 @@ static uint64_t roundUp(uint64_t n, uint64_t m)
 
 
 template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, size_t startOffset)
+void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, size_t startOffset, size_t extraBytes)
 {
     assert(startOffset >= sizeof(Elf_Ehdr));
 
@@ -512,7 +512,7 @@ void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, size_t start
     wri(phdr.p_offset, phdrs.at(splitIndex).p_offset - splitShift - shift);
     wri(phdr.p_paddr, phdrs.at(splitIndex).p_paddr - splitShift - shift);
     wri(phdr.p_vaddr, phdrs.at(splitIndex).p_vaddr - splitShift - shift);
-    wri(phdr.p_filesz, wri(phdr.p_memsz, splitShift + shift));
+    wri(phdr.p_filesz, wri(phdr.p_memsz, splitShift + extraBytes));
     wri(phdr.p_flags, PF_R | PF_W);
     wri(phdr.p_align, getPageSize());
 }
@@ -912,12 +912,14 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
         neededSpace += sizeof(Elf_Phdr);
         debug("needed space is %d\n", neededSpace);
 
-        unsigned int neededPages = roundUp(neededSpace - startOffset, getPageSize()) / getPageSize();
+        /* Calculate how many bytes are needed out of the additional pages. */
+        size_t extraSpace = neededSpace - startOffset; 
+        unsigned int neededPages = roundUp(extraSpace, getPageSize()) / getPageSize();
         debug("needed pages is %d\n", neededPages);
         if (neededPages * getPageSize() > firstPage)
             error("virtual address space underrun!");
 
-        shiftFile(neededPages, startOffset);
+        shiftFile(neededPages, startOffset, extraSpace);
 
         firstPage -= neededPages * getPageSize();
         startOffset += neededPages * getPageSize();
