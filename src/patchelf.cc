@@ -1487,6 +1487,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
                 debug("no RPATH to delete\n");
                 return;
             }
+            zeroOutRpath(rpath);
             removeRPath(shdrDynamic);
             return;
         }
