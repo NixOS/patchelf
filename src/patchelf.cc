@@ -1415,7 +1415,8 @@ void ElfFile<ElfFileParamNames>::removeRPath(Elf_Shdr & shdrDynamic) {
     this->rewriteSections();
 }
 
-void zeroOutRpath(char* rpath)
+/** Zeroes out the rpath string and returns its former length */
+size_t zeroOutRpath(char* rpath)
 {
     /* Zero out the previous rpath to prevent retained dependencies in
        Nix. */
@@ -1424,6 +1425,7 @@ void zeroOutRpath(char* rpath)
         rpathSize = strlen(rpath);
         memset(rpath, 'X', rpathSize);
     }
+    return rpathSize;
 }
 
 template<ElfFileParams>
@@ -1492,7 +1494,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
             if (!rpath) {
                 debug("no RPATH to shrink\n");
                 return;
-            ;}
+            }
             newRPath = shrinkRPath(rpath, neededLibs, allowedRpathPrefixes);
             break;
         }
@@ -1522,10 +1524,9 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
     }
     changed = true;
 
-    zeroOutRpath(rpath);
+    size_t rpathSize = zeroOutRpath(rpath);
 
     debug("new rpath is '%s'\n", newRPath.c_str());
-
 
     if (newRPath.size() <= rpathSize) {
         if (rpath) memcpy(rpath, newRPath.c_str(), newRPath.size() + 1);
