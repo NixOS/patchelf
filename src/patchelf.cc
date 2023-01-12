@@ -1415,6 +1415,17 @@ void ElfFile<ElfFileParamNames>::removeRPath(Elf_Shdr & shdrDynamic) {
     this->rewriteSections();
 }
 
+void zeroOutRpath(char* rpath)
+{
+    /* Zero out the previous rpath to prevent retained dependencies in
+       Nix. */
+    size_t rpathSize = 0;
+    if (rpath) {
+        rpathSize = strlen(rpath);
+        memset(rpath, 'X', rpathSize);
+    }
+}
+
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
     const std::vector<std::string> & allowedRpathPrefixes, std::string newRPath)
@@ -1511,13 +1522,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
     }
     changed = true;
 
-    /* Zero out the previous rpath to prevent retained dependencies in
-       Nix. */
-    size_t rpathSize = 0;
-    if (rpath) {
-        rpathSize = strlen(rpath);
-        memset(rpath, 'X', rpathSize);
-    }
+    zeroOutRpath(rpath);
 
     debug("new rpath is '%s'\n", newRPath.c_str());
 
