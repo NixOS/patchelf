@@ -1010,10 +1010,10 @@ void ElfFile<ElfFileParamNames>::normalizeNoteSegments()
 
 
 template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::rewriteSections()
+void ElfFile<ElfFileParamNames>::rewriteSections(bool force)
 {
 
-    if (replacedSections.empty()) return;
+    if (!force && replacedSections.empty()) return;
 
     for (auto & i : replacedSections)
         debug("replacing section '%s' with size %d\n",
@@ -1890,6 +1890,85 @@ void ElfFile<ElfFileParamNames>::clearSymbolVersions(const std::set<std::string>
     this->rewriteSections();
 }
 
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::modifyExecstack(ExecstackMode op)
+{
+    if (op == ExecstackMode::clear || op == ExecstackMode::set) {
+        size_t nullhdr = (size_t)-1;
+
+        for (size_t i = 0; i < phdrs.size(); i++) {
+            auto & header = phdrs[i];
+            const auto type = rdi(header.p_type);
+            if (type != PT_GNU_STACK) {
+                if (!nullhdr && type == PT_NULL)
+                    nullhdr = i;
+                continue;
+            }
+
+            if (op == ExecstackMode::clear && (rdi(header.p_flags) & PF_X) == PF_X) {
+                debug("simple execstack clear of header %zu\n", i);
+
+                wri(header.p_flags, rdi(header.p_flags) & ~PF_X);
+                * ((Elf_Phdr *) (fileContents->data() + rdi(hdr()->e_phoff)) + i) = header;
+                changed = true;
+            } else if (op == ExecstackMode::set && (rdi(header.p_flags) & PF_X) != PF_X) {
+                debug("simple execstack set of header %zu\n", i);
+
+                wri(header.p_flags, rdi(header.p_flags) | PF_X);
+                * ((Elf_Phdr *) (fileContents->data() + rdi(hdr()->e_phoff)) + i) = header;
+                changed = true;
+            } else {
+                debug("execstack already in requested state\n");
+            }
+
+            return;
+        }
+
+        if (nullhdr != (size_t)-1) {
+            debug("replacement execstack of header %zu\n", nullhdr);
+
+            auto & header = phdrs[nullhdr];
+            header = {};
+            wri(header.p_type,  PT_GNU_STACK);
+            wri(header.p_flags, PF_R | PF_W | (op == ExecstackMode::set ? PF_X : 0));
+            wri(header.p_align, 0x1);
+
+            * ((Elf_Phdr *) (fileContents->data() + rdi(hdr()->e_phoff)) + nullhdr) = header;
+            changed = true;
+            return;
+        }
+
+        debug("header addition for execstack\n");
+
+        Elf_Phdr new_phdr = {};
+        wri(new_phdr.p_type,  PT_GNU_STACK);
+        wri(new_phdr.p_flags, PF_R | PF_W | (op == ExecstackMode::set ? PF_X : 0));
+        wri(new_phdr.p_align, 0x1);
+        phdrs.push_back(new_phdr);
+
+        wri(hdr()->e_phnum, rdi(hdr()->e_phnum) + 1);
+
+        changed = true;
+        rewriteSections(true);
+        return;
+    }
+
+    char result = '?';
+
+    for (const auto & header : phdrs) {
+        if (rdi(header.p_type) != PT_GNU_STACK)
+            continue;
+
+        if ((rdi(header.p_flags) & PF_X) == PF_X)
+            result = 'X';
+        else
+            result = '-';
+        break;
+    }
+
+    printf("execstack: %c\n", result);
+}
+
 static bool printInterpreter = false;
 static bool printOsAbi = false;
 static bool setOsAbi = false;
@@ -1912,6 +1991,9 @@ static std::set<std::string> neededLibsToAdd;
 static std::set<std::string> symbolsToClearVersion;
 static bool printNeeded = false;
 static bool noDefaultLib = false;
+static bool printExecstack = false;
+static bool clearExecstack = false;
+static bool setExecstack = false;
 
 template<class ElfFile>
 static void patchElf2(ElfFile && elfFile, const FileContents & fileContents, const std::string & fileName)
@@ -1936,6 +2018,13 @@ static void patchElf2(ElfFile && elfFile, const FileContents & fileContents, con
 
     if (printRPath)
         elfFile.modifyRPath(elfFile.rpPrint, {}, "");
+
+    if (printExecstack)
+        elfFile.modifyExecstack(ElfFile::ExecstackMode::print);
+    else if (clearExecstack)
+        elfFile.modifyExecstack(ElfFile::ExecstackMode::clear);
+    else if (setExecstack)
+        elfFile.modifyExecstack(ElfFile::ExecstackMode::set);
 
     if (shrinkRPath)
         elfFile.modifyRPath(elfFile.rpShrink, allowedRpathPrefixes, "");
@@ -2019,6 +2108,9 @@ void showHelp(const std::string & progName)
   [--no-sort]\t\tDo not sort program+section headers; useful for debugging patchelf.\n\
   [--clear-symbol-version SYMBOL]\n\
   [--add-debug-tag]\n\
+  [--print-execstack]\t\tPrints whether the object requests an executable stack\n\
+  [--clear-execstack]\n\
+  [--set-execstack]\n\
   [--output FILE]\n\
   [--debug]\n\
   [--version]\n\
@@ -2126,6 +2218,15 @@ int mainWrapped(int argc, char * * argv)
         else if (arg == "--clear-symbol-version") {
             if (++i == argc) error("missing argument");
             symbolsToClearVersion.insert(resolveArgument(argv[i]));
+        }
+        else if (arg == "--print-execstack") {
+            printExecstack = true;
+        }
+        else if (arg == "--clear-execstack") {
+            clearExecstack = true;
+        }
+        else if (arg == "--set-execstack") {
+            setExecstack = true;
         }
         else if (arg == "--output") {
             if (++i == argc) error("missing argument");
