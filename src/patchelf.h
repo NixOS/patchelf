@@ -1,7 +1,22 @@
 using FileContents = std::shared_ptr<std::vector<unsigned char>>;
 
-#define ElfFileParams class Elf_Ehdr, class Elf_Phdr, class Elf_Shdr, class Elf_Addr, class Elf_Off, class Elf_Dyn, class Elf_Sym, class Elf_Verneed, class Elf_Versym
-#define ElfFileParamNames Elf_Ehdr, Elf_Phdr, Elf_Shdr, Elf_Addr, Elf_Off, Elf_Dyn, Elf_Sym, Elf_Verneed, Elf_Versym
+#define ElfFileParams class Elf_Ehdr, class Elf_Phdr, class Elf_Shdr, class Elf_Addr, class Elf_Off, class Elf_Dyn, class Elf_Sym, class Elf_Verneed, class Elf_Versym, class Elf_Rel, class Elf_Rela, unsigned ElfClass
+#define ElfFileParamNames Elf_Ehdr, Elf_Phdr, Elf_Shdr, Elf_Addr, Elf_Off, Elf_Dyn, Elf_Sym, Elf_Verneed, Elf_Versym, Elf_Rel, Elf_Rela, ElfClass
+
+template<class T>
+struct span
+{
+    span(T* d = {}, size_t l = {}) : data(d), len(l) {}
+    span(T* from, T* to) : data(from), len(to-from) {}
+    T& operator[](std::size_t i) { return data[i]; }
+    T* begin() { return data; }
+    T* end() { return data + len; }
+    auto size() { return len; }
+    explicit operator bool() { return size() > 0; }
+
+    T* data;
+    size_t len;
+};
 
 template<ElfFileParams>
 class ElfFile
@@ -85,6 +100,10 @@ private:
 
     std::optional<std::reference_wrapper<Elf_Shdr>> tryFindSectionHeader(const SectionName & sectionName);
 
+    template<class T> span<T> getSectionSpan(const Elf_Shdr & shdr) const;
+    template<class T> span<T> getSectionSpan(const SectionName & sectionName);
+    template<class T> span<T> tryGetSectionSpan(const SectionName & sectionName);
+
     unsigned int getSectionIndex(const SectionName & sectionName);
 
     std::string & replaceSection(const SectionName & sectionName,
@@ -136,6 +155,55 @@ public:
     void noDefaultLib();
 
     void addDebugTag();
+
+    void renameDynamicSymbols(const std::unordered_map<std::string_view, std::string>&);
+
+    struct GnuHashTable {
+        using BloomWord = Elf_Addr;
+        struct Header {
+            uint32_t numBuckets, symndx, maskwords, shift2;
+        } m_hdr;
+        span<BloomWord> m_bloomFilters;
+        span<uint32_t> m_buckets, m_table;
+    };
+    GnuHashTable parseGnuHashTable(span<char> gh);
+
+    struct HashTable {
+        struct Header {
+            uint32_t numBuckets, nchain;
+        } m_hdr;
+        span<uint32_t> m_buckets, m_chain;
+    };
+    HashTable parseHashTable(span<char> gh);
+
+    void rebuildGnuHashTable(const char* strTab, span<Elf_Sym> dynsyms);
+    void rebuildHashTable(const char* strTab, span<Elf_Sym> dynsyms);
+
+    using Elf_Rel_Info = decltype(Elf_Rel::r_info);
+
+    uint32_t rel_getSymId(const Elf_Rel_Info& info) const
+    {
+        if constexpr (std::is_same_v<Elf_Rel, Elf64_Rel>)
+            return ELF64_R_SYM(info);
+        else
+            return ELF32_R_SYM(info);
+    }
+
+    Elf_Rel_Info rel_setSymId(Elf_Rel_Info info, uint32_t id) const
+    {
+        if constexpr (std::is_same_v<Elf_Rel, Elf64_Rel>)
+        {
+            constexpr Elf_Rel_Info idmask = (~Elf_Rel_Info()) << 32;
+            info = (info & ~idmask) | (Elf_Rel_Info(id) << 32);
+        }
+        else
+        {
+            constexpr Elf_Rel_Info idmask = (~Elf_Rel_Info()) << 8;
+            info = (info & ~idmask) | (Elf_Rel_Info(id) << 8);
+        }
+        return info;
+    }
+
 
     void clearSymbolVersions(const std::set<std::string> & syms);
 
