@@ -6,12 +6,12 @@
 # by a signal. This works because the exit code of processes that were
 # killed by a signal is 128 plus the signal number.
 killed_by_signal() {
-    [ $1 -ge 128 ]
+    [ "$1" -ge 128 ]
 }
 
 
 # The directory containing all our input files.
-TEST_DIR=$(dirname $(readlink -f $0))/invalid-elf
+TEST_DIR=$(dirname "$(readlink -f "$0")")/invalid-elf
 
 # Each test case is listed here. The names should roughly indicate
 # what makes the given ELF file invalid.

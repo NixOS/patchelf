@@ -1,14 +1,14 @@
 #! /bin/sh
 set -e
 
-SCRATCH=scratch/$(basename $0 .sh)
+SCRATCH=scratch/$(basename "$0" .sh)
 MAIN_ELF="${SCRATCH}/main"
 
 PATCHELF="../src/patchelf"
 
-rm -rf ${SCRATCH}
-mkdir -p ${SCRATCH}
-cp main ${SCRATCH}/
+rm -rf "${SCRATCH}"
+mkdir -p "${SCRATCH}"
+cp main "${SCRATCH}"/
 
 echo "Confirming main requires libfoo"
 ${PATCHELF} --print-needed "${MAIN_ELF}" | grep -q libfoo.so
