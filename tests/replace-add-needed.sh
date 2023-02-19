@@ -1,15 +1,15 @@
 #! /bin/sh -e
-SCRATCH=scratch/$(basename $0 .sh)
+SCRATCH=scratch/$(basename "$0" .sh)
 PATCHELF=$(readlink -f "../src/patchelf")
 
-rm -rf ${SCRATCH}
-mkdir -p ${SCRATCH}
+rm -rf "${SCRATCH}"
+mkdir -p "${SCRATCH}"
 
-cp simple ${SCRATCH}/
-cp libfoo.so ${SCRATCH}/
-cp libbar.so ${SCRATCH}/
+cp simple "${SCRATCH}"/
+cp libfoo.so "${SCRATCH}"/
+cp libbar.so "${SCRATCH}"/
 
-cd ${SCRATCH}
+cd "${SCRATCH}"
 
 libcldd=$(ldd ./simple | awk '/ => / { print $3 }' | grep -E "(libc.so|ld-musl)")
 
@@ -22,11 +22,11 @@ ${PATCHELF} --add-needed libbar.so ./simple
 # Make the NEEDED in libfoo the same as simple
 # This is a current "bug" in musl
 # https://www.openwall.com/lists/musl/2021/12/21/1
-${PATCHELF} --replace-needed libbar.so $(readlink -f ./libbar.so) ./libfoo.so
+${PATCHELF} --replace-needed libbar.so "$(readlink -f ./libbar.so)" ./libfoo.so
 
-${PATCHELF} --replace-needed libc.so.6 ${libcldd} \
-            --replace-needed libbar.so $(readlink -f ./libbar.so) \
-            --add-needed $(readlink -f ./libfoo.so) \
+${PATCHELF} --replace-needed libc.so.6 "${libcldd}" \
+            --replace-needed libbar.so "$(readlink -f ./libbar.so)" \
+            --add-needed "$(readlink -f ./libfoo.so)" \
             ./simple
 
 exitCode=0
