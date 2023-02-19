@@ -1,5 +1,5 @@
 #! /bin/sh -e
-SCRATCH=scratch/$(basename $0 .sh)
+SCRATCH=scratch/$(basename "$0" .sh)
 READELF=${READELF:-readelf}
 
 rm -rf "${SCRATCH}"
