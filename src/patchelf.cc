@@ -799,7 +799,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
     bool needNewSegment = true;
     auto& lastSeg = phdrs.back();
     /* Try to extend the last segment to include replaced sections */
-    if (phdrs.size() &&
+    if (!phdrs.empty() &&
         rdi(lastSeg.p_type) == PT_LOAD &&
         rdi(lastSeg.p_flags) == (PF_R | PF_W) &&
         rdi(lastSeg.p_align) == getPageSize()) {
