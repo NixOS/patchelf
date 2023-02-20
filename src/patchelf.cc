@@ -985,7 +985,9 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
 
         /* Calculate how many bytes are needed out of the additional pages. */
         size_t extraSpace = neededSpace - startOffset; 
-        unsigned int neededPages = roundUp(extraSpace, getPageSize()) / getPageSize();
+        // Always give one extra page to avoid colliding with segments that start at
+        // unaligned addresses and will be rounded down when loaded
+        unsigned int neededPages = 1 + roundUp(extraSpace, getPageSize()) / getPageSize();
         debug("needed pages is %d\n", neededPages);
         if (neededPages * getPageSize() > firstPage)
             error("virtual address space underrun!");
