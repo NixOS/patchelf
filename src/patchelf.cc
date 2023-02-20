@@ -2357,7 +2357,7 @@ void showHelp(const std::string & progName)
   [--print-execstack]\t\tPrints whether the object requests an executable stack\n\
   [--clear-execstack]\n\
   [--set-execstack]\n\
-  [--rename-dynamic-symbols NAME_MAP_FILE]\tRenames dynamic symbols. The name map file should contain two symbols (old_name new_name) per line\n\
+  [--rename-dynamic-symbols NAME_MAP_FILE]\tRenames dynamic symbols. The map file should contain two symbols (old_name new_name) per line\n\
   [--output FILE]\n\
   [--debug]\n\
   [--version]\n\

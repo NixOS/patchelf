@@ -123,6 +123,10 @@ Clears the executable flag of the GNU_STACK program header, or adds a new header
 .IP "--set-execstack"
 Sets the executable flag of the GNU_STACK program header, or adds a new header.
 
+.IP "--rename-dynamic-symbols NAME_MAP_FILE"
+Renames dynamic symbols. The name map file should contain two space separated
+names (old name and new name) per line.
+
 .IP "--output FILE"
 Set the output file name.  If not specified, the input will be modified in place.
 
