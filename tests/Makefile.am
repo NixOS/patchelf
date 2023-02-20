@@ -1,6 +1,6 @@
 LIBS =
 
-check_PROGRAMS = simple-pie simple main too-many-strtab main-scoped big-dynstr no-rpath contiguous-note-sections
+check_PROGRAMS = simple-pie simple simple-execstack main too-many-strtab main-scoped big-dynstr no-rpath contiguous-note-sections
 
 no_rpath_arch_TESTS = \
   no-rpath-amd64.sh \
@@ -43,7 +43,9 @@ src_TESTS = \
   replace-needed.sh \
   replace-add-needed.sh \
   add-debug-tag.sh \
-  empty-note.sh
+  empty-note.sh \
+  print-execstack.sh \
+  modify-execstack.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)
@@ -71,9 +73,14 @@ export NIX_LDFLAGS=
 simple_SOURCES = simple.c
 # no -fpic for simple.o
 simple_CFLAGS =
+simple_LDFLAGS = -Wl,-z,noexecstack
 
 simple_pie_SOURCES = simple.c
 simple_pie_CFLAGS = -fPIC -pie
+
+simple_execstack_SOURCES = simple.c
+simple_execstack_CFLAGS =
+simple_execstack_LDFLAGS = -Wl,-z,execstack
 
 main_SOURCES = main.c
 main_LDADD = -lfoo $(AM_LDADD)
@@ -108,7 +115,7 @@ check_DATA = libbig-dynstr.debug
 # - without libtool, only archives (static libraries) can be built by automake
 # - with libtool, it is difficult to control options
 # - with libtool, it is not possible to compile convenience *dynamic* libraries :-(
-check_PROGRAMS += libfoo.so libfoo-scoped.so libbar.so libbar-scoped.so libsimple.so libbuildid.so libtoomanystrtab.so \
+check_PROGRAMS += libfoo.so libfoo-scoped.so libbar.so libbar-scoped.so libsimple.so libsimple-execstack.so libbuildid.so libtoomanystrtab.so \
                   phdr-corruption.so
 
 libbuildid_so_SOURCES = simple.c
@@ -131,7 +138,10 @@ libbar_scoped_so_SOURCES = bar.c
 libbar_scoped_so_LDFLAGS = $(LDFLAGS_sharedlib)
 
 libsimple_so_SOURCES = simple.c
-libsimple_so_LDFLAGS = $(LDFLAGS_sharedlib)
+libsimple_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-z,noexecstack
+
+libsimple_execstack_so_SOURCES = simple.c
+libsimple_execstack_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-z,execstack
 
 too_many_strtab_SOURCES = too-many-strtab.c too-many-strtab2.s
 libtoomanystrtab_so_SOURCES = too-many-strtab.c too-many-strtab2.s
