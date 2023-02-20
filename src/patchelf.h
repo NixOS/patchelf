@@ -105,7 +105,7 @@ private:
 
 public:
 
-    void rewriteSections();
+    void rewriteSections(bool force = false);
 
     std::string getInterpreter();
 
@@ -138,6 +138,10 @@ public:
     void addDebugTag();
 
     void clearSymbolVersions(const std::set<std::string> & syms);
+
+    enum class ExecstackMode { print, set, clear };
+
+    void modifyExecstack(ExecstackMode op);
 
 private:
 

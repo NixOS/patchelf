@@ -14,7 +14,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - uses: cachix/install-nix-action@v18
+      - uses: cachix/install-nix-action@v19
       - name: Build tarballs
         run: |
           nix build -L .#hydraJobs.tarball
@@ -31,7 +31,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - uses: cachix/install-nix-action@v18
+      - uses: cachix/install-nix-action@v19
       - name: Build windows executable
         run: |
           nix build -L .#patchelf-win32 .#patchelf-win64

@@ -114,6 +114,15 @@ This means that when a shared library has an entry point (so that it
 can be run as an executable), the debugger does not connect to it correctly and
 symbols are not resolved.
 
+.IP "--print-execstack"
+Prints the state of the executable flag of the GNU_STACK program header, if present.
+
+.IP "--clear-execstack"
+Clears the executable flag of the GNU_STACK program header, or adds a new header.
+
+.IP "--set-execstack"
+Sets the executable flag of the GNU_STACK program header, or adds a new header.
+
 .IP "--output FILE"
 Set the output file name.  If not specified, the input will be modified in place.
 
