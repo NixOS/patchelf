@@ -15,12 +15,10 @@ struct span
     explicit operator bool() const { return size() > 0; }
 
 private:
-    void checkRange(std::size_t i)
-    {
-        bool oor = i >= size();
-        assert(!oor);
-        if (oor) throw std::out_of_range("error: Access out of range.");
+    void checkRange(std::size_t i) {
+        if (i >= size()) throw std::out_of_range("error: Span access out of range.");
     }
+
     T* data;
     size_t len;
 };
