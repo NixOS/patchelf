@@ -2,6 +2,7 @@
 #include <memory>
 #include <optional>
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -157,11 +158,14 @@ private:
     constexpr I rdi(I i) const noexcept;
 
     /* Convert back to the ELF representation. */
-    template<class I>
-    constexpr I wri(I & t, unsigned long long i) const
+    template<class I, class U>
+    constexpr inline I wri(I & t, U i) const
     {
-        t = rdi((I) i);
-        return i;
+        I val = static_cast<I>(i);
+        if (static_cast<U>(val) != i)            
+            throw std::runtime_error { "value truncation" };
+        t = rdi(val);
+        return val;
     }
 
     [[nodiscard]] Elf_Ehdr *hdr() noexcept {
