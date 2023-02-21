@@ -124,8 +124,10 @@ Clears the executable flag of the GNU_STACK program header, or adds a new header
 Sets the executable flag of the GNU_STACK program header, or adds a new header.
 
 .IP "--rename-dynamic-symbols NAME_MAP_FILE"
-Renames dynamic symbols. The name map file should contain two space separated
-names (old name and new name) per line.
+Renames dynamic symbols. The name map file should contain lines
+with the old and the new name separated by spaces like this:
+
+old_name new_name
 
 .IP "--output FILE"
 Set the output file name.  If not specified, the input will be modified in place.
