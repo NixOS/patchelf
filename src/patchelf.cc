@@ -535,7 +535,7 @@ std::string ElfFile<ElfFileParamNames>::getSectionName(const Elf_Shdr & shdr) co
 
 
 template<ElfFileParams>
-Elf_Shdr & ElfFile<ElfFileParamNames>::findSectionHeader(const SectionName & sectionName)
+const Elf_Shdr & ElfFile<ElfFileParamNames>::findSectionHeader(const SectionName & sectionName) const
 {
     auto shdr = tryFindSectionHeader(sectionName);
     if (!shdr) {
@@ -549,7 +549,7 @@ Elf_Shdr & ElfFile<ElfFileParamNames>::findSectionHeader(const SectionName & sec
 
 
 template<ElfFileParams>
-std::optional<std::reference_wrapper<Elf_Shdr>> ElfFile<ElfFileParamNames>::tryFindSectionHeader(const SectionName & sectionName)
+std::optional<std::reference_wrapper<const Elf_Shdr>> ElfFile<ElfFileParamNames>::tryFindSectionHeader(const SectionName & sectionName) const
 {
     auto i = getSectionIndex(sectionName);
     if (i)
@@ -602,7 +602,7 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
        clobbering previously written new section contents. */
     for (auto & i : replacedSections) {
         const std::string & sectionName = i.first;
-        Elf_Shdr & shdr = findSectionHeader(sectionName);
+        const Elf_Shdr & shdr = findSectionHeader(sectionName);
         if (rdi(shdr.sh_type) != SHT_NOBITS)
             memset(fileContents->data() + rdi(shdr.sh_offset), 'X', rdi(shdr.sh_size));
     }
@@ -1190,10 +1190,10 @@ static void setSubstr(std::string & s, unsigned int pos, const std::string & t)
 
 
 template<ElfFileParams>
-std::string ElfFile<ElfFileParamNames>::getInterpreter()
+std::string ElfFile<ElfFileParamNames>::getInterpreter() const
 {
     auto shdr = findSectionHeader(".interp");
-    return std::string((char *) fileContents->data() + rdi(shdr.sh_offset), rdi(shdr.sh_size) - 1);
+    return std::string((const char *) fileContents->data() + rdi(shdr.sh_offset), rdi(shdr.sh_size) - 1);
 }
 
 template<ElfFileParams>
@@ -1776,13 +1776,13 @@ void ElfFile<ElfFileParamNames>::addNeeded(const std::set<std::string> & libs)
 }
 
 template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::printNeededLibs() // const
+void ElfFile<ElfFileParamNames>::printNeededLibs() const
 {
     const auto shdrDynamic = findSectionHeader(".dynamic");
     const auto shdrDynStr = findSectionHeader(".dynstr");
-    const char *strTab = (char *)fileContents->data() + rdi(shdrDynStr.sh_offset);
+    const char *strTab = (const char *)fileContents->data() + rdi(shdrDynStr.sh_offset);
 
-    const Elf_Dyn *dyn = (Elf_Dyn *) (fileContents->data() + rdi(shdrDynamic.sh_offset));
+    const Elf_Dyn *dyn = (const Elf_Dyn *) (fileContents->data() + rdi(shdrDynamic.sh_offset));
 
     for (; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_NEEDED) {

@@ -87,9 +87,9 @@ private:
 
     [[nodiscard]] std::string getSectionName(const Elf_Shdr & shdr) const;
 
-    Elf_Shdr & findSectionHeader(const SectionName & sectionName);
+    const Elf_Shdr & findSectionHeader(const SectionName & sectionName) const;
 
-    [[nodiscard]] std::optional<std::reference_wrapper<Elf_Shdr>> tryFindSectionHeader(const SectionName & sectionName);
+    [[nodiscard]] std::optional<std::reference_wrapper<const Elf_Shdr>> tryFindSectionHeader(const SectionName & sectionName) const;
 
     [[nodiscard]] unsigned int getSectionIndex(const SectionName & sectionName) const;
 
@@ -113,7 +113,7 @@ public:
 
     void rewriteSections(bool force = false);
 
-    [[nodiscard]] std::string getInterpreter();
+    [[nodiscard]] std::string getInterpreter() const;
 
     typedef enum { printOsAbi, replaceOsAbi } osAbiMode;
 
@@ -137,7 +137,7 @@ public:
 
     void replaceNeeded(const std::map<std::string, std::string> & libs);
 
-    void printNeededLibs() /* should be const */;
+    void printNeededLibs() const;
 
     void noDefaultLib();
 
