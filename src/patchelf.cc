@@ -167,7 +167,7 @@ struct SysError : std::runtime_error
     { }
 };
 
-__attribute__((noreturn)) static void error(const std::string & msg)
+[[noreturn]] static void error(const std::string & msg)
 {
     if (errno)
         throw SysError(msg);
