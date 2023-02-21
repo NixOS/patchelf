@@ -183,8 +183,8 @@ public:
     };
     HashTable parseHashTable(span<char> gh);
 
-    void rebuildGnuHashTable(const char* strTab, span<Elf_Sym> dynsyms);
-    void rebuildHashTable(const char* strTab, span<Elf_Sym> dynsyms);
+    void rebuildGnuHashTable(span<char> strTab, span<Elf_Sym> dynsyms);
+    void rebuildHashTable(span<char> strTab, span<Elf_Sym> dynsyms);
 
     using Elf_Rel_Info = decltype(Elf_Rel::r_info);
 

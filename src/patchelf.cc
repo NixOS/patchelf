@@ -1902,7 +1902,7 @@ auto ElfFile<ElfFileParamNames>::parseGnuHashTable(span<char> sectionData) -> Gn
 }
 
 template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::rebuildGnuHashTable(const char* strTab, span<Elf_Sym> dynsyms)
+void ElfFile<ElfFileParamNames>::rebuildGnuHashTable(span<char> strTab, span<Elf_Sym> dynsyms)
 {
     auto sectionData = tryGetSectionSpan<char>(".gnu.hash");
     if (!sectionData)
@@ -1916,12 +1916,12 @@ void ElfFile<ElfFileParamNames>::rebuildGnuHashTable(const char* strTab, span<El
 
     // The hash table includes only a subset of dynsyms
     auto firstSymIdx = rdi(ght.m_hdr.symndx);
-    dynsyms = span(dynsyms.begin() + firstSymIdx, dynsyms.end());
+    dynsyms = span(&dynsyms[firstSymIdx], dynsyms.end());
 
     // Only use the range of symbol versions that will be changed
     auto versyms = tryGetSectionSpan<Elf_Versym>(".gnu.version");
     if (versyms)
-        versyms = span(versyms.begin() + firstSymIdx, versyms.end());
+        versyms = span(&versyms[firstSymIdx], versyms.end());
 
     struct Entry
     {
@@ -1935,7 +1935,7 @@ void ElfFile<ElfFileParamNames>::rebuildGnuHashTable(const char* strTab, span<El
     for (auto& sym : dynsyms)
     {
         Entry e;
-        e.hash = gnuHash(strTab + rdi(sym.st_name));
+        e.hash = gnuHash(&strTab[rdi(sym.st_name)]);
         e.bucketIdx = e.hash % ght.m_buckets.size();
         e.originalPos = pos++;
         entries.push_back(e);
@@ -2044,7 +2044,7 @@ auto ElfFile<ElfFileParamNames>::parseHashTable(span<char> sectionData) -> HashT
 }
 
 template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::rebuildHashTable(const char* strTab, span<Elf_Sym> dynsyms)
+void ElfFile<ElfFileParamNames>::rebuildHashTable(span<char> strTab, span<Elf_Sym> dynsyms)
 {
     auto sectionData = tryGetSectionSpan<char>(".hash");
     if (!sectionData)
@@ -2055,11 +2055,13 @@ void ElfFile<ElfFileParamNames>::rebuildHashTable(const char* strTab, span<Elf_S
     std::fill(ht.m_buckets.begin(), ht.m_buckets.end(), 0);
     std::fill(ht.m_chain.begin(), ht.m_chain.end(), 0);
 
-    auto symsToInsert = span(dynsyms.end() - ht.m_chain.size(), dynsyms.end());
+    // The hash table includes only a subset of dynsyms
+    auto firstSymIdx = dynsyms.size() - ht.m_chain.size();
+    dynsyms = span(&dynsyms[firstSymIdx], dynsyms.end());
 
-    for (auto& sym : symsToInsert)
+    for (auto& sym : dynsyms)
     {
-        auto name = strTab + rdi(sym.st_name);
+        auto name = &strTab[rdi(sym.st_name)];
         uint32_t i = &sym - dynsyms.begin();
         uint32_t hash = sysvHash(name) % ht.m_buckets.size();
         wri(ht.m_chain[i], rdi(ht.m_buckets[hash]));
@@ -2075,27 +2077,29 @@ void ElfFile<ElfFileParamNames>::renameDynamicSymbols(const std::unordered_map<s
 
     std::vector<char> extraStrings;
     extraStrings.reserve(remap.size() * 30); // Just an estimate
-    for (size_t i = 0; i < dynsyms.size(); i++)
+    for (auto& dynsym : dynsyms)
     {
-        auto& dynsym = dynsyms[i];
         std::string_view name = &strTab[rdi(dynsym.st_name)];
         auto it = remap.find(name);
         if (it != remap.end())
         {
             wri(dynsym.st_name, strTab.size() + extraStrings.size());
             auto& newName = it->second;
-            extraStrings.insert(extraStrings.end(), newName.data(), newName.data() + newName.size() + 1);
+            extraStrings.insert(extraStrings.end(), newName.begin(), newName.end() + 1);
             changed = true;
         }
     }
 
     if (changed)
     {
-        auto& newSec = replaceSection(".dynstr", strTab.size() + extraStrings.size());
-        std::copy(extraStrings.begin(), extraStrings.end(), newSec.begin() + strTab.size());
+        auto newStrTabSize = strTab.size() + extraStrings.size();
+        auto& newSec = replaceSection(".dynstr", newStrTabSize);
+        auto newStrTabSpan = span(newSec.data(), newStrTabSize);
 
-        rebuildGnuHashTable(newSec.data(), dynsyms);
-        rebuildHashTable(newSec.data(), dynsyms);
+        std::copy(extraStrings.begin(), extraStrings.end(), &newStrTabSpan[strTab.size()]);
+
+        rebuildGnuHashTable(newStrTabSpan, dynsyms);
+        rebuildHashTable(newStrTabSpan, dynsyms);
     }
 
     this->rewriteSections();
