@@ -30,7 +30,7 @@ fi
 # Tests for powerpc PIE endianness regressions
 readelfData=$(${READELF} -l ${SCRATCH}/no-rpath 2>&1)
 
-if [ $(echo "$readelfData" | grep --count "PHDR") != 1 ]; then
+if [ $(echo "$readelfData" | grep "PHDR" | wc -l) != 1 ]; then
   # Triggered if PHDR errors appear on stderr
   echo "Unexpected number of occurences of PHDR in readelf results"
   exit 1

@@ -2,7 +2,7 @@
 
 PATCHELF="../src/patchelf"
 SONAME="phdr-corruption.so"
-SCRATCH="scratch/$(basename $0 .sh)"
+SCRATCH="scratch/$(basename "$0" .sh)"
 SCRATCH_SO="${SCRATCH}/${SONAME}"
 READELF=${READELF:-readelf}
 
@@ -15,7 +15,7 @@ cp "${SONAME}" "${SCRATCH}"
 # Check for PT_PHDR entry VirtAddr corruption
 readelfData=$(${READELF} -l "${SCRATCH_SO}" 2>&1)
 
-if [ $(echo "$readelfData" | grep --count "PHDR") != 1 ]; then
+if [ "$(echo "$readelfData" | grep "PHDR" | wc -l)" != 1 ]; then
   # Triggered if PHDR errors appear on stderr
   echo "ERROR: Unexpected number of occurences of PHDR in readelf results!"
   exit 1
