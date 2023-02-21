@@ -6,14 +6,21 @@ using FileContents = std::shared_ptr<std::vector<unsigned char>>;
 template<class T>
 struct span
 {
-    span(T* d = {}, size_t l = {}) : data(d), len(l) {}
-    span(T* from, T* to) : data(from), len(to-from) {}
-    T& operator[](std::size_t i) { return data[i]; }
+    explicit span(T* d = {}, size_t l = {}) : data(d), len(l) {}
+    span(T* from, T* to) : data(from), len(to-from) { assert(from <= to); }
+    T& operator[](std::size_t i) { checkRange(i); return data[i]; }
     T* begin() { return data; }
     T* end() { return data + len; }
-    auto size() { return len; }
-    explicit operator bool() { return size() > 0; }
+    auto size() const { return len; }
+    explicit operator bool() const { return size() > 0; }
 
+private:
+    void checkRange(std::size_t i)
+    {
+        bool oor = i >= size();
+        assert(!oor);
+        if (oor) throw std::out_of_range("error: Access out of range.");
+    }
     T* data;
     size_t len;
 };
