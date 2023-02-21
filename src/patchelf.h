@@ -67,8 +67,6 @@ private:
         }
     };
 
-    friend struct CompPhdr;
-
     void sortPhdrs();
 
     struct CompShdr
@@ -79,8 +77,6 @@ private:
             return elfFile->rdi(x.sh_offset) < elfFile->rdi(y.sh_offset);
         }
     };
-
-    friend struct CompShdr;
 
     [[nodiscard]] unsigned int getPageSize() const noexcept;
 
