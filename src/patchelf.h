@@ -165,10 +165,10 @@ private:
     }
 
     [[nodiscard]] Elf_Ehdr *hdr() noexcept {
-      return (Elf_Ehdr *)fileContents->data();
+      return reinterpret_cast<Elf_Ehdr *>(fileContents->data());
     }
 
     [[nodiscard]] const Elf_Ehdr *hdr() const noexcept {
-      return (const Elf_Ehdr *)fileContents->data();
+      return reinterpret_cast<const Elf_Ehdr *>(fileContents->data());
     }
 };
