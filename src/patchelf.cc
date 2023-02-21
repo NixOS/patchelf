@@ -24,6 +24,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 #include <optional>
@@ -69,14 +70,18 @@ static int forcedPageSize = -1;
 #define EM_LOONGARCH    258
 #endif
 
-
-static std::vector<std::string> splitColonDelimitedString(const char * s)
+[[nodiscard]] static std::vector<std::string> splitColonDelimitedString(std::string_view s)
 {
-    std::string item;
     std::vector<std::string> parts;
-    std::stringstream ss(s);
-    while (std::getline(ss, item, ':'))
-        parts.push_back(item);
+
+    size_t pos;
+    while ((pos = s.find(':')) != std::string_view::npos) {
+        parts.emplace_back(s.substr(0, pos));
+        s = s.substr(pos + 1);
+    }
+
+    if (!s.empty())
+        parts.emplace_back(s);
 
     return parts;
 }
