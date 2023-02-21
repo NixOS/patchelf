@@ -39,14 +39,14 @@ private:
 
     /* Align on 4 or 8 bytes boundaries on 32- or 64-bit platforms
        respectively. */
-    size_t sectionAlignment = sizeof(Elf_Off);
+    static constexpr size_t sectionAlignment = sizeof(Elf_Off);
 
     std::vector<SectionName> sectionsByOldIndex;
 
 public:
     explicit ElfFile(FileContents fileContents);
 
-    bool isChanged()
+    [[nodiscard]] bool isChanged() const noexcept
     {
         return changed;
     }
@@ -55,8 +55,8 @@ private:
 
     struct CompPhdr
     {
-        ElfFile * elfFile;
-        bool operator ()(const Elf_Phdr & x, const Elf_Phdr & y)
+        const ElfFile * elfFile;
+        bool operator ()(const Elf_Phdr & x, const Elf_Phdr & y) const noexcept
         {
             // A PHDR comes before everything else.
             if (elfFile->rdi(y.p_type) == PT_PHDR) return false;
@@ -73,8 +73,8 @@ private:
 
     struct CompShdr
     {
-        ElfFile * elfFile;
-        bool operator ()(const Elf_Shdr & x, const Elf_Shdr & y)
+        const ElfFile * elfFile;
+        bool operator ()(const Elf_Shdr & x, const Elf_Shdr & y) const noexcept
         {
             return elfFile->rdi(x.sh_offset) < elfFile->rdi(y.sh_offset);
         }
@@ -82,24 +82,24 @@ private:
 
     friend struct CompShdr;
 
-    unsigned int getPageSize() const;
+    [[nodiscard]] unsigned int getPageSize() const noexcept;
 
     void sortShdrs();
 
     void shiftFile(unsigned int extraPages, Elf_Addr startPage);
 
-    std::string getSectionName(const Elf_Shdr & shdr) const;
+    [[nodiscard]] std::string getSectionName(const Elf_Shdr & shdr) const;
 
     Elf_Shdr & findSectionHeader(const SectionName & sectionName);
 
-    std::optional<std::reference_wrapper<Elf_Shdr>> tryFindSectionHeader(const SectionName & sectionName);
+    [[nodiscard]] std::optional<std::reference_wrapper<Elf_Shdr>> tryFindSectionHeader(const SectionName & sectionName);
 
-    unsigned int getSectionIndex(const SectionName & sectionName);
+    [[nodiscard]] unsigned int getSectionIndex(const SectionName & sectionName) const;
 
     std::string & replaceSection(const SectionName & sectionName,
         unsigned int size);
 
-    bool haveReplacedSection(const SectionName & sectionName) const;
+    [[nodiscard]] bool haveReplacedSection(const SectionName & sectionName) const;
 
     void writeReplacedSections(Elf_Off & curOff,
         Elf_Addr startAddr, Elf_Off startOffset);
@@ -116,7 +116,7 @@ public:
 
     void rewriteSections();
 
-    std::string getInterpreter();
+    [[nodiscard]] std::string getInterpreter();
 
     typedef enum { printSoname, replaceSoname } sonameMode;
 
@@ -150,21 +150,21 @@ private:
        specified by the ELF header) to this platform's integer
        representation. */
     template<class I>
-    I rdi(I i) const;
+    constexpr I rdi(I i) const noexcept;
 
     /* Convert back to the ELF representation. */
     template<class I>
-    I wri(I & t, unsigned long long i) const
+    constexpr I wri(I & t, unsigned long long i) const
     {
         t = rdi((I) i);
         return i;
     }
 
-    Elf_Ehdr *hdr() {
+    [[nodiscard]] Elf_Ehdr *hdr() noexcept {
       return (Elf_Ehdr *)fileContents->data();
     }
 
-    const Elf_Ehdr *hdr() const {
+    [[nodiscard]] const Elf_Ehdr *hdr() const noexcept {
       return (const Elf_Ehdr *)fileContents->data();
     }
 };

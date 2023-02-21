@@ -90,7 +90,7 @@ static bool hasAllowedPrefix(const std::string & s, const std::vector<std::strin
    why... */
 template<ElfFileParams>
 template<class I>
-I ElfFile<ElfFileParamNames>::rdi(I i) const
+constexpr I ElfFile<ElfFileParamNames>::rdi(I i) const noexcept
 {
     I r = 0;
     if (littleEndian) {
@@ -117,7 +117,7 @@ static void debug(const char * format, ...)
 }
 
 
-void fmt2(std::ostringstream & out)
+static void fmt2([[maybe_unused]] std::ostringstream & out)
 {
 }
 
@@ -295,7 +295,7 @@ ElfFile<ElfFileParamNames>::ElfFile(FileContents fContents)
 
 
 template<ElfFileParams>
-unsigned int ElfFile<ElfFileParamNames>::getPageSize() const
+unsigned int ElfFile<ElfFileParamNames>::getPageSize() const noexcept
 {
     if (forcedPageSize > 0)
         return forcedPageSize;
@@ -498,7 +498,7 @@ std::optional<std::reference_wrapper<Elf_Shdr>> ElfFile<ElfFileParamNames>::tryF
 
 
 template<ElfFileParams>
-unsigned int ElfFile<ElfFileParamNames>::getSectionIndex(const SectionName & sectionName)
+unsigned int ElfFile<ElfFileParamNames>::getSectionIndex(const SectionName & sectionName) const
 {
     for (unsigned int i = 1; i < rdi(hdr()->e_shnum); ++i)
         if (getSectionName(shdrs.at(i)) == sectionName) return i;
