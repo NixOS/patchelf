@@ -1320,7 +1320,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
         case rpPrint: {
             printf("%s\n", rpath ? rpath : "");
             return;
-        };
+        }
         case rpRemove: {
             if (!rpath) {
                 debug("no RPATH to delete\n");
@@ -1333,7 +1333,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
             if (!rpath) {
                 debug("no RPATH to shrink\n");
                 return;
-            ;}
+            }
             newRPath = shrinkRPath(rpath, neededLibs, allowedRpathPrefixes);
             break;
         }
