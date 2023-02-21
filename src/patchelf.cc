@@ -1827,7 +1827,7 @@ static void patchElf()
     }
 }
 
-std::string resolveArgument(const char *arg) {
+[[nodiscard]] static std::string resolveArgument(const char *arg) {
   if (strlen(arg) > 0 && arg[0] == '@') {
     FileContents cnts = readFile(arg + 1);
     return std::string((char *)cnts->data(), cnts->size());
@@ -1837,7 +1837,7 @@ std::string resolveArgument(const char *arg) {
 }
 
 
-void showHelp(const std::string & progName)
+static void showHelp(const std::string & progName)
 {
         fprintf(stderr, "syntax: %s\n\
   [--set-interpreter FILENAME]\n\
@@ -1867,7 +1867,7 @@ void showHelp(const std::string & progName)
 }
 
 
-int mainWrapped(int argc, char * * argv)
+static int mainWrapped(int argc, char * * argv)
 {
     if (argc <= 1) {
         showHelp(argv[0]);
