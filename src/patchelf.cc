@@ -621,7 +621,7 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
         debug("rewriting section '%s' from offset 0x%x (size %d) to offset 0x%x (size %d)\n",
             sectionName.c_str(), rdi(shdr.sh_offset), rdi(shdr.sh_size), curOff, i->second.size());
 
-        memcpy(fileContents->data() + curOff, (unsigned char *) i->second.c_str(),
+        memcpy(fileContents->data() + curOff, i->second.c_str(),
             i->second.size());
 
         /* Update the section header for this section. */
@@ -1316,7 +1316,7 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string &
         std::string & newDynamic = replaceSection(".dynamic", rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn));
 
         unsigned int idx = 0;
-        for (; rdi(((Elf_Dyn *) newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++);
+        for (; rdi(reinterpret_cast<const Elf_Dyn *>(newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++);
         debug("DT_NULL index is %d\n", idx);
 
         /* Shift all entries down by one. */
@@ -1551,7 +1551,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
             rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn));
 
         unsigned int idx = 0;
-        for ( ; rdi(((Elf_Dyn *) newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
+        for ( ; rdi(reinterpret_cast<const Elf_Dyn *>(newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
         debug("DT_NULL index is %d\n", idx);
 
         /* Shift all entries down by one. */
@@ -1753,7 +1753,7 @@ void ElfFile<ElfFileParamNames>::addNeeded(const std::set<std::string> & libs)
         rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn) * libs.size());
 
     unsigned int idx = 0;
-    for ( ; rdi(((Elf_Dyn *) newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
+    for ( ; rdi(reinterpret_cast<const Elf_Dyn *>(newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
     debug("DT_NULL index is %d\n", idx);
 
     /* Shift all entries down by the number of new entries. */
@@ -1815,7 +1815,7 @@ void ElfFile<ElfFileParamNames>::noDefaultLib()
                 rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn));
 
         unsigned int idx = 0;
-        for ( ; rdi(((Elf_Dyn *) newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
+        for ( ; rdi(reinterpret_cast<const Elf_Dyn *>(newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
         debug("DT_NULL index is %d\n", idx);
 
         /* Shift all entries down by one. */
@@ -1848,7 +1848,7 @@ void ElfFile<ElfFileParamNames>::addDebugTag()
             rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn));
 
     unsigned int idx = 0;
-    for ( ; rdi(((Elf_Dyn *) newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
+    for ( ; rdi(reinterpret_cast<const Elf_Dyn *>(newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
     debug("DT_NULL index is %d\n", idx);
 
     /* Shift all entries down by one. */
