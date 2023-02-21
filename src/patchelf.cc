@@ -198,10 +198,10 @@ struct ElfType
 };
 
 
-ElfType getElfType(const FileContents & fileContents)
+[[nodiscard]] static ElfType getElfType(const FileContents & fileContents)
 {
     /* Check the ELF header for basic validity. */
-    if (fileContents->size() < static_cast<off_t>(sizeof(Elf32_Ehdr)))
+    if (fileContents->size() < sizeof(Elf32_Ehdr))
         error("missing ELF header");
 
     auto contents = fileContents->data();
