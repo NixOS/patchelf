@@ -236,10 +236,9 @@ struct ElfType
 }
 
 
-static void checkPointer(const FileContents & contents, void * p, unsigned int size)
+static void checkPointer(const FileContents & contents, const void * p, size_t size)
 {
-    auto q = static_cast<unsigned char *>(p);
-    if (!(q >= contents->data() && q + size <= contents->data() + contents->size()))
+    if (p < contents->data() || size > contents->size() || p > contents->data() + contents->size() - size)
         error("data region extends past file end");
 }
 
