@@ -276,11 +276,11 @@ ElfFile<ElfFileParamNames>::ElfFile(FileContents fContents)
     /* Get the section header string table section (".shstrtab").  Its
        index in the section header table is given by e_shstrndx field
        of the ELF header. */
-    unsigned int shstrtabIndex = rdi(hdr()->e_shstrndx);
+    auto shstrtabIndex = rdi(hdr()->e_shstrndx);
     if (shstrtabIndex >= shdrs.size())
         error("string table index out of bounds");
 
-    unsigned int shstrtabSize = rdi(shdrs[shstrtabIndex].sh_size);
+    auto shstrtabSize = rdi(shdrs[shstrtabIndex].sh_size);
     char * shstrtab = (char * ) fileContents->data() + rdi(shdrs[shstrtabIndex].sh_offset);
     checkPointer(fileContents, shstrtab, shstrtabSize);
 
