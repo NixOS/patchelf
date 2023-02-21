@@ -243,6 +243,25 @@ static void checkPointer(const FileContents & contents, const void * p, size_t s
 }
 
 
+static void checkOffset(const FileContents & contents, size_t offset, size_t size)
+{
+    size_t end;
+
+    if (offset > contents->size()
+        || size > contents->size()
+        || __builtin_add_overflow(offset, size, &end)
+        || end > contents->size())
+        error("data offset extends past file end");
+}
+
+
+static std::string extractString(const FileContents & contents, size_t offset, size_t size)
+{
+    checkOffset(contents, offset, size);
+    return { reinterpret_cast<const char *>(contents->data()) + offset, size };
+}
+
+
 template<ElfFileParams>
 ElfFile<ElfFileParamNames>::ElfFile(FileContents fContents)
     : fileContents(fContents)
@@ -259,14 +278,34 @@ ElfFile<ElfFileParamNames>::ElfFile(FileContents fContents)
     if (rdi(hdr()->e_type) != ET_EXEC && rdi(hdr()->e_type) != ET_DYN)
         error("wrong ELF type");
 
-    if (rdi(hdr()->e_phoff) + rdi(hdr()->e_phnum) * rdi(hdr()->e_phentsize) > fileContents->size())
-        error("program header table out of bounds");
+    {
+        auto ph_offset = rdi(hdr()->e_phoff);
+        auto ph_num = rdi(hdr()->e_phnum);
+        auto ph_entsize = rdi(hdr()->e_phentsize);
+        size_t ph_size, ph_end;
+
+        if (__builtin_mul_overflow(ph_num, ph_entsize, &ph_size)
+            || __builtin_add_overflow(ph_offset, ph_size, &ph_end)
+            || ph_end > fileContents->size()) {
+            error("program header table out of bounds");
+        }
+    }
 
     if (rdi(hdr()->e_shnum) == 0)
         error("no section headers. The input file is probably a statically linked, self-decompressing binary");
 
-    if (rdi(hdr()->e_shoff) + rdi(hdr()->e_shnum) * rdi(hdr()->e_shentsize) > fileContents->size())
-        error("section header table out of bounds");
+    {
+        auto sh_offset = rdi(hdr()->e_shoff);
+        auto sh_num = rdi(hdr()->e_shnum);
+        auto sh_entsize = rdi(hdr()->e_shentsize);
+        size_t sh_size, sh_end;
+
+        if (__builtin_mul_overflow(sh_num, sh_entsize, &sh_size)
+            || __builtin_add_overflow(sh_offset, sh_size, &sh_end)
+            || sh_end > fileContents->size()) {
+            error("section header table out of bounds");
+        }
+    }
 
     if (rdi(hdr()->e_phentsize) != sizeof(Elf_Phdr))
         error("program headers have wrong size");
@@ -295,7 +334,10 @@ ElfFile<ElfFileParamNames>::ElfFile(FileContents fContents)
         error("string table index out of bounds");
 
     auto shstrtabSize = rdi(shdrs[shstrtabIndex].sh_size);
-    char * shstrtab = (char * ) fileContents->data() + rdi(shdrs[shstrtabIndex].sh_offset);
+    size_t shstrtabptr;
+    if (__builtin_add_overflow(reinterpret_cast<size_t>(fileContents->data()), rdi(shdrs[shstrtabIndex].sh_offset), &shstrtabptr))
+        error("string table overflow");
+    const char *shstrtab = reinterpret_cast<const char *>(shstrtabptr);
     checkPointer(fileContents, shstrtab, shstrtabSize);
 
     if (shstrtabSize == 0)
@@ -583,7 +625,7 @@ std::string & ElfFile<ElfFileParamNames>::replaceSection(const SectionName & sec
         s = std::string(i->second);
     } else {
         auto shdr = findSectionHeader(sectionName);
-        s = std::string((char *) fileContents->data() + rdi(shdr.sh_offset), rdi(shdr.sh_size));
+        s = extractString(fileContents, rdi(shdr.sh_offset), rdi(shdr.sh_size));
     }
 
     s.resize(size);
@@ -1193,7 +1235,10 @@ template<ElfFileParams>
 std::string ElfFile<ElfFileParamNames>::getInterpreter() const
 {
     auto shdr = findSectionHeader(".interp");
-    return std::string((const char *) fileContents->data() + rdi(shdr.sh_offset), rdi(shdr.sh_size) - 1);
+    auto size = rdi(shdr.sh_size);
+    if (size > 0)
+        size--;
+    return extractString(fileContents, rdi(shdr.sh_offset), size);
 }
 
 template<ElfFileParams>
