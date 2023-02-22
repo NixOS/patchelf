@@ -169,6 +169,13 @@ public:
 
     void renameDynamicSymbols(const std::unordered_map<std::string_view, std::string>&);
 
+    void clearSymbolVersions(const std::set<std::string> & syms);
+
+    enum class ExecstackMode { print, set, clear };
+
+    void modifyExecstack(ExecstackMode op);
+
+private:
     struct GnuHashTable {
         using BloomWord = Elf_Addr;
         struct Header {
@@ -215,14 +222,20 @@ public:
         return info;
     }
 
+    template<class ElfRelType, class RemapFn>
+    void changeRelocTableSymIds(const Elf_Shdr& shdr, RemapFn&& old2newSymId)
+    {
+        static_assert(std::is_same_v<ElfRelType, Elf_Rel> || std::is_same_v<ElfRelType, Elf_Rela>);
 
-    void clearSymbolVersions(const std::set<std::string> & syms);
-
-    enum class ExecstackMode { print, set, clear };
-
-    void modifyExecstack(ExecstackMode op);
-
-private:
+        for (auto& r : getSectionSpan<ElfRelType>(shdr))
+        {
+            auto info = rdi(r.r_info);
+            auto oldSymIdx = rel_getSymId(info);
+            auto newSymIdx = old2newSymId(oldSymIdx);
+            if (newSymIdx != oldSymIdx)
+                wri(r.r_info, rel_setSymId(info, newSymIdx));
+        }
+    }
 
     /* Convert an integer in big or little endian representation (as
        specified by the ELF header) to this platform's integer

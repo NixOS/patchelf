@@ -2013,20 +2013,10 @@ void ElfFile<ElfFileParamNames>::rebuildGnuHashTable(span<char> strTab, span<Elf
     if (versyms)
         reorderSpan(versyms, old2new);
 
-    auto fixRelocationTable = [&old2new, firstSymIdx, this] <class ER> (auto& hdr)
+    auto remapSymbolId = [&old2new, firstSymIdx] (auto& oldSymIdx)
     {
-        auto rela = getSectionSpan<ER>(hdr);
-        for (auto& r : rela)
-        {
-            auto info = rdi(r.r_info);
-            auto oldSymIdx = rel_getSymId(info);
-            if (oldSymIdx >= firstSymIdx)
-            {
-                auto newSymIdx = old2new[oldSymIdx - firstSymIdx] + firstSymIdx;
-                if (newSymIdx != oldSymIdx)
-                    wri(r.r_info, rel_setSymId(info, newSymIdx));
-            }
-        }
+        return oldSymIdx >= firstSymIdx ? old2new[oldSymIdx - firstSymIdx] + firstSymIdx
+                                        : oldSymIdx;
     };
 
     for (unsigned int i = 1; i < rdi(hdr()->e_shnum); ++i)
@@ -2034,9 +2024,9 @@ void ElfFile<ElfFileParamNames>::rebuildGnuHashTable(span<char> strTab, span<Elf
         auto& shdr = shdrs.at(i);
         auto shtype = rdi(shdr.sh_type);
         if (shtype == SHT_REL)
-            fixRelocationTable.template operator()<Elf_Rel>(shdr);
+            changeRelocTableSymIds<Elf_Rel>(shdr, remapSymbolId);
         else if (shtype == SHT_RELA)
-            fixRelocationTable.template operator()<Elf_Rela>(shdr);
+            changeRelocTableSymIds<Elf_Rela>(shdr, remapSymbolId);
     }
 
     // Update bloom filters
