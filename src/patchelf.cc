@@ -787,24 +787,22 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
     /* When normalizing note segments we will in the worst case be adding
        1 program header for each SHT_NOTE section. */
     unsigned int num_notes = std::count_if(shdrs.begin(), shdrs.end(),
-        [this](Elf_Shdr shdr) { return rdi(shdr.sh_type) == SHT_NOTE; });
+        [this](const Elf_Shdr & shdr) { return rdi(shdr.sh_type) == SHT_NOTE; });
 
     /* Because we're adding a new section header, we're necessarily increasing
        the size of the program header table.  This can cause the first section
        to overlap the program header table in memory; we need to shift the first
        few segments to someplace else. */
     /* Some sections may already be replaced so account for that */
-    unsigned int i = 1;
     Elf_Addr pht_size = sizeof(Elf_Ehdr) + (phdrs.size() + num_notes + 1)*sizeof(Elf_Phdr);
-    while( i < rdi(hdr()->e_shnum) && rdi(shdrs.at(i).sh_offset) <= pht_size ) {
+    for (unsigned int i = 1; i < rdi(hdr()->e_shnum) && rdi(shdrs.at(i).sh_offset) <= pht_size; i++) {
         if (not haveReplacedSection(getSectionName(shdrs.at(i))))
             replaceSection(getSectionName(shdrs.at(i)), rdi(shdrs.at(i).sh_size));
-        i++;
     }
 
     /* Compute the total space needed for the replaced sections */
     off_t neededSpace = 0;
-    for (auto & s : replacedSections)
+    for (const auto & s : replacedSections)
         neededSpace += roundUp(s.second.size(), sectionAlignment);
     debug("needed space is %d\n", neededSpace);
 
