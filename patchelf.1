@@ -129,6 +129,8 @@ with the old and the new name separated by spaces like this:
 
 old_name new_name
 
+Symbol names do not contain version specifier that are also shown in the output of the nm -D command from binutils. So instead of the name write@GLIBC_2.2.5 it is just write.
+
 .IP "--output FILE"
 Set the output file name.  If not specified, the input will be modified in place.
 
