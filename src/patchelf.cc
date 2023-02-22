@@ -2563,7 +2563,7 @@ static int mainWrapped(int argc, char * * argv)
                 if (!(iss >> to))
                     error(fmt(fname, ":", lineCount, ": Map file line is missing the second element"));
                 if (symbolsToRenameKeys.count(from))
-                    error(fmt(fname, ":", lineCount, ": Name ", from, " appears twice in the map file"));
+                    error(fmt(fname, ":", lineCount, ": Name '", from, "' appears twice in the map file"));
                 if (from.find('@') != std::string_view::npos || to.find('@') != std::string_view::npos)
                     error(fmt(fname, ":", lineCount, ": Name pair contains version tag: ", from, " ", to));
                 lineCount++;
