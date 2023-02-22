@@ -842,7 +842,17 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
     wri(phdr.p_offset, startOffset);
     wri(phdr.p_vaddr, wri(phdr.p_paddr, startPage));
     wri(phdr.p_filesz, wri(phdr.p_memsz, neededSpace));
-    wri(phdr.p_flags, PF_R | PF_W);
+    {
+        bool need_write = false, need_exec = false;
+        for (const auto & rs : replacedSections) {
+            const auto flags = findSectionHeader(rs.first).sh_flags;
+            if (flags & SHF_WRITE)
+                need_write = true;
+            if (flags & SHF_EXECINSTR)
+                need_exec = true;
+        }
+        wri(phdr.p_flags, PF_R | (need_write ? PF_W : 0) | (need_exec ? PF_X : 0));
+    }
     wri(phdr.p_align, getPageSize());
 
 
