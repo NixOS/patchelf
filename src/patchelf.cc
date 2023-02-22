@@ -421,6 +421,8 @@ static void writeFile(const std::string & fileName, const FileContents & content
 
 static uint64_t roundUp(uint64_t n, uint64_t m)
 {
+    if (n == 0)
+        return m;
     return ((n - 1) / m + 1) * m;
 }
 
