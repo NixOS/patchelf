@@ -2134,6 +2134,7 @@ void ElfFile<ElfFileParamNames>::renameDynamicSymbols(const std::unordered_map<s
         {
             wri(dynsym.st_name, strTab.size() + extraStrings.size());
             auto& newName = it->second;
+            debug("renaming dynamic symbol %s to %s\n", name.data(), it->second.c_str());
             extraStrings.insert(extraStrings.end(), newName.begin(), newName.end() + 1);
             changed = true;
         }
