@@ -26,6 +26,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -71,14 +72,18 @@ static int forcedPageSize = -1;
 #define EM_LOONGARCH    258
 #endif
 
-
-static std::vector<std::string> splitColonDelimitedString(const char * s)
+[[nodiscard]] static std::vector<std::string> splitColonDelimitedString(std::string_view s)
 {
-    std::string item;
     std::vector<std::string> parts;
-    std::stringstream ss(s);
-    while (std::getline(ss, item, ':'))
-        parts.push_back(item);
+
+    size_t pos;
+    while ((pos = s.find(':')) != std::string_view::npos) {
+        parts.emplace_back(s.substr(0, pos));
+        s = s.substr(pos + 1);
+    }
+
+    if (!s.empty())
+        parts.emplace_back(s);
 
     return parts;
 }
@@ -106,7 +111,7 @@ static std::string downcase(std::string s)
    why... */
 template<ElfFileParams>
 template<class I>
-I ElfFile<ElfFileParamNames>::rdi(I i) const
+constexpr I ElfFile<ElfFileParamNames>::rdi(I i) const noexcept
 {
     I r = 0;
     if (littleEndian) {
@@ -133,7 +138,7 @@ static void debug(const char * format, ...)
 }
 
 
-void fmt2(std::ostringstream & out)
+static void fmt2([[maybe_unused]] std::ostringstream & out)
 {
 }
 
@@ -164,7 +169,7 @@ struct SysError : std::runtime_error
     { }
 };
 
-__attribute__((noreturn)) static void error(const std::string & msg)
+[[noreturn]] static void error(const std::string & msg)
 {
     if (errno)
         throw SysError(msg);
@@ -193,10 +198,10 @@ static FileContents readFile(const std::string & fileName,
     while ((portion = read(fd, contents->data() + bytesRead, size - bytesRead)) > 0)
         bytesRead += portion;
 
+    close(fd);
+
     if (bytesRead != size)
         throw SysError(fmt("reading '", fileName, "'"));
-
-    close(fd);
 
     return contents;
 }
@@ -209,10 +214,10 @@ struct ElfType
 };
 
 
-ElfType getElfType(const FileContents & fileContents)
+[[nodiscard]] static ElfType getElfType(const FileContents & fileContents)
 {
     /* Check the ELF header for basic validity. */
-    if (fileContents->size() < static_cast<off_t>(sizeof(Elf32_Ehdr)))
+    if (fileContents->size() < sizeof(Elf32_Ehdr))
         error("missing ELF header");
 
     auto contents = fileContents->data();
@@ -233,11 +238,29 @@ ElfType getElfType(const FileContents & fileContents)
 }
 
 
-static void checkPointer(const FileContents & contents, void * p, unsigned int size)
+static void checkPointer(const FileContents & contents, const void * p, size_t size)
 {
-    auto q = static_cast<unsigned char *>(p);
-    if (!(q >= contents->data() && q + size <= contents->data() + contents->size()))
+    if (p < contents->data() || size > contents->size() || p > contents->data() + contents->size() - size)
         error("data region extends past file end");
+}
+
+
+static void checkOffset(const FileContents & contents, size_t offset, size_t size)
+{
+    size_t end;
+
+    if (offset > contents->size()
+        || size > contents->size()
+        || __builtin_add_overflow(offset, size, &end)
+        || end > contents->size())
+        error("data offset extends past file end");
+}
+
+
+static std::string extractString(const FileContents & contents, size_t offset, size_t size)
+{
+    checkOffset(contents, offset, size);
+    return { reinterpret_cast<const char *>(contents->data()) + offset, size };
 }
 
 
@@ -257,14 +280,34 @@ ElfFile<ElfFileParamNames>::ElfFile(FileContents fContents)
     if (rdi(hdr()->e_type) != ET_EXEC && rdi(hdr()->e_type) != ET_DYN)
         error("wrong ELF type");
 
-    if (rdi(hdr()->e_phoff) + rdi(hdr()->e_phnum) * rdi(hdr()->e_phentsize) > fileContents->size())
-        error("program header table out of bounds");
+    {
+        auto ph_offset = rdi(hdr()->e_phoff);
+        auto ph_num = rdi(hdr()->e_phnum);
+        auto ph_entsize = rdi(hdr()->e_phentsize);
+        size_t ph_size, ph_end;
+
+        if (__builtin_mul_overflow(ph_num, ph_entsize, &ph_size)
+            || __builtin_add_overflow(ph_offset, ph_size, &ph_end)
+            || ph_end > fileContents->size()) {
+            error("program header table out of bounds");
+        }
+    }
 
     if (rdi(hdr()->e_shnum) == 0)
         error("no section headers. The input file is probably a statically linked, self-decompressing binary");
 
-    if (rdi(hdr()->e_shoff) + rdi(hdr()->e_shnum) * rdi(hdr()->e_shentsize) > fileContents->size())
-        error("section header table out of bounds");
+    {
+        auto sh_offset = rdi(hdr()->e_shoff);
+        auto sh_num = rdi(hdr()->e_shnum);
+        auto sh_entsize = rdi(hdr()->e_shentsize);
+        size_t sh_size, sh_end;
+
+        if (__builtin_mul_overflow(sh_num, sh_entsize, &sh_size)
+            || __builtin_add_overflow(sh_offset, sh_size, &sh_end)
+            || sh_end > fileContents->size()) {
+            error("section header table out of bounds");
+        }
+    }
 
     if (rdi(hdr()->e_phentsize) != sizeof(Elf_Phdr))
         error("program headers have wrong size");
@@ -288,12 +331,15 @@ ElfFile<ElfFileParamNames>::ElfFile(FileContents fContents)
     /* Get the section header string table section (".shstrtab").  Its
        index in the section header table is given by e_shstrndx field
        of the ELF header. */
-    unsigned int shstrtabIndex = rdi(hdr()->e_shstrndx);
+    auto shstrtabIndex = rdi(hdr()->e_shstrndx);
     if (shstrtabIndex >= shdrs.size())
         error("string table index out of bounds");
 
-    unsigned int shstrtabSize = rdi(shdrs[shstrtabIndex].sh_size);
-    char * shstrtab = (char * ) fileContents->data() + rdi(shdrs[shstrtabIndex].sh_offset);
+    auto shstrtabSize = rdi(shdrs[shstrtabIndex].sh_size);
+    size_t shstrtabptr;
+    if (__builtin_add_overflow(reinterpret_cast<size_t>(fileContents->data()), rdi(shdrs[shstrtabIndex].sh_offset), &shstrtabptr))
+        error("string table overflow");
+    const char *shstrtab = reinterpret_cast<const char *>(shstrtabptr);
     checkPointer(fileContents, shstrtab, shstrtabSize);
 
     if (shstrtabSize == 0)
@@ -311,7 +357,7 @@ ElfFile<ElfFileParamNames>::ElfFile(FileContents fContents)
 
 
 template<ElfFileParams>
-unsigned int ElfFile<ElfFileParamNames>::getPageSize() const
+unsigned int ElfFile<ElfFileParamNames>::getPageSize() const noexcept
 {
     if (forcedPageSize > 0)
         return forcedPageSize;
@@ -533,7 +579,7 @@ std::string ElfFile<ElfFileParamNames>::getSectionName(const Elf_Shdr & shdr) co
 
 
 template<ElfFileParams>
-Elf_Shdr & ElfFile<ElfFileParamNames>::findSectionHeader(const SectionName & sectionName)
+const Elf_Shdr & ElfFile<ElfFileParamNames>::findSectionHeader(const SectionName & sectionName) const
 {
     auto shdr = tryFindSectionHeader(sectionName);
     if (!shdr) {
@@ -547,7 +593,7 @@ Elf_Shdr & ElfFile<ElfFileParamNames>::findSectionHeader(const SectionName & sec
 
 
 template<ElfFileParams>
-std::optional<std::reference_wrapper<Elf_Shdr>> ElfFile<ElfFileParamNames>::tryFindSectionHeader(const SectionName & sectionName)
+std::optional<std::reference_wrapper<const Elf_Shdr>> ElfFile<ElfFileParamNames>::tryFindSectionHeader(const SectionName & sectionName) const
 {
     auto i = getSectionIndex(sectionName);
     if (i)
@@ -578,7 +624,7 @@ span<T> ElfFile<ElfFileParamNames>::tryGetSectionSpan(const SectionName & sectio
 }
 
 template<ElfFileParams>
-unsigned int ElfFile<ElfFileParamNames>::getSectionIndex(const SectionName & sectionName)
+unsigned int ElfFile<ElfFileParamNames>::getSectionIndex(const SectionName & sectionName) const
 {
     for (unsigned int i = 1; i < rdi(hdr()->e_shnum); ++i)
         if (getSectionName(shdrs.at(i)) == sectionName) return i;
@@ -602,7 +648,7 @@ std::string & ElfFile<ElfFileParamNames>::replaceSection(const SectionName & sec
         s = std::string(i->second);
     } else {
         auto shdr = findSectionHeader(sectionName);
-        s = std::string((char *) fileContents->data() + rdi(shdr.sh_offset), rdi(shdr.sh_size));
+        s = extractString(fileContents, rdi(shdr.sh_offset), rdi(shdr.sh_size));
     }
 
     s.resize(size);
@@ -621,7 +667,7 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
        clobbering previously written new section contents. */
     for (auto & i : replacedSections) {
         const std::string & sectionName = i.first;
-        Elf_Shdr & shdr = findSectionHeader(sectionName);
+        const Elf_Shdr & shdr = findSectionHeader(sectionName);
         if (rdi(shdr.sh_type) != SHT_NOBITS)
             memset(fileContents->data() + rdi(shdr.sh_offset), 'X', rdi(shdr.sh_size));
     }
@@ -640,7 +686,7 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
         debug("rewriting section '%s' from offset 0x%x (size %d) to offset 0x%x (size %d)\n",
             sectionName.c_str(), rdi(shdr.sh_offset), rdi(shdr.sh_size), curOff, i->second.size());
 
-        memcpy(fileContents->data() + curOff, (unsigned char *) i->second.c_str(),
+        memcpy(fileContents->data() + curOff, i->second.c_str(),
             i->second.size());
 
         /* Update the section header for this section. */
@@ -1209,10 +1255,13 @@ static void setSubstr(std::string & s, unsigned int pos, const std::string & t)
 
 
 template<ElfFileParams>
-std::string ElfFile<ElfFileParamNames>::getInterpreter()
+std::string ElfFile<ElfFileParamNames>::getInterpreter() const
 {
     auto shdr = findSectionHeader(".interp");
-    return std::string((char *) fileContents->data() + rdi(shdr.sh_offset), rdi(shdr.sh_size) - 1);
+    auto size = rdi(shdr.sh_size);
+    if (size > 0)
+        size--;
+    return extractString(fileContents, rdi(shdr.sh_offset), size);
 }
 
 template<ElfFileParams>
@@ -1335,7 +1384,7 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string &
         std::string & newDynamic = replaceSection(".dynamic", rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn));
 
         unsigned int idx = 0;
-        for (; rdi(((Elf_Dyn *) newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++);
+        for (; rdi(reinterpret_cast<const Elf_Dyn *>(newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++);
         debug("DT_NULL index is %d\n", idx);
 
         /* Shift all entries down by one. */
@@ -1491,7 +1540,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
         case rpPrint: {
             printf("%s\n", rpath ? rpath : "");
             return;
-        };
+        }
         case rpRemove: {
             if (!rpath) {
                 debug("no RPATH to delete\n");
@@ -1504,7 +1553,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
             if (!rpath) {
                 debug("no RPATH to shrink\n");
                 return;
-            ;}
+            }
             newRPath = shrinkRPath(rpath, neededLibs, allowedRpathPrefixes);
             break;
         }
@@ -1570,7 +1619,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
             rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn));
 
         unsigned int idx = 0;
-        for ( ; rdi(((Elf_Dyn *) newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
+        for ( ; rdi(reinterpret_cast<const Elf_Dyn *>(newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
         debug("DT_NULL index is %d\n", idx);
 
         /* Shift all entries down by one. */
@@ -1772,7 +1821,7 @@ void ElfFile<ElfFileParamNames>::addNeeded(const std::set<std::string> & libs)
         rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn) * libs.size());
 
     unsigned int idx = 0;
-    for ( ; rdi(((Elf_Dyn *) newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
+    for ( ; rdi(reinterpret_cast<const Elf_Dyn *>(newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
     debug("DT_NULL index is %d\n", idx);
 
     /* Shift all entries down by the number of new entries. */
@@ -1795,13 +1844,13 @@ void ElfFile<ElfFileParamNames>::addNeeded(const std::set<std::string> & libs)
 }
 
 template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::printNeededLibs() // const
+void ElfFile<ElfFileParamNames>::printNeededLibs() const
 {
     const auto shdrDynamic = findSectionHeader(".dynamic");
     const auto shdrDynStr = findSectionHeader(".dynstr");
-    const char *strTab = (char *)fileContents->data() + rdi(shdrDynStr.sh_offset);
+    const char *strTab = (const char *)fileContents->data() + rdi(shdrDynStr.sh_offset);
 
-    const Elf_Dyn *dyn = (Elf_Dyn *) (fileContents->data() + rdi(shdrDynamic.sh_offset));
+    const Elf_Dyn *dyn = (const Elf_Dyn *) (fileContents->data() + rdi(shdrDynamic.sh_offset));
 
     for (; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_NEEDED) {
@@ -1834,7 +1883,7 @@ void ElfFile<ElfFileParamNames>::noDefaultLib()
                 rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn));
 
         unsigned int idx = 0;
-        for ( ; rdi(((Elf_Dyn *) newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
+        for ( ; rdi(reinterpret_cast<const Elf_Dyn *>(newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
         debug("DT_NULL index is %d\n", idx);
 
         /* Shift all entries down by one. */
@@ -1867,7 +1916,7 @@ void ElfFile<ElfFileParamNames>::addDebugTag()
             rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn));
 
     unsigned int idx = 0;
-    for ( ; rdi(((Elf_Dyn *) newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
+    for ( ; rdi(reinterpret_cast<const Elf_Dyn *>(newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
     debug("DT_NULL index is %d\n", idx);
 
     /* Shift all entries down by one. */
@@ -2323,7 +2372,7 @@ static void patchElf()
     }
 }
 
-std::string resolveArgument(const char *arg) {
+[[nodiscard]] static std::string resolveArgument(const char *arg) {
   if (strlen(arg) > 0 && arg[0] == '@') {
     FileContents cnts = readFile(arg + 1);
     return std::string((char *)cnts->data(), cnts->size());
@@ -2333,7 +2382,7 @@ std::string resolveArgument(const char *arg) {
 }
 
 
-void showHelp(const std::string & progName)
+static void showHelp(const std::string & progName)
 {
         fprintf(stderr, "syntax: %s\n\
   [--set-interpreter FILENAME]\n\
@@ -2369,7 +2418,7 @@ void showHelp(const std::string & progName)
 }
 
 
-int mainWrapped(int argc, char * * argv)
+static int mainWrapped(int argc, char * * argv)
 {
     if (argc <= 1) {
         showHelp(argv[0]);
