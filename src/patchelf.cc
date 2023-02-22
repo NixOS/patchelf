@@ -2549,18 +2549,24 @@ static int mainWrapped(int argc, char * * argv)
             renameDynamicSymbols = true;
             if (++i == argc) error("missing argument");
 
-            std::ifstream infile(argv[i]);
-            if (!infile) error(fmt("Cannot open map file ", argv[i]));
+            const char* fname = argv[i];
+            std::ifstream infile(fname);
+            if (!infile) error(fmt("Cannot open map file ", fname));
 
-            std::string from, to;
-            while (true)
+            std::string line, from, to;
+            size_t lineCount = 1;
+            while (std::getline(infile, line))
             {
-                if (!(infile >> from))
+                std::istringstream iss(line);
+                if (!(iss >> from))
                     break;
-                if (!(infile >> to))
-                    error("Odd number of symbols in map file");
+                if (!(iss >> to))
+                    error(fmt(fname, ":", lineCount, ": Map file line is missing the second element"));
                 if (symbolsToRenameKeys.count(from))
-                    error(fmt("Symbol appears twice in the map file: ", from.c_str()));
+                    error(fmt(fname, ":", lineCount, ": Name ", from, " appears twice in the map file"));
+                if (from.find('@') != std::string_view::npos || to.find('@') != std::string_view::npos)
+                    error(fmt(fname, ":", lineCount, ": Name pair contains version tag: ", from, " ", to));
+                lineCount++;
                 symbolsToRename[*symbolsToRenameKeys.insert(from).first] = to;
             }
         }
