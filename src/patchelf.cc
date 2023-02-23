@@ -17,17 +17,19 @@
  */
 
 #include <algorithm>
+#include <fstream>
 #include <limits>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
-#include <optional>
 
 #include <cassert>
 #include <cerrno>
@@ -599,6 +601,27 @@ std::optional<std::reference_wrapper<const Elf_Shdr>> ElfFile<ElfFileParamNames>
     return {};
 }
 
+template<ElfFileParams>
+template<class T>
+span<T> ElfFile<ElfFileParamNames>::getSectionSpan(const Elf_Shdr & shdr) const
+{
+    return span((T*)(fileContents->data() + rdi(shdr.sh_offset)), rdi(shdr.sh_size)/sizeof(T));
+}
+
+template<ElfFileParams>
+template<class T>
+span<T> ElfFile<ElfFileParamNames>::getSectionSpan(const SectionName & sectionName)
+{
+    return getSectionSpan<T>(findSectionHeader(sectionName));
+}
+
+template<ElfFileParams>
+template<class T>
+span<T> ElfFile<ElfFileParamNames>::tryGetSectionSpan(const SectionName & sectionName)
+{
+    auto shdrOpt = tryFindSectionHeader(sectionName);
+    return shdrOpt ? getSectionSpan<T>(*shdrOpt) : span<T>();
+}
 
 template<ElfFileParams>
 unsigned int ElfFile<ElfFileParamNames>::getSectionIndex(const SectionName & sectionName) const
@@ -1910,6 +1933,220 @@ void ElfFile<ElfFileParamNames>::addDebugTag()
     changed = true;
 }
 
+static uint32_t gnuHash(std::string_view name) {
+    uint32_t h = 5381;
+    for (uint8_t c : name)
+        h = ((h << 5) + h) + c;
+    return h;
+}
+
+template<ElfFileParams>
+auto ElfFile<ElfFileParamNames>::parseGnuHashTable(span<char> sectionData) -> GnuHashTable
+{
+    auto hdr = (typename GnuHashTable::Header*)sectionData.begin();
+    auto bloomFilters = span((typename GnuHashTable::BloomWord*)(hdr+1), rdi(hdr->maskwords));
+    auto buckets = span((uint32_t*)bloomFilters.end(), rdi(hdr->numBuckets));
+    auto table = span(buckets.end(), ((uint32_t*)sectionData.end()) - buckets.end());
+    return GnuHashTable{*hdr, bloomFilters, buckets, table};
+}
+
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::rebuildGnuHashTable(span<char> strTab, span<Elf_Sym> dynsyms)
+{
+    auto sectionData = tryGetSectionSpan<char>(".gnu.hash");
+    if (!sectionData)
+        return;
+
+    auto ght = parseGnuHashTable(sectionData);
+
+    // We can't trust the value of symndx when the hash table is empty
+    if (ght.m_table.size() == 0)
+        return;
+
+    // The hash table includes only a subset of dynsyms
+    auto firstSymIdx = rdi(ght.m_hdr.symndx);
+    dynsyms = span(&dynsyms[firstSymIdx], dynsyms.end());
+
+    // Only use the range of symbol versions that will be changed
+    auto versyms = tryGetSectionSpan<Elf_Versym>(".gnu.version");
+    if (versyms)
+        versyms = span(&versyms[firstSymIdx], versyms.end());
+
+    struct Entry
+    {
+        uint32_t hash, bucketIdx, originalPos;
+    };
+
+    std::vector<Entry> entries;
+    entries.reserve(dynsyms.size());
+
+    uint32_t pos = 0; // Track the original position of the symbol in the table
+    for (auto& sym : dynsyms)
+    {
+        Entry e;
+        e.hash = gnuHash(&strTab[rdi(sym.st_name)]);
+        e.bucketIdx = e.hash % ght.m_buckets.size();
+        e.originalPos = pos++;
+        entries.push_back(e);
+    }
+
+    // Sort the entries based on the buckets. This is a requirement for gnu hash table to work
+    std::sort(entries.begin(), entries.end(), [&] (auto& l, auto& r) {
+        return l.bucketIdx < r.bucketIdx;
+    });
+
+    // Create a map of old positions to new positions after sorting
+    std::vector<uint32_t> old2new(entries.size());
+    for (size_t i = 0; i < entries.size(); ++i)
+        old2new[entries[i].originalPos] = i;
+
+    // Update the symbol table with the new order and
+    // all tables that refer to symbols through indexes in the symbol table
+    auto reorderSpan = [] (auto dst, auto& old2new)
+    {
+        std::vector tmp(dst.begin(), dst.end());
+        for (size_t i = 0; i < tmp.size(); ++i)
+            dst[old2new[i]] = tmp[i];
+    };
+
+    reorderSpan(dynsyms, old2new);
+    if (versyms)
+        reorderSpan(versyms, old2new);
+
+    auto remapSymbolId = [&old2new, firstSymIdx] (auto& oldSymIdx)
+    {
+        return oldSymIdx >= firstSymIdx ? old2new[oldSymIdx - firstSymIdx] + firstSymIdx
+                                        : oldSymIdx;
+    };
+
+    for (unsigned int i = 1; i < rdi(hdr()->e_shnum); ++i)
+    {
+        auto& shdr = shdrs.at(i);
+        auto shtype = rdi(shdr.sh_type);
+        if (shtype == SHT_REL)
+            changeRelocTableSymIds<Elf_Rel>(shdr, remapSymbolId);
+        else if (shtype == SHT_RELA)
+            changeRelocTableSymIds<Elf_Rela>(shdr, remapSymbolId);
+    }
+
+    // Update bloom filters
+    std::fill(ght.m_bloomFilters.begin(), ght.m_bloomFilters.end(), 0); 
+    for (size_t i = 0; i < entries.size(); ++i)
+    {
+        auto h = entries[i].hash;
+        size_t idx = (h / ElfClass) % ght.m_bloomFilters.size();
+        auto val = rdi(ght.m_bloomFilters[idx]);
+        val |= uint64_t(1) << (h % ElfClass);
+        val |= uint64_t(1) << ((h >> rdi(ght.m_hdr.shift2)) % ElfClass);
+        wri(ght.m_bloomFilters[idx], val);
+    }
+
+    // Fill buckets
+    std::fill(ght.m_buckets.begin(), ght.m_buckets.end(), 0); 
+    for (size_t i = 0; i < entries.size(); ++i)
+    {
+        auto symBucketIdx = entries[i].bucketIdx;
+        if (!ght.m_buckets[symBucketIdx])
+            wri(ght.m_buckets[symBucketIdx], i + firstSymIdx);
+    }
+
+    // Fill hash table
+    for (size_t i = 0; i < entries.size(); ++i)
+    {
+        auto& n = entries[i];
+        bool isLast = (i == entries.size() - 1) || (n.bucketIdx != entries[i+1].bucketIdx);
+        // Add hash with first bit indicating end of chain
+        wri(ght.m_table[i], isLast ? (n.hash | 1) : (n.hash & ~1));
+    }
+}
+
+static uint32_t sysvHash(std::string_view name) {
+    uint32_t h = 0;
+    for (uint8_t c : name)
+    {
+        h = (h << 4) + c;
+        uint32_t g = h & 0xf0000000;
+        if (g != 0)
+            h ^= g >> 24;
+        h &= ~g;
+    }
+    return h;
+}
+
+template<ElfFileParams>
+auto ElfFile<ElfFileParamNames>::parseHashTable(span<char> sectionData) -> HashTable
+{
+    auto hdr = (typename HashTable::Header*)sectionData.begin();
+    auto buckets = span((uint32_t*)(hdr+1), rdi(hdr->numBuckets));
+    auto table = span(buckets.end(), ((uint32_t*)sectionData.end()) - buckets.end());
+    return HashTable{*hdr, buckets, table};
+}
+
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::rebuildHashTable(span<char> strTab, span<Elf_Sym> dynsyms)
+{
+    auto sectionData = tryGetSectionSpan<char>(".hash");
+    if (!sectionData)
+        return;
+
+    auto ht = parseHashTable(sectionData);
+
+    std::fill(ht.m_buckets.begin(), ht.m_buckets.end(), 0);
+    std::fill(ht.m_chain.begin(), ht.m_chain.end(), 0);
+
+    // The hash table includes only a subset of dynsyms
+    auto firstSymIdx = dynsyms.size() - ht.m_chain.size();
+    dynsyms = span(&dynsyms[firstSymIdx], dynsyms.end());
+
+    for (auto& sym : dynsyms)
+    {
+        auto name = &strTab[rdi(sym.st_name)];
+        uint32_t i = &sym - dynsyms.begin();
+        uint32_t hash = sysvHash(name) % ht.m_buckets.size();
+        wri(ht.m_chain[i], rdi(ht.m_buckets[hash]));
+        wri(ht.m_buckets[hash], i);
+    }
+}
+
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::renameDynamicSymbols(const std::unordered_map<std::string_view, std::string>& remap)
+{
+    auto dynsyms = getSectionSpan<Elf_Sym>(".dynsym");
+    auto strTab = getSectionSpan<char>(".dynstr");
+
+    std::vector<char> extraStrings;
+    extraStrings.reserve(remap.size() * 30); // Just an estimate
+    for (auto& dynsym : dynsyms)
+    {
+        std::string_view name = &strTab[rdi(dynsym.st_name)];
+        auto it = remap.find(name);
+        if (it != remap.end())
+        {
+            wri(dynsym.st_name, strTab.size() + extraStrings.size());
+            auto& newName = it->second;
+            debug("renaming dynamic symbol %s to %s\n", name.data(), it->second.c_str());
+            extraStrings.insert(extraStrings.end(), newName.begin(), newName.end() + 1);
+            changed = true;
+        } else {
+            debug("skip renaming dynamic symbol %sn", name.data());
+        }
+    }
+
+    if (changed)
+    {
+        auto newStrTabSize = strTab.size() + extraStrings.size();
+        auto& newSec = replaceSection(".dynstr", newStrTabSize);
+        auto newStrTabSpan = span(newSec.data(), newStrTabSize);
+
+        std::copy(extraStrings.begin(), extraStrings.end(), &newStrTabSpan[strTab.size()]);
+
+        rebuildGnuHashTable(newStrTabSpan, dynsyms);
+        rebuildHashTable(newStrTabSpan, dynsyms);
+    }
+
+    this->rewriteSections();
+}
+
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::clearSymbolVersions(const std::set<std::string> & syms)
 {
@@ -2032,12 +2269,15 @@ static bool removeRPath = false;
 static bool setRPath = false;
 static bool addRPath = false;
 static bool addDebugTag = false;
+static bool renameDynamicSymbols = false;
 static bool printRPath = false;
 static std::string newRPath;
 static std::set<std::string> neededLibsToRemove;
 static std::map<std::string, std::string> neededLibsToReplace;
 static std::set<std::string> neededLibsToAdd;
 static std::set<std::string> symbolsToClearVersion;
+static std::unordered_map<std::string_view, std::string> symbolsToRename;
+static std::unordered_set<std::string> symbolsToRenameKeys;
 static bool printNeeded = false;
 static bool noDefaultLib = false;
 static bool printExecstack = false;
@@ -2097,6 +2337,9 @@ static void patchElf2(ElfFile && elfFile, const FileContents & fileContents, con
     if (addDebugTag)
         elfFile.addDebugTag();
 
+    if (renameDynamicSymbols)
+        elfFile.renameDynamicSymbols(symbolsToRename);
+
     if (elfFile.isChanged()){
         writeFile(fileName, elfFile.fileContents);
     } else if (alwaysWrite) {
@@ -2116,9 +2359,9 @@ static void patchElf()
         const std::string & outputFileName2 = outputFileName.empty() ? fileName : outputFileName;
 
         if (getElfType(fileContents).is32Bit)
-            patchElf2(ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym, Elf32_Verneed, Elf32_Versym>(fileContents), fileContents, outputFileName2);
+            patchElf2(ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym, Elf32_Verneed, Elf32_Versym, Elf32_Rel, Elf32_Rela, 32>(fileContents), fileContents, outputFileName2);
         else
-            patchElf2(ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym, Elf64_Verneed, Elf64_Versym>(fileContents), fileContents, outputFileName2);
+            patchElf2(ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym, Elf64_Verneed, Elf64_Versym, Elf64_Rel, Elf64_Rela, 64>(fileContents), fileContents, outputFileName2);
     }
 }
 
@@ -2160,6 +2403,7 @@ static void showHelp(const std::string & progName)
   [--print-execstack]\t\tPrints whether the object requests an executable stack\n\
   [--clear-execstack]\n\
   [--set-execstack]\n\
+  [--rename-dynamic-symbols NAME_MAP_FILE]\tRenames dynamic symbols. The map file should contain two symbols (old_name new_name) per line\n\
   [--output FILE]\n\
   [--debug]\n\
   [--version]\n\
@@ -2290,6 +2534,31 @@ static int mainWrapped(int argc, char * * argv)
         }
         else if (arg == "--add-debug-tag") {
             addDebugTag = true;
+        }
+        else if (arg == "--rename-dynamic-symbols") {
+            renameDynamicSymbols = true;
+            if (++i == argc) error("missing argument");
+
+            const char* fname = argv[i];
+            std::ifstream infile(fname);
+            if (!infile) error(fmt("Cannot open map file ", fname));
+
+            std::string line, from, to;
+            size_t lineCount = 1;
+            while (std::getline(infile, line))
+            {
+                std::istringstream iss(line);
+                if (!(iss >> from))
+                    break;
+                if (!(iss >> to))
+                    error(fmt(fname, ":", lineCount, ": Map file line is missing the second element"));
+                if (symbolsToRenameKeys.count(from))
+                    error(fmt(fname, ":", lineCount, ": Name '", from, "' appears twice in the map file"));
+                if (from.find('@') != std::string_view::npos || to.find('@') != std::string_view::npos)
+                    error(fmt(fname, ":", lineCount, ": Name pair contains version tag: ", from, " ", to));
+                lineCount++;
+                symbolsToRename[*symbolsToRenameKeys.insert(from).first] = to;
+            }
         }
         else if (arg == "--help" || arg == "-h" ) {
             showHelp(argv[0]);

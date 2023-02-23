@@ -123,6 +123,14 @@ Clears the executable flag of the GNU_STACK program header, or adds a new header
 .IP "--set-execstack"
 Sets the executable flag of the GNU_STACK program header, or adds a new header.
 
+.IP "--rename-dynamic-symbols NAME_MAP_FILE"
+Renames dynamic symbols. The name map file should contain lines
+with the old and the new name separated by spaces like this:
+
+old_name new_name
+
+Symbol names do not contain version specifier that are also shown in the output of the nm -D command from binutils. So instead of the name write@GLIBC_2.2.5 it is just write.
+
 .IP "--output FILE"
 Set the output file name.  If not specified, the input will be modified in place.
 
