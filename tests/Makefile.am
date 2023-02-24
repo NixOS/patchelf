@@ -46,7 +46,9 @@ src_TESTS = \
   repeated-updates.sh \
   empty-note.sh \
   print-execstack.sh \
-  modify-execstack.sh
+  modify-execstack.sh \
+  rename-dynamic-symbols.sh \
+  empty-note.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)
@@ -117,7 +119,7 @@ check_DATA = libbig-dynstr.debug
 # - with libtool, it is difficult to control options
 # - with libtool, it is not possible to compile convenience *dynamic* libraries :-(
 check_PROGRAMS += libfoo.so libfoo-scoped.so libbar.so libbar-scoped.so libsimple.so libsimple-execstack.so libbuildid.so libtoomanystrtab.so \
-                  phdr-corruption.so
+                  phdr-corruption.so many-syms-main libmany-syms.so
 
 libbuildid_so_SOURCES = simple.c
 libbuildid_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,--build-id
@@ -148,6 +150,14 @@ too_many_strtab_SOURCES = too-many-strtab.c too-many-strtab2.s
 libtoomanystrtab_so_SOURCES = too-many-strtab.c too-many-strtab2.s
 libtoomanystrtab_so_LDFLAGS = $(LDFLAGS_sharedlib)
 
+many_syms_main_SOURCES = many-syms-main.c 
+many_syms_main_LDFLAGS = $(LDFLAGS_local) 
+many_syms_main_LDADD = -lmany-syms $(AM_LDADD)
+many_syms_main_DEPENDENCIES = libmany-syms.so
+many_syms_main_CFLAGS = -pie
+libmany_syms_so_SOURCES = many-syms.c
+libmany_syms_so_LDFLAGS = $(LDFLAGS_sharedlib)
+
 no_rpath_SOURCES = no-rpath.c
 # no -fpic for no-rpath.o
 no_rpath_CFLAGS =
@@ -159,3 +169,12 @@ contiguous_note_sections_CFLAGS = -pie
 phdr_corruption_so_SOURCES = void.c phdr-corruption.ld
 phdr_corruption_so_LDFLAGS = -nostdlib -shared -Wl,-T$(srcdir)/phdr-corruption.ld
 phdr_corruption_so_CFLAGS =
+
+many-syms.c:
+	i=1; while [ $$i -le 2000 ]; do echo "void f$$i() {};"; i=$$(($$i + 1)); done > $@
+
+many-syms-main.c:
+	echo "int main() {" > $@
+	i=1; while [ $$i -le 2000 ]; do echo "void f$$i(); f$$i();"; i=$$(($$i + 1)); done >> $@
+	echo "}" >> $@
+
