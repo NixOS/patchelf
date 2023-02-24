@@ -826,11 +826,16 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
             replaceSection(getSectionName(shdrs.at(i)), rdi(shdrs.at(i).sh_size));
         i++;
     }
+    bool moveHeaderTableToTheEnd = rdi(hdr()->e_shoff) < pht_size;
 
     /* Compute the total space needed for the replaced sections */
     off_t neededSpace = 0;
     for (auto & s : replacedSections)
         neededSpace += roundUp(s.second.size(), sectionAlignment);
+
+    off_t headerTableSpace = roundUp(rdi(hdr()->e_shnum) * rdi(hdr()->e_shentsize), sectionAlignment);
+    if (moveHeaderTableToTheEnd)
+        neededSpace += headerTableSpace;
     debug("needed space is %d\n", neededSpace);
 
     Elf_Off startOffset = roundUp(fileContents->size(), getPageSize());
@@ -860,24 +865,48 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
         startPage = startOffset;
     }
 
-    /* Add a segment that maps the replaced sections into memory. */
     wri(hdr()->e_phoff, sizeof(Elf_Ehdr));
-    phdrs.resize(rdi(hdr()->e_phnum) + 1);
-    wri(hdr()->e_phnum, rdi(hdr()->e_phnum) + 1);
-    Elf_Phdr & phdr = phdrs.at(rdi(hdr()->e_phnum) - 1);
-    wri(phdr.p_type, PT_LOAD);
-    wri(phdr.p_offset, startOffset);
-    wri(phdr.p_vaddr, wri(phdr.p_paddr, startPage));
-    wri(phdr.p_filesz, wri(phdr.p_memsz, neededSpace));
-    wri(phdr.p_flags, PF_R | PF_W);
-    wri(phdr.p_align, getPageSize());
 
+    bool needNewSegment = true;
+    auto& lastSeg = phdrs.back();
+    /* Try to extend the last segment to include replaced sections */
+    if (!phdrs.empty() &&
+        rdi(lastSeg.p_type) == PT_LOAD &&
+        rdi(lastSeg.p_flags) == (PF_R | PF_W) &&
+        rdi(lastSeg.p_align) == getPageSize()) {
+        auto segEnd = roundUp(rdi(lastSeg.p_offset) + rdi(lastSeg.p_memsz), getPageSize());
+        if (segEnd == startOffset) {
+            auto newSz = startOffset + neededSpace - rdi(lastSeg.p_offset);
+            wri(lastSeg.p_filesz, wri(lastSeg.p_memsz, newSz));
+            needNewSegment = false;
+        }
+    }
+
+    if (needNewSegment) {
+        /* Add a segment that maps the replaced sections into memory. */
+        phdrs.resize(rdi(hdr()->e_phnum) + 1);
+        wri(hdr()->e_phnum, rdi(hdr()->e_phnum) + 1);
+        Elf_Phdr & phdr = phdrs.at(rdi(hdr()->e_phnum) - 1);
+        wri(phdr.p_type, PT_LOAD);
+        wri(phdr.p_offset, startOffset);
+        wri(phdr.p_vaddr, wri(phdr.p_paddr, startPage));
+        wri(phdr.p_filesz, wri(phdr.p_memsz, neededSpace));
+        wri(phdr.p_flags, PF_R | PF_W);
+        wri(phdr.p_align, getPageSize());
+    }
 
     normalizeNoteSegments();
 
 
     /* Write out the replaced sections. */
     Elf_Off curOff = startOffset;
+
+    if (moveHeaderTableToTheEnd) {
+        debug("Moving the shtable to offset %d\n", curOff);
+        wri(hdr()->e_shoff, curOff);
+        curOff += headerTableSpace;
+    }
+
     writeReplacedSections(curOff, startPage, startOffset);
     assert(curOff == startOffset + neededSpace);
 

@@ -43,6 +43,7 @@ src_TESTS = \
   replace-needed.sh \
   replace-add-needed.sh \
   add-debug-tag.sh \
+  repeated-updates.sh \
   empty-note.sh \
   print-execstack.sh \
   modify-execstack.sh \
