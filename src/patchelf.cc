@@ -30,6 +30,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include <iostream>
 
 #include <cassert>
 #include <cerrno>
@@ -45,6 +46,7 @@
 
 #include "elf.h"
 #include "patchelf.h"
+#include "layout.h"
 
 #ifndef PACKAGE_STRING
 #define PACKAGE_STRING "patchelf"
@@ -55,7 +57,11 @@
 #define O_BINARY 0
 #endif
 
+using utl::roundUp;
+
 static bool debugMode = false;
+static bool tryLayoutEngine = false;
+static bool onlyLayoutEngine = false;
 
 static bool forceRPath = false;
 
@@ -474,14 +480,6 @@ static void writeFile(const std::string & fileName, const FileContents & content
     if (errno == EINTR)
         return;
     error("close");
-}
-
-
-static uint64_t roundUp(uint64_t n, uint64_t m)
-{
-    if (n == 0)
-        return m;
-    return ((n - 1) / m + 1) * m;
 }
 
 
@@ -1085,6 +1083,14 @@ void ElfFile<ElfFileParamNames>::rewriteSections(bool force)
 {
 
     if (!force && replacedSections.empty()) return;
+
+    if (tryLayoutEngine)
+    {
+        if (runLayoutEngine())
+            return;
+        else if (onlyLayoutEngine)
+            error("Layout engine failed");
+    }
 
     for (auto & i : replacedSections)
         debug("replacing section '%s' with size %d\n",
@@ -2257,6 +2263,234 @@ void ElfFile<ElfFileParamNames>::modifyExecstack(ExecstackMode op)
     printf("execstack: %c\n", result);
 }
 
+template<ElfFileParams>
+bool ElfFile<ElfFileParamNames>::runLayoutEngine()
+{
+    using namespace le;
+
+    auto [layout, maps] = elf2layout();
+
+    LayoutEngine le(std::move(layout), phdrs.size() - layout.m_segs.size(), sizeof(Elf_Phdr));
+
+    for (auto& [name, data] : replacedSections)
+    {
+        auto secid = maps.shdr2id[&findSectionHeader(name)];
+        if (!le.resize(secid, data.size()+1))
+            return false;
+    }
+    if (!le.updateFileLayout())
+        return false;
+
+    layout2elf(le, maps);
+    return true;
+}
+
+template<ElfFileParams>
+auto ElfFile<ElfFileParamNames>::elf2layout() -> std::pair<le::Layout, Elf2LayoutMaps>
+{
+    using namespace le;
+
+    Layout lo;
+    Elf2LayoutMaps maps;
+
+    lo.add(
+        Section{"<EHD>", Section::Type::ElfHeader, {0, sizeof(Elf_Ehdr)}, 1, true}
+    );
+
+    lo.add(
+        Section{"<PHT>", Section::Type::PHTable, utl::Range{rdi(hdr()->e_phoff), rdi(hdr()->e_phnum)*sizeof(Elf_Phdr)}, 1, true}
+    );
+
+    lo.add(
+        Section{"<SHT>", Section::Type::SHTable, utl::Range{rdi(hdr()->e_shoff), rdi(hdr()->e_shnum)*sizeof(Elf_Shdr)}, 8, false}
+    );
+
+    for (auto& shdr : shdrs)
+    {
+        auto name = getSectionName(shdr);
+        if (name.empty()) continue;
+
+        auto size = rdi(shdr.sh_type) != SHT_NOBITS ? rdi(shdr.sh_size) : 0;
+        bool pinned =
+            (rdi(shdr.sh_type) == SHT_PROGBITS && name != ".interp") ||
+            rdi(shdr.sh_type) == SHT_NOBITS;
+
+        auto id = lo.add(
+            Section{name, Section::Type::Regular, {rdi(shdr.sh_offset), size}, rdi(shdr.sh_addralign), pinned}
+        );
+
+        maps.id2shdr[id] = &shdr;
+        maps.shdr2id[&shdr] = id;
+    }
+
+    for (auto& phdr : phdrs)
+    {
+        // Only loads contribute to the address space
+        if (rdi(phdr.p_type) != PT_LOAD)
+            continue;
+
+        assert(rdi(phdr.p_vaddr) == rdi(phdr.p_paddr));
+
+        auto convertFlags = [] (auto flags) {
+            Access a = None;
+            addIf(a, Access::Exec, flags & PF_X);
+            addIf(a, Access::Read, flags & PF_R);
+            addIf(a, Access::Write, flags & PF_W);
+            return a;
+        };
+
+        auto id = lo.add(
+            Segment{{rdi(phdr.p_vaddr), rdi(phdr.p_memsz)},
+                    {rdi(phdr.p_offset), rdi(phdr.p_filesz)},
+                    convertFlags(rdi(phdr.p_flags)),
+                    getPageSize()
+            }
+        );
+
+        maps.id2phdr[id] = &phdr;
+    }
+
+    return {std::move(lo), std::move(maps)};
+}
+
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::layout2elf(const le::LayoutEngine& le, const Elf2LayoutMaps& maps)
+{
+    using namespace le;
+
+    auto& nlo = le.layout();
+
+    std::vector<unsigned char> newFile(nlo.m_fileSz);
+    for (auto& sec : nlo.m_secs)
+    {
+        size_t at = sec.fRange.begin();
+        switch (sec.type)
+        {
+            case Section::Type::ElfHeader:
+            {
+                auto begin = fileContents->data();
+                auto end = begin + sec.fRange.size();
+                std::copy(begin, end, &newFile[at]);
+                break;
+            }
+            case Section::Type::PHTable:
+            {
+                auto begin = fileContents->data() + rdi(hdr()->e_phoff);
+                auto end = begin + sec.fRange.size();
+                std::copy(begin, end, &newFile[at]);
+                break;
+            }
+            case Section::Type::SHTable:
+            {
+                assert(sec.fRange.size() == rdi(hdr()->e_shnum)*sizeof(Elf_Shdr));
+                auto begin = fileContents->data() + rdi(hdr()->e_shoff);
+                auto end = begin + sec.fRange.size();
+                std::copy(begin, end, &newFile[at]);
+                break;
+            }
+            case Section::Type::Regular:
+            {
+                auto it = replacedSections.find(sec.name);
+                if (it != replacedSections.end())
+                {
+                    assert(it->second.size() + 1 == sec.fRange.size());
+                    std::copy(it->second.begin(), it->second.end()+1, &newFile[at]);
+                }
+                else
+                {
+                    if (sec.fRange.size() == 0)
+                        continue;
+
+                    auto& shdr = *maps.id2shdr.at(sec.id);
+                    auto shdrSpan = getSectionSpan<unsigned char>(shdr);
+                    if (shdrSpan.size() != sec.fRange.size())
+                    {
+                        std::cerr << "Section name with wrong sizes: " << sec.name << std::endl;
+                        std::cerr << "shdr is:" << shdrSpan.size() << std::endl;
+                        std::cerr << "sec  is:" << sec.fRange.size() << std::endl;
+                    }
+                    assert(shdrSpan.size() == sec.fRange.size());
+                    std::copy(shdrSpan.begin(), shdrSpan.end(), &newFile[at]);
+                }
+                break;
+            }
+        }
+    }
+
+    for (auto& seg : nlo.m_segs)
+    {
+        if (maps.id2phdr.count(seg.id))
+        {
+            auto& phdr = *maps.id2phdr.at(seg.id);
+            wri(phdr.p_offset, seg.fRange.begin());
+            wri(phdr.p_filesz, seg.fRange.size());
+            wri(phdr.p_paddr, wri(phdr.p_vaddr, seg.vRange.begin()));
+            wri(phdr.p_memsz, seg.vRange.size());
+        }
+        else
+        {
+            Elf_Phdr phdr;
+            wri(phdr.p_align, getPageSize());
+            wri(phdr.p_filesz, seg.fRange.size());
+            size_t flags =
+                ((seg.access & Access::Read) ? PF_R : 0) | 
+                ((seg.access & Access::Write) ? PF_W : 0) |
+                ((seg.access & Access::Exec) ? PF_X : 0);
+            wri(phdr.p_flags, flags);
+            wri(phdr.p_memsz, seg.vRange.size());
+            wri(phdr.p_offset, seg.fRange.begin());
+            wri(phdr.p_paddr, wri(phdr.p_vaddr, seg.vRange.begin()));
+            wri(phdr.p_type, PT_LOAD);
+            phdrs.push_back(phdr);
+        }
+    }
+
+    for (auto& sec : nlo.m_secs)
+    {
+        if (sec.type == Section::Type::Regular)
+        {
+            auto& shdr = *maps.id2shdr.at(sec.id);
+            wri(shdr.sh_offset, sec.fRange.begin());
+            wri(shdr.sh_size, sec.fRange.size());
+            wri(shdr.sh_addralign, sec.align);
+            wri(shdr.sh_addr, le.getVirtualAddress(sec.id));
+
+            /* If this is the .interp section, then the PT_INTERP segment
+               must be sync'ed with it. */
+            if (sec.name == ".interp") {
+                for (auto & phdr : phdrs) {
+                    if (rdi(phdr.p_type) == PT_INTERP) {
+                        phdr.p_offset = shdr.sh_offset;
+                        phdr.p_vaddr = phdr.p_paddr = shdr.sh_addr;
+                        phdr.p_filesz = phdr.p_memsz = shdr.sh_size;
+                    }
+                }
+            }
+            /* If this is the .dynamic section, then the PT_DYNAMIC segment
+               must be sync'ed with it. */
+            else if (sec.name == ".dynamic") {
+                for (auto & phdr : phdrs) {
+                    if (rdi(phdr.p_type) == PT_DYNAMIC) {
+                        phdr.p_offset = shdr.sh_offset;
+                        phdr.p_vaddr = phdr.p_paddr = shdr.sh_addr;
+                        phdr.p_filesz = phdr.p_memsz = shdr.sh_size;
+                    }
+                }
+            }
+        }
+    }
+
+    *fileContents = std::move(newFile);
+
+    wri(hdr()->e_phoff, nlo.m_secs[1].fRange.begin());
+    wri(hdr()->e_shoff, nlo.m_secs[2].fRange.begin());
+    wri(hdr()->e_phnum, phdrs.size());
+    wri(hdr()->e_shnum, shdrs.size());
+
+    size_t phAddr = le.getVirtualAddress(/*phdr*/1);
+    rewriteHeaders(phAddr);
+}
+
 static bool printInterpreter = false;
 static bool printOsAbi = false;
 static bool setOsAbi = false;
@@ -2408,6 +2642,8 @@ static void showHelp(const std::string & progName)
   [--rename-dynamic-symbols NAME_MAP_FILE]\tRenames dynamic symbols. The map file should contain two symbols (old_name new_name) per line\n\
   [--output FILE]\n\
   [--debug]\n\
+  [--try-layout-engine]\n\
+  [--only-layout-engine]\n\
   [--version]\n\
   FILENAME...\n", progName.c_str());
 }
@@ -2422,6 +2658,9 @@ static int mainWrapped(int argc, char * * argv)
 
     if (getenv("PATCHELF_DEBUG") != nullptr)
         debugMode = true;
+
+    if (getenv("PATCHELF_ONLY_LAYOUT_ENGINE") != nullptr)
+        tryLayoutEngine = onlyLayoutEngine = true;
 
     int i;
     for (i = 1; i < argc; ++i) {
@@ -2530,6 +2769,13 @@ static int mainWrapped(int argc, char * * argv)
         }
         else if (arg == "--debug") {
             debugMode = true;
+        }
+        else if (arg == "--try-layout-engine") {
+            tryLayoutEngine = true;
+        }
+        else if (arg == "--only-layout-engine") {
+            tryLayoutEngine = true;
+            onlyLayoutEngine = true;
         }
         else if (arg == "--no-default-lib") {
             noDefaultLib = true;
