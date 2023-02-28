@@ -1975,7 +1975,7 @@ void ElfFile<ElfFileParamNames()>::cleanstrtab()
     auto strTab = (char *)fileContents->data() + rdi(shdrDynStr.sh_offset);
     int verneednum = 0;
     int verdefnum = 0;
-    //mkref(strTab, rdi(shdrDynStr.sh_size)); // new strInfo()
+
     mymap m(strTab, rdi(shdrDynStr.sh_size));
 
     Elf_Dyn* dyn = (Elf_Dyn *) (fileContents->data() + rdi(shdrDynamic.sh_offset));
@@ -1985,9 +1985,6 @@ void ElfFile<ElfFileParamNames()>::cleanstrtab()
         switch (rdi(dyn->d_tag)) {
         case DT_NEEDED: case DT_SONAME:
         	m.incref(strTab + rdi(dyn->d_un.d_val), &dyn->d_un.d_val);
-
-            //incref(strTab + rdi(dyn->d_un.d_val), &dyn->d_un.d_val, sizeof dyn->d_un.d_val);
-            //m[strTab + rdi(dyn->d_un.d_val)].push_front(lsym);}
         	break;
         case DT_VERNEEDNUM:
         	verneednum = rdi(dyn->d_un.d_val);
@@ -2002,7 +1999,6 @@ void ElfFile<ElfFileParamNames()>::cleanstrtab()
     int count = rdi(shdrDynSym.sh_size) / sizeof(Elf_Sym);
     for (int i = 0; i < count; i++) {
         auto dynsym = sym[i];
-        //incref(strTab + rdi(dynsym.st_name), &dynsym.st_name, sizeof dynsym.st_name);
         m.incref(strTab + rdi(dynsym.st_name), &dynsym.st_name);
     }
 
@@ -2015,12 +2011,10 @@ void ElfFile<ElfFileParamNames()>::cleanstrtab()
 			auto versym = (Elf_Verneed *)verr;
 			while (verneednum>0) {
 				// NAMEs in verneed referring to dynstr
-				//incref(strTab + rdi(versym->vn_file), &versym->vn_file, sizeof versym->vn_file);
 				m.incref(strTab + rdi(versym->vn_file), &versym->vn_file);
 				int auxnum = rdi(versym->vn_cnt);
 				auto auxsym = (Elf_Vernaux *)((char*)versym + rdi(versym->vn_aux));
 				while (auxnum>0) {
-					//incref(strTab + rdi(auxsym->vna_name), &auxsym->vna_name, sizeof auxsym->vna_name);
 					m.incref(strTab + rdi(auxsym->vna_name), &auxsym->vna_name);
 					auxsym = (Elf_Vernaux *)((char*)auxsym + rdi(auxsym->vna_next));
 					auxnum--;
@@ -2044,7 +2038,6 @@ void ElfFile<ElfFileParamNames()>::cleanstrtab()
 				int auxnum = rdi(versym->vd_cnt);
 				auto auxsym = (Elf_Verdaux *)((char*)versym + rdi(versym->vd_aux));
 				while (auxnum>0) {
-					//incref(strTab + rdi(auxsym->vda_name), &auxsym->vda_name, sizeof auxsym->vda_name);
 					m.incref(strTab + rdi(auxsym->vda_name), &auxsym->vda_name);
 					auxsym = (Elf_Verdaux *)(verd + rdi(auxsym->vda_next));
 					auxnum--;
