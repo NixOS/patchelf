@@ -1,7 +1,7 @@
 using FileContents = std::shared_ptr<std::vector<unsigned char>>;
 
-#define ElfFileParams class Elf_Ehdr, class Elf_Phdr, class Elf_Shdr, class Elf_Addr, class Elf_Off, class Elf_Dyn, class Elf_Sym, class Elf_Verneed, class Elf_Versym
-#define ElfFileParamNames Elf_Ehdr, Elf_Phdr, Elf_Shdr, Elf_Addr, Elf_Off, Elf_Dyn, Elf_Sym, Elf_Verneed, Elf_Versym
+#define ElfFileParams class Elf_Ehdr, class Elf_Phdr, class Elf_Shdr, class Elf_Addr, class Elf_Off, class Elf_Dyn, class Elf_Sym, class Elf_Verneed, class Elf_Vernaux, class Elf_Verdef, class Elf_Verdaux, class Elf_Versym
+#define ElfFileParamNames(x) Elf##x##_Ehdr, Elf##x##_Phdr, Elf##x##_Shdr, Elf##x##_Addr, Elf##x##_Off, Elf##x##_Dyn, Elf##x##_Sym, Elf##x##_Verneed, Elf##x##_Vernaux, Elf##x##_Verdef, Elf##x##_Verdaux, Elf##x##_Versym
 
 template<ElfFileParams>
 class ElfFile
@@ -90,6 +90,9 @@ private:
     std::string & replaceSection(const SectionName & sectionName,
         unsigned int size);
 
+    std::string & replaceSection(const SectionName & sectionName,
+        std::string & replacement);
+
     bool haveReplacedSection(const SectionName & sectionName) const;
 
     void writeReplacedSections(Elf_Off & curOff,
@@ -139,6 +142,8 @@ public:
 
     void clearSymbolVersions(const std::set<std::string> & syms);
 
+    void cleanstrtab();
+
 private:
 
     /* Convert an integer in big or little endian representation (as
@@ -149,10 +154,26 @@ private:
 
     /* Convert back to the ELF representation. */
     template<class I>
-    I wri(I & t, unsigned long long i) const
+    I wri(I & t, int64_t i) const
     {
         t = rdi((I) i);
+        return (I) i;
+    }
+    template<class I>
+    I wri(I & t, I i) const
+    {
+        t = rdi(i);
         return i;
+    }
+
+    static Elf_Off roundUp(Elf_Off n, unsigned int m)
+    {
+    	if (m==(m&-m)) { /* typical case: m is power of 2 */
+    		m--;
+    		return (n+m)&~m;
+    	}
+    	/* fallback: not power of 2 */
+        return ((n - 1) / m + 1) * m;
     }
 
     Elf_Ehdr *hdr() {
