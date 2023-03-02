@@ -32,6 +32,7 @@ Makefile
 /tests/libbig-dynstr.debug
 /tests/contiguous-note-sections
 /tests/simple-pie
+/tests/simple-execstack
 
 .direnv/
 .vscode/

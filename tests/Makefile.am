@@ -1,6 +1,6 @@
 LIBS =
 
-check_PROGRAMS = simple-pie simple main too-many-strtab main-scoped big-dynstr no-rpath contiguous-note-sections
+check_PROGRAMS = simple-pie simple simple-execstack main too-many-strtab main-scoped big-dynstr no-rpath contiguous-note-sections
 
 no_rpath_arch_TESTS = \
   no-rpath-amd64.sh \
@@ -43,6 +43,11 @@ src_TESTS = \
   replace-needed.sh \
   replace-add-needed.sh \
   add-debug-tag.sh \
+  repeated-updates.sh \
+  empty-note.sh \
+  print-execstack.sh \
+  modify-execstack.sh \
+  rename-dynamic-symbols.sh \
   empty-note.sh
 
 build_TESTS = \
@@ -71,9 +76,14 @@ export NIX_LDFLAGS=
 simple_SOURCES = simple.c
 # no -fpic for simple.o
 simple_CFLAGS =
+simple_LDFLAGS = -Wl,-z,noexecstack
 
 simple_pie_SOURCES = simple.c
 simple_pie_CFLAGS = -fPIC -pie
+
+simple_execstack_SOURCES = simple.c
+simple_execstack_CFLAGS =
+simple_execstack_LDFLAGS = -Wl,-z,execstack
 
 main_SOURCES = main.c
 main_LDADD = -lfoo $(AM_LDADD)
@@ -108,8 +118,8 @@ check_DATA = libbig-dynstr.debug
 # - without libtool, only archives (static libraries) can be built by automake
 # - with libtool, it is difficult to control options
 # - with libtool, it is not possible to compile convenience *dynamic* libraries :-(
-check_PROGRAMS += libfoo.so libfoo-scoped.so libbar.so libbar-scoped.so libsimple.so libbuildid.so libtoomanystrtab.so \
-                  phdr-corruption.so
+check_PROGRAMS += libfoo.so libfoo-scoped.so libbar.so libbar-scoped.so libsimple.so libsimple-execstack.so libbuildid.so libtoomanystrtab.so \
+                  phdr-corruption.so many-syms-main libmany-syms.so
 
 libbuildid_so_SOURCES = simple.c
 libbuildid_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,--build-id
@@ -131,11 +141,22 @@ libbar_scoped_so_SOURCES = bar.c
 libbar_scoped_so_LDFLAGS = $(LDFLAGS_sharedlib)
 
 libsimple_so_SOURCES = simple.c
-libsimple_so_LDFLAGS = $(LDFLAGS_sharedlib)
+libsimple_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-z,noexecstack
+
+libsimple_execstack_so_SOURCES = simple.c
+libsimple_execstack_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-z,execstack
 
 too_many_strtab_SOURCES = too-many-strtab.c too-many-strtab2.s
 libtoomanystrtab_so_SOURCES = too-many-strtab.c too-many-strtab2.s
 libtoomanystrtab_so_LDFLAGS = $(LDFLAGS_sharedlib)
+
+many_syms_main_SOURCES = many-syms-main.c 
+many_syms_main_LDFLAGS = $(LDFLAGS_local) 
+many_syms_main_LDADD = -lmany-syms $(AM_LDADD)
+many_syms_main_DEPENDENCIES = libmany-syms.so
+many_syms_main_CFLAGS = -pie
+libmany_syms_so_SOURCES = many-syms.c
+libmany_syms_so_LDFLAGS = $(LDFLAGS_sharedlib)
 
 no_rpath_SOURCES = no-rpath.c
 # no -fpic for no-rpath.o
@@ -148,3 +169,12 @@ contiguous_note_sections_CFLAGS = -pie
 phdr_corruption_so_SOURCES = void.c phdr-corruption.ld
 phdr_corruption_so_LDFLAGS = -nostdlib -shared -Wl,-T$(srcdir)/phdr-corruption.ld
 phdr_corruption_so_CFLAGS =
+
+many-syms.c:
+	i=1; while [ $$i -le 2000 ]; do echo "void f$$i() {};"; i=$$(($$i + 1)); done > $@
+
+many-syms-main.c:
+	echo "int main() {" > $@
+	i=1; while [ $$i -le 2000 ]; do echo "void f$$i(); f$$i();"; i=$$(($$i + 1)); done >> $@
+	echo "}" >> $@
+
