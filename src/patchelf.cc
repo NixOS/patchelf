@@ -68,6 +68,10 @@ static int forcedPageSize = DEFAULT_PAGESIZE;
 static int forcedPageSize = -1;
 #endif
 
+#ifndef DT_MIPS_XHASH
+#define DT_MIPS_XHASH   0x70000036
+#endif
+
 #ifndef EM_LOONGARCH
 #define EM_LOONGARCH    258
 #endif
