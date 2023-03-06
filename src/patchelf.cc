@@ -44,7 +44,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <stdlib.h>
 
 #include "elf.h"
 #include "patchelf.h"
@@ -683,7 +682,7 @@ void ElfFile<ElfFileParamNames()>::writeReplacedSections(Elf_Off & curOff,
         const std::string & sectionName = i.first;
         const Elf_Shdr & shdr = findSectionHeader(sectionName);
         if (rdi(shdr.sh_type) != SHT_NOBITS)
-            memset(fileContents->data() + rdi(shdr.sh_offset), 'Y', rdi(shdr.sh_size));
+            memset(fileContents->data() + rdi(shdr.sh_offset), 'X', rdi(shdr.sh_size));
     }
 
     std::set<unsigned int> noted_phdrs = {};
@@ -795,9 +794,7 @@ void ElfFile<ElfFileParamNames()>::writeReplacedSections(Elf_Off & curOff,
                 }
             }
         }
-        debug("curoff %d, size %d, align %d\n", curOff, i->second.size(), sectionAlignment);
         curOff += roundUp((Elf_Off)i->second.size(), sectionAlignment);
-        debug("-> next curoff %d\n", curOff);
     }
 
     replacedSections.clear();
@@ -1632,7 +1629,7 @@ void ElfFile<ElfFileParamNames()>::modifyRPath(RPathOp op,
     size_t rpathSize = 0;
     if (rpath) {
         rpathSize = strlen(rpath);
-        memset(rpath, 0, rpathSize);
+        memset(rpath, 'X', rpathSize);
     }
 
     debug("new rpath is '%s'\n", newRPath.c_str());
@@ -2259,8 +2256,8 @@ struct Comparator {
 
 class mymap : public map<symstr, forward_list<symref>, Comparator> {
 
-    public:
-	size_t totalsize;
+public:
+    size_t totalsize;
     mymap(const char *s, size_t s_length) : totalsize(s_length)
     {
         const char *c = NULL;
@@ -2277,7 +2274,7 @@ class mymap : public map<symstr, forward_list<symref>, Comparator> {
     template <class T>
     void incref(const char *idx, T *sym)
     {
-    	(*this)[idx].push_front(sym);
+        (*this)[idx].push_front(sym);
     }
 
 };
@@ -2301,14 +2298,14 @@ void ElfFile<ElfFileParamNames()>::cleanstrtab()
     for (; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         switch (rdi(dyn->d_tag)) {
         case DT_NEEDED: case DT_SONAME:
-        	m.incref(strTab + rdi(dyn->d_un.d_val), &dyn->d_un.d_val);
-        	break;
+            m.incref(strTab + rdi(dyn->d_un.d_val), &dyn->d_un.d_val);
+            break;
         case DT_VERNEEDNUM:
-        	verneednum = rdi(dyn->d_un.d_val);
-        	break;
+            verneednum = rdi(dyn->d_un.d_val);
+            break;
         case DT_VERDEFNUM:
-        	verdefnum = rdi(dyn->d_un.d_val);
-        	break;
+            verdefnum = rdi(dyn->d_un.d_val);
+            break;
         }
     }
     /* NAMEs in dynsym */
@@ -2321,77 +2318,77 @@ void ElfFile<ElfFileParamNames()>::cleanstrtab()
 
     if (verneednum) {
         auto shdrVerSymr = findSectionHeader(".gnu.version_r");
- 		Elf_Shdr & shdrVersionRStrings = shdrs.at(rdi(shdrVerSymr.sh_link));
-		// this is where we find the actual version strings; is it dynstr?
-		if (shdrVersionRStrings.sh_offset == shdrDynStr.sh_offset) {
-			auto verr = fileContents->data() + rdi(shdrVerSymr.sh_offset);
-			auto versym = (Elf_Verneed *)verr;
-			while (verneednum>0) {
-				// NAMEs in verneed referring to dynstr
-				m.incref(strTab + rdi(versym->vn_file), &versym->vn_file);
-				int auxnum = rdi(versym->vn_cnt);
-				auto auxsym = (Elf_Vernaux *)((char*)versym + rdi(versym->vn_aux));
-				while (auxnum>0) {
-					m.incref(strTab + rdi(auxsym->vna_name), &auxsym->vna_name);
-					auxsym = (Elf_Vernaux *)((char*)auxsym + rdi(auxsym->vna_next));
-					auxnum--;
-				}
-				versym = (Elf_Verneed *)((char*)versym + rdi(versym->vn_next));
-				verneednum--;
-			}
-		}
+        Elf_Shdr & shdrVersionRStrings = shdrs.at(rdi(shdrVerSymr.sh_link));
+        // this is where we find the actual version strings; is it dynstr?
+        if (shdrVersionRStrings.sh_offset == shdrDynStr.sh_offset) {
+            auto verr = fileContents->data() + rdi(shdrVerSymr.sh_offset);
+            auto versym = (Elf_Verneed *)verr;
+            while (verneednum>0) {
+                // NAMEs in verneed referring to dynstr
+                m.incref(strTab + rdi(versym->vn_file), &versym->vn_file);
+                int auxnum = rdi(versym->vn_cnt);
+                auto auxsym = (Elf_Vernaux *)((char*)versym + rdi(versym->vn_aux));
+                while (auxnum>0) {
+                    m.incref(strTab + rdi(auxsym->vna_name), &auxsym->vna_name);
+                    auxsym = (Elf_Vernaux *)((char*)auxsym + rdi(auxsym->vna_next));
+                    auxnum--;
+                }
+                versym = (Elf_Verneed *)((char*)versym + rdi(versym->vn_next));
+                verneednum--;
+            }
+        }
     }
 
     if (verdefnum) {
         auto shdrVerSymd = findSectionHeader(".gnu.version_d");
-    	Elf_Shdr & shdrVersionDStrings = shdrs.at(rdi(shdrVerSymd.sh_link));
-		// this is where we find the actual version strings; is it dynstr?
-		if (shdrVersionDStrings.sh_offset == shdrDynStr.sh_offset) {
-			// NAMEs in verdef referring to dynstr
-			auto verd = fileContents->data() + rdi(shdrVerSymd.sh_offset);
-			auto versym = (Elf_Verdef *)verd;
-			while (verneednum>0) {
-				// NAMEs in verneed referring to dynstr
-				int auxnum = rdi(versym->vd_cnt);
-				auto auxsym = (Elf_Verdaux *)((char*)versym + rdi(versym->vd_aux));
-				while (auxnum>0) {
-					m.incref(strTab + rdi(auxsym->vda_name), &auxsym->vda_name);
-					auxsym = (Elf_Verdaux *)(verd + rdi(auxsym->vda_next));
-					auxnum--;
-				}
-				versym = (Elf_Verdef *)((char*)versym + rdi(versym->vd_next));
-				verneednum--;
-			}
-		}
+        Elf_Shdr & shdrVersionDStrings = shdrs.at(rdi(shdrVerSymd.sh_link));
+        // this is where we find the actual version strings; is it dynstr?
+        if (shdrVersionDStrings.sh_offset == shdrDynStr.sh_offset) {
+            // NAMEs in verdef referring to dynstr
+            auto verd = fileContents->data() + rdi(shdrVerSymd.sh_offset);
+            auto versym = (Elf_Verdef *)verd;
+            while (verneednum>0) {
+                // NAMEs in verneed referring to dynstr
+                int auxnum = rdi(versym->vd_cnt);
+                auto auxsym = (Elf_Verdaux *)((char*)versym + rdi(versym->vd_aux));
+                while (auxnum>0) {
+                    m.incref(strTab + rdi(auxsym->vda_name), &auxsym->vda_name);
+                    auxsym = (Elf_Verdaux *)(verd + rdi(auxsym->vda_next));
+                    auxnum--;
+                }
+                versym = (Elf_Verdef *)((char*)versym + rdi(versym->vd_next));
+                verneednum--;
+            }
+        }
     }
 
-	int shift=0;
-	int newsize=m.totalsize;
-	for (auto& [s, l] : m) {
-		if (shift) {
-			for (auto& p : l) {
-				visit([this,shift](auto &x){
-					wri(*x, rdi(*x)-shift);
-				},p);
-			}
-			debug("shifted sym %s by %d bytes, %s refs\n", s.str-shift, shift, l.empty()?"0":">=1");
-		}
-		if (l.empty()) {
-			const char *sym = s.str - shift;
-			debug("sym %s is unreferenced\n", sym);
-			shift+= s.len+1;
-			debug("shifting next symbols by %d bytes\n", shift);
-			newsize-=s.len+1;
-			memmove((void*)sym, sym+s.len+1, newsize-(sym-strTab));
-		}
-	}
-	memset((void*)(strTab+newsize), 0, shift);
+    int shift=0;
+    int newsize=m.totalsize;
+    for (auto& [s, l] : m) {
+        if (shift) {
+            for (auto& p : l) {
+                visit([this,shift](auto &x){
+                    wri(*x, rdi(*x)-shift);
+                },p);
+            }
+            debug("shifted sym %s by %d bytes, %s refs\n", s.str-shift, shift, l.empty()?"0":">=1");
+        }
+        if (l.empty()) {
+            const char *sym = s.str - shift;
+            debug("sym %s is unreferenced\n", sym);
+            shift+= s.len+1;
+            debug("shifting next symbols by %d bytes\n", shift);
+            newsize-=s.len+1;
+            memmove((void*)sym, sym+s.len+1, newsize-(sym-strTab));
+        }
+    }
+    memset((void*)(strTab+newsize), 0, shift);
 
     if (shift) {
-    	debug("new .dynstr size %d\n", newsize);
-    	changed=true;
-    	replaceSection(".dynstr", newsize);
-    	rewriteSections();
+        debug("new .dynstr size %d\n", newsize);
+        changed=true;
+        replaceSection(".dynstr", newsize);
+        rewriteSections();
     }
 }
 
