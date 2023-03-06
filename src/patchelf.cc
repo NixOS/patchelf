@@ -2223,10 +2223,7 @@ void ElfFile<ElfFileParamNames()>::clearSymbolVersions(const std::set<std::strin
     rewriteSections();
 }
 
-struct symstr {
-    const char *str;
-    size_t len;
-};
+typedef string_view symstr;
 
 // Elf32_Off, Elf32_Word, Elf54_Word = unsigned int
 // Elf64_Off, Elf64_Xword = unsigned long (or long long on 32 bit)
@@ -2238,17 +2235,17 @@ struct Comparator {
     using is_transparent = void;
     bool operator()(const symstr& a, const symstr& b) const
     {
-        return (a.str+a.len < b.str+b.len);
+        return (a.data()+a.length() < b.data()+b.length());
     }
 
     bool operator()(const char* a, const symstr& b) const
     {
-        return (a < b.str);
+        return (a < b.data());
     }
 
     bool operator()(const symstr& a, const char* b) const
     {
-        return (a.str+a.len < b);
+        return (a.data()+a.length() < b);
     }
 };
 
@@ -2260,9 +2257,11 @@ public:
     size_t totalsize;
     symmap(const char *s, size_t s_length) : totalsize(s_length)
     {
-        const char *c = NULL;
-        while ((c=argz_next(s, s_length, c))) {
-            insert({(const struct symstr){c, strlen(c)},forward_list<symref>()});
+        const char *e = s + s_length;
+        while (s<e) {
+            symstr sym(s);
+            insert({sym, forward_list<symref>()});
+            s+=sym.length()+1;
         }
     }
 
@@ -2371,18 +2370,19 @@ void ElfFile<ElfFileParamNames()>::cleanstrtab()
                     wri(*x, rdi(*x)-shift);
                 },p);
             }
-            debug("shifted sym %s by %d bytes, %s refs\n", s.str-shift, shift, l.empty()?"0":">=1");
+            debug("shifted sym %s by %d bytes, %s refs\n", s.data()-shift, shift, l.empty()?"0":">=1");
         }
         if (l.empty()) {
-            Elf_Off offset = s.str - strTab;
+            Elf_Off offset=s.data()-strTab;
             char *sym = strTab + offset - shift;
             debug("sym %s is unreferenced\n", sym);
-            shift+= s.len+1;
+            shift+= s.length()+1;
             debug("shifting next symbols by %d bytes\n", shift);
-            newsize-=s.len+1;
-            memmove(sym, sym+s.len+1, newsize-(sym-strTab));
+            newsize-=s.length()+1;
+            memmove(sym, sym+s.length()+1, newsize-(sym-strTab));
         }
     }
+    // not really necessary, as .dynstr is going to be shrunk by shift
     memset((void*)(strTab+newsize), 0, shift);
 
     if (shift) {
