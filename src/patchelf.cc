@@ -2254,11 +2254,11 @@ struct Comparator {
 
 #include <argz.h>
 
-class mymap : public map<symstr, forward_list<symref>, Comparator> {
+class symmap : public map<symstr, forward_list<symref>, Comparator> {
 
 public:
     size_t totalsize;
-    mymap(const char *s, size_t s_length) : totalsize(s_length)
+    symmap(const char *s, size_t s_length) : totalsize(s_length)
     {
         const char *c = NULL;
         while ((c=argz_next(s, s_length, c))) {
@@ -2290,7 +2290,7 @@ void ElfFile<ElfFileParamNames()>::cleanstrtab()
     int verneednum = 0;
     int verdefnum = 0;
 
-    mymap m(strTab, rdi(shdrDynStr.sh_size));
+    symmap m(strTab, rdi(shdrDynStr.sh_size));
 
     Elf_Dyn* dyn = (Elf_Dyn *) (fileContents->data() + rdi(shdrDynamic.sh_offset));
 
