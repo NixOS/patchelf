@@ -2374,12 +2374,13 @@ void ElfFile<ElfFileParamNames()>::cleanstrtab()
             debug("shifted sym %s by %d bytes, %s refs\n", s.str-shift, shift, l.empty()?"0":">=1");
         }
         if (l.empty()) {
-            const char *sym = s.str - shift;
+            Elf_Off offset = s.str - strTab;
+            char *sym = strTab + offset - shift;
             debug("sym %s is unreferenced\n", sym);
             shift+= s.len+1;
             debug("shifting next symbols by %d bytes\n", shift);
             newsize-=s.len+1;
-            memmove((void*)sym, sym+s.len+1, newsize-(sym-strTab));
+            memmove(sym, sym+s.len+1, newsize-(sym-strTab));
         }
     }
     memset((void*)(strTab+newsize), 0, shift);
