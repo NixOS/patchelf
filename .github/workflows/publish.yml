@@ -1,5 +1,11 @@
 name: Publish
 on:
+  workflow_dispatch:
+    inputs:
+      enable_stress_test:
+        description: "Run pachelf on all binaries in the image"
+        type: boolean
+        default: false
   pull_request:
   push:
     branches:
@@ -89,7 +95,7 @@ jobs:
           rm -f dist/*
           cd patchelf-*
           ./configure --prefix /patchelf
-          make check || (cat tests/test-suite.log; exit 1)
+          make check STRESS=${{ inputs.enable_stress_test }} || (cat tests/test-suite.log; exit 1)
           make install-strip
           cd -
           tar -czf ./dist/patchelf-\$(cat patchelf-*/version)-\$(uname -m).tar.gz -C /patchelf .

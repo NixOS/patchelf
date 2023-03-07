@@ -49,6 +49,7 @@ src_TESTS = \
   modify-execstack.sh \
   rename-dynamic-symbols.sh \
   overlapping-segments-after-rounding.sh \
+  stress.sh \
   empty-note.sh
 
 build_TESTS = \
