@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "elf.h"
+#include "layout.h"
 
 using FileContents = std::shared_ptr<std::vector<unsigned char>>;
 
@@ -236,6 +237,17 @@ private:
                 wri(r.r_info, rel_setSymId(info, newSymIdx));
         }
     }
+
+    struct Elf2LayoutMaps
+    {
+        std::map<size_t, Elf_Shdr*> id2shdr;
+        std::map<const Elf_Shdr*, size_t> shdr2id;
+        std::map<size_t, Elf_Phdr*> id2phdr;
+    };
+
+    bool runLayoutEngine();
+    std::pair<le::Layout, Elf2LayoutMaps> elf2layout();
+    void layout2elf(const le::LayoutEngine& , const Elf2LayoutMaps&);
 
     /* Convert an integer in big or little endian representation (as
        specified by the ELF header) to this platform's integer

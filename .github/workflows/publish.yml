@@ -90,6 +90,7 @@ jobs:
           cd patchelf-*
           ./configure --prefix /patchelf
           make check
+          env PATCHELF_ONLY_LAYOUT_ENGINE=1 make check
           make install-strip
           cd -
           tar -czf ./dist/patchelf-\$(cat patchelf-*/version)-\$(uname -m).tar.gz -C /patchelf .
