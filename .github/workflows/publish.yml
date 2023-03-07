@@ -89,7 +89,7 @@ jobs:
           rm -f dist/*
           cd patchelf-*
           ./configure --prefix /patchelf
-          make check
+          make check || (cat tests/test-suite.log; exit 1)
           make install-strip
           cd -
           tar -czf ./dist/patchelf-\$(cat patchelf-*/version)-\$(uname -m).tar.gz -C /patchelf .
