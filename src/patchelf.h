@@ -10,8 +10,11 @@
 
 using FileContents = std::shared_ptr<std::vector<unsigned char>>;
 
-#define ElfFileParams class Elf_Ehdr, class Elf_Phdr, class Elf_Shdr, class Elf_Addr, class Elf_Off, class Elf_Dyn, class Elf_Sym, class Elf_Verneed, class Elf_Versym, class Elf_Rel, class Elf_Rela, unsigned ElfClass
-#define ElfFileParamNames Elf_Ehdr, Elf_Phdr, Elf_Shdr, Elf_Addr, Elf_Off, Elf_Dyn, Elf_Sym, Elf_Verneed, Elf_Versym, Elf_Rel, Elf_Rela, ElfClass
+#define ElfFileParams class Elf_Ehdr, class Elf_Phdr, class Elf_Shdr, class Elf_Addr, class Elf_Off, class Elf_Dyn, class Elf_Sym, class Elf_Verneed, class Elf_Vernaux, class Elf_Verdef, class Elf_Verdaux, class Elf_Versym, class Elf_Rel, class Elf_Rela, unsigned ElfClass
+#define ElfFileParamNames(x) Elf##x##_Ehdr, Elf##x##_Phdr, Elf##x##_Shdr, Elf##x##_Addr, Elf##x##_Off, Elf##x##_Dyn, Elf##x##_Sym, Elf##x##_Verneed, Elf##x##_Vernaux, Elf##x##_Verdef, Elf##x##_Verdaux, Elf##x##_Versym, Elf##x##_Rel, Elf##x##_Rela, ElfClass##x
+
+#define ElfClass32 32
+#define ElfClass64 64
 
 template<class T>
 struct span
@@ -120,6 +123,9 @@ private:
     std::string & replaceSection(const SectionName & sectionName,
         unsigned int size);
 
+    std::string & replaceSection(const SectionName & sectionName,
+        std::string & replacement);
+
     [[nodiscard]] bool haveReplacedSection(const SectionName & sectionName) const;
 
     void writeReplacedSections(Elf_Off & curOff,
@@ -170,6 +176,8 @@ public:
     void renameDynamicSymbols(const std::unordered_map<std::string_view, std::string>&);
 
     void clearSymbolVersions(const std::set<std::string> & syms);
+
+    void cleanstrtab();
 
     enum class ExecstackMode { print, set, clear };
 
@@ -248,10 +256,20 @@ private:
     constexpr inline I wri(I & t, U i) const
     {
         I val = static_cast<I>(i);
-        if (static_cast<U>(val) != i)            
+        if (static_cast<U>(val) != i)
             throw std::runtime_error { "value truncation" };
         t = rdi(val);
         return val;
+    }
+
+    static constexpr Elf_Off roundUp(Elf_Off n, unsigned int m) //const
+    {
+    	if (m==(m&-m)) { /* typical case: m is power of 2 */
+    		m--;
+    		return (n+m)&~m;
+    	}
+    	/* fallback: not power of 2 */
+        return ((n - 1) / m + 1) * m;
     }
 
     [[nodiscard]] Elf_Ehdr *hdr() noexcept {
