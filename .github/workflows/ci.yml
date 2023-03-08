@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: cachix/install-nix-action@v19
+    - uses: cachix/install-nix-action@v20
     - run: nix-build -A hydraJobs.release
   ubuntu:
     runs-on: ubuntu-latest

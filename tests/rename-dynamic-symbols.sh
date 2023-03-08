@@ -82,3 +82,9 @@ ${PATCHELF} --rename-dynamic-symbols ../map *
 
 echo "# Run the patched tool and libraries"
 env LD_BIND_NOW=1 LD_LIBRARY_PATH=${PWD} ./many-syms-main
+
+# Test that other switches still work when --rename-dynamic-symbols has no effect
+echo "SYMBOL_THAT_DOESNT_EXIST ANOTHER_NAME" > map
+${PATCHELF} --set-rpath changed_rpath --rename-dynamic-symbols map --output libnewrpath.so "$full_lib_name"
+[ "$(${PATCHELF} --print-rpath libnewrpath.so)" = changed_rpath ] || exit 1
+

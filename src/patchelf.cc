@@ -2179,7 +2179,7 @@ void ElfFile<ElfFileParamNames()>::renameDynamicSymbols(const std::unordered_map
         }
     }
 
-    if (changed)
+    if (!extraStrings.empty())
     {
         auto newStrTabSize = strTab.size() + extraStrings.size();
         auto& newSec = replaceSection(".dynstr", newStrTabSize);
