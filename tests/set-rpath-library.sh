@@ -61,7 +61,7 @@ fi
 # ALL loads should have the same alignment
 lib="${SCRATCH}/liboveralign.so"
 ../src/patchelf --set-rpath "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" "$lib"
-num_alignments=$(${READELF} -W -l "${lib}"  | grep LOAD | awk '{ print $NF }' | sort -u | wc -l)
+num_alignments=$(${READELF} -W -l "${lib}"  | awk '/LOAD/ { print $NF }' | sort -u | wc -l)
 echo "$num_alignments"
 if test "${num_alignments}" -ne "1"; then
     exit 1
