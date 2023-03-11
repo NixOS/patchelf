@@ -800,11 +800,16 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
        page of other segments. */
     Elf_Addr startPage = 0;
     Elf_Addr firstPage = 0;
+    unsigned alignStartPage = getPageSize();
     for (auto & phdr : phdrs) {
-        Elf_Addr thisPage = roundUp(rdi(phdr.p_vaddr) + rdi(phdr.p_memsz), getPageSize());
+        Elf_Addr thisPage = rdi(phdr.p_vaddr) + rdi(phdr.p_memsz);
         if (thisPage > startPage) startPage = thisPage;
         if (rdi(phdr.p_type) == PT_PHDR) firstPage = rdi(phdr.p_vaddr) - rdi(phdr.p_offset);
+        unsigned thisAlign = rdi(phdr.p_align);
+        alignStartPage = std::max(alignStartPage, thisAlign);
     }
+
+    startPage = roundUp(startPage, alignStartPage);
 
     debug("last page is 0x%llx\n", (unsigned long long) startPage);
     debug("first page is 0x%llx\n", (unsigned long long) firstPage);
@@ -873,7 +878,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
     if (!phdrs.empty() &&
         rdi(lastSeg.p_type) == PT_LOAD &&
         rdi(lastSeg.p_flags) == (PF_R | PF_W) &&
-        rdi(lastSeg.p_align) == getPageSize()) {
+        rdi(lastSeg.p_align) == alignStartPage) {
         auto segEnd = roundUp(rdi(lastSeg.p_offset) + rdi(lastSeg.p_memsz), getPageSize());
         if (segEnd == startOffset) {
             auto newSz = startOffset + neededSpace - rdi(lastSeg.p_offset);
@@ -892,7 +897,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
         wri(phdr.p_vaddr, wri(phdr.p_paddr, startPage));
         wri(phdr.p_filesz, wri(phdr.p_memsz, neededSpace));
         wri(phdr.p_flags, PF_R | PF_W);
-        wri(phdr.p_align, getPageSize());
+        wri(phdr.p_align, alignStartPage);
     }
 
     normalizeNoteSegments();

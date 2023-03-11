@@ -14,6 +14,7 @@ mkdir -p "${SCRATCH}/libsB"
 cp main-scoped "${SCRATCH}/"
 cp libfoo-scoped.so "${SCRATCH}/libsA/"
 cp libbar-scoped.so "${SCRATCH}/libsB/"
+cp liboveralign.so "${SCRATCH}/"
 
 oldRPath=$(../src/patchelf --print-rpath "${SCRATCH}"/main-scoped)
 if test -z "$oldRPath"; then oldRPath="/oops"; fi
@@ -54,5 +55,14 @@ exitCode=0
 
 if test "$exitCode" != 46; then
     echo "bad exit code!"
+    exit 1
+fi
+
+# ALL loads should have the same alignment
+lib="${SCRATCH}/liboveralign.so"
+../src/patchelf --set-rpath "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" "$lib"
+num_alignments=$(${READELF} -W -l "${lib}"  | awk '/LOAD/ { print $NF }' | sort -u | wc -l)
+echo "$num_alignments"
+if test "${num_alignments}" -ne "1"; then
     exit 1
 fi
