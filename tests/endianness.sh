@@ -6,7 +6,7 @@ for arch in ppc64 ppc64le; do
     rm -rf "${SCRATCH}"
     mkdir -p "${SCRATCH}"
 
-    cp "${srcdir}/endianness/${arch}/main" "${srcdir}/endianness/${arch}/libtest.so" "${SCRATCH}/"
+    cp "${srcdir:?}/endianness/${arch}/main" "${srcdir}/endianness/${arch}/libtest.so" "${SCRATCH}/"
 
     rpath="${PWD}/${SCRATCH}"
 

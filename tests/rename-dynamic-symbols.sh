@@ -1,17 +1,17 @@
 #!/bin/sh -e
-SCRATCH=scratch/$(basename $0 .sh)
+SCRATCH=scratch/$(basename "$0" .sh)
 PATCHELF=$(readlink -f "../src/patchelf")
 
-rm -rf ${SCRATCH}
-mkdir -p ${SCRATCH}
+rm -rf "${SCRATCH}"
+mkdir -p "${SCRATCH}"
 
 full_main_name="${PWD}/many-syms-main"
 full_lib_name="${PWD}/libmany-syms.so"
-chmod -w $full_lib_name $full_main_name
+chmod -w "$full_lib_name" "$full_main_name"
 
 suffix="_special_suffix"
 
-cd ${SCRATCH}
+cd "${SCRATCH}"
 
 ###############################################################################
 # Test that all symbols in the dynamic symbol table will have the expected
@@ -20,16 +20,16 @@ cd ${SCRATCH}
 ###############################################################################
 
 list_symbols() {
-    nm -D $@ | awk '{ print $NF }' | sed '/^ *$/d'
+    nm -D "$@" | awk '{ print $NF }' | sed '/^ *$/d'
 }
 
-list_symbols $full_lib_name | cut -d@ -f1 | sort -u | awk "{printf \"%s %s${suffix}\n\",\$1,\$1}" > map
-list_symbols $full_lib_name | cut -d@ -f1 | sort -u | awk "{printf \"%s${suffix} %s\n\",\$1,\$1}" > rmap
+list_symbols "$full_lib_name" | cut -d@ -f1 | sort -u | awk "{printf \"%s %s${suffix}\n\",\$1,\$1}" > map
+list_symbols "$full_lib_name" | cut -d@ -f1 | sort -u | awk "{printf \"%s${suffix} %s\n\",\$1,\$1}" > rmap
 
-${PATCHELF} --rename-dynamic-symbols map --output libmapped.so $full_lib_name
+${PATCHELF} --rename-dynamic-symbols map --output libmapped.so "$full_lib_name"
 ${PATCHELF} --rename-dynamic-symbols rmap --output libreversed.so libmapped.so
 
-list_symbols $full_lib_name | sort > orig_syms
+list_symbols "$full_lib_name" | sort > orig_syms
 list_symbols libmapped.so | sort > map_syms
 list_symbols libreversed.so | sort > rev_syms
 
@@ -47,10 +47,10 @@ diff orig_syms map_syms_r > diff_orig_syms_map_syms_r || exit 1
 ###############################################################################
 
 print_relocation_table() {
-    readelf -W -r $1 | awk '{ printf "%s\n",$5 }' | cut -f1 -d@
+    readelf -W -r "$1" | awk '{ printf "%s\n",$5 }' | cut -f1 -d@
 }
 
-print_relocation_table $full_lib_name > orig_rel
+print_relocation_table "$full_lib_name" > orig_rel
 print_relocation_table libmapped.so > map_rel
 print_relocation_table libreversed.so > rev_rel
 
@@ -69,19 +69,19 @@ diff orig_rel map_rel_r > diff_orig_rel_map_rel_r || exit 1
 ###############################################################################
 
 echo "# Create the map"
-list_symbols --defined-only $full_lib_name | cut -d@ -f1 | sort -u | awk "{printf \"%s %s${suffix}\n\",\$1,\$1}" > map
+list_symbols --defined-only "$full_lib_name" | cut -d@ -f1 | sort -u | awk "{printf \"%s %s${suffix}\n\",\$1,\$1}" > map
 
 echo "# Copy all dependencies"
 mkdir env
 cd env
-cp $full_lib_name $full_main_name .
+cp "$full_lib_name" "$full_main_name" .
 
 echo "# Apply renaming"
-chmod +w *
-${PATCHELF} --rename-dynamic-symbols ../map *
+chmod +w ./*
+${PATCHELF} --rename-dynamic-symbols ../map ./*
 
 echo "# Run the patched tool and libraries"
-env LD_BIND_NOW=1 LD_LIBRARY_PATH=${PWD} ./many-syms-main
+env LD_BIND_NOW=1 LD_LIBRARY_PATH="${PWD}" ./many-syms-main
 
 # Test that other switches still work when --rename-dynamic-symbols has no effect
 echo "SYMBOL_THAT_DOESNT_EXIST ANOTHER_NAME" > map

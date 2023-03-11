@@ -1,16 +1,16 @@
 #! /bin/sh -e
-SCRATCH=scratch/$(basename $0 .sh)
+SCRATCH=scratch/$(basename "$0" .sh)
 PATCHELF=$(readlink -f "../src/patchelf")
 
-rm -rf ${SCRATCH}
-mkdir -p ${SCRATCH}
+rm -rf "${SCRATCH}"
+mkdir -p "${SCRATCH}"
 
-cp simple ${SCRATCH}/
-cp simple-execstack ${SCRATCH}/
-cp libsimple.so ${SCRATCH}/
-cp libsimple-execstack.so ${SCRATCH}/
+cp simple "${SCRATCH}"/
+cp simple-execstack "${SCRATCH}"/
+cp libsimple.so "${SCRATCH}"/
+cp libsimple-execstack.so "${SCRATCH}"/
 
-cd ${SCRATCH}
+cd "${SCRATCH}"
 
 
 ## simple
