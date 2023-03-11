@@ -14,10 +14,10 @@ if [ -z "$ARCH" ] || [ "$ARCH" = prebuild ] ; then
   exit 1
 fi
 
-no_rpath_bin="${srcdir}/no-rpath-prebuild/no-rpath-$ARCH"
+no_rpath_bin="${srcdir:?}/no-rpath-prebuild/no-rpath-$ARCH"
 
 if [ ! -f "$no_rpath_bin" ]; then
-  echo "no 'no-rpath' binary for '$ARCH' in '${srcdir}/no-rpath-prebuild'"
+  echo "no 'no-rpath' binary for '$ARCH' in '${srcdir:?}/no-rpath-prebuild'"
   exit 1
 fi
 
