@@ -664,14 +664,14 @@ template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
     Elf_Addr startAddr, Elf_Off startOffset)
 {
-    /* Overwrite the old section contents with 'X's.  Do this
+    /* Overwrite the old section contents with 'Z's.  Do this
        *before* writing the new section contents (below) to prevent
        clobbering previously written new section contents. */
     for (auto & i : replacedSections) {
         const std::string & sectionName = i.first;
         const Elf_Shdr & shdr = findSectionHeader(sectionName);
         if (rdi(shdr.sh_type) != SHT_NOBITS)
-            memset(fileContents->data() + rdi(shdr.sh_offset), 'X', rdi(shdr.sh_size));
+            memset(fileContents->data() + rdi(shdr.sh_offset), 'Z', rdi(shdr.sh_size));
     }
 
     std::set<unsigned int> noted_phdrs = {};
