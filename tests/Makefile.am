@@ -49,6 +49,7 @@ src_TESTS = \
   modify-execstack.sh \
   rename-dynamic-symbols.sh \
   overlapping-segments-after-rounding.sh \
+  shared-rpath.sh \
   empty-note.sh
 
 build_TESTS = \
@@ -121,7 +122,7 @@ check_DATA = libbig-dynstr.debug
 # - with libtool, it is difficult to control options
 # - with libtool, it is not possible to compile convenience *dynamic* libraries :-(
 check_PROGRAMS += libfoo.so libfoo-scoped.so libbar.so libbar-scoped.so libsimple.so libsimple-execstack.so libbuildid.so libtoomanystrtab.so \
-                  phdr-corruption.so many-syms-main libmany-syms.so liboveralign.so
+                  phdr-corruption.so many-syms-main libmany-syms.so liboveralign.so libshared-rpath.so
 
 libbuildid_so_SOURCES = simple.c
 libbuildid_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,--build-id
@@ -147,6 +148,9 @@ libsimple_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-z,noexecstack
 
 liboveralign_so_SOURCES = simple.c
 liboveralign_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-z,max-page-size=0x10000
+
+libshared_rpath_so_SOURCES = shared-rpath.c
+libshared_rpath_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-rpath=a_symbol_name
 
 libsimple_execstack_so_SOURCES = simple.c
 libsimple_execstack_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-z,execstack
