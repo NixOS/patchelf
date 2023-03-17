@@ -1538,7 +1538,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
 
     /* !!! We assume that the virtual address in the DT_STRTAB entry
        of the dynamic section corresponds to the .dynstr section. */
-    auto shdrDynStr = findSectionHeader(".dynstr");
+    auto& shdrDynStr = findSectionHeader(".dynstr");
     char * strTab = (char *) fileContents->data() + rdi(shdrDynStr.sh_offset);
 
 
@@ -1621,24 +1621,39 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
     }
     changed = true;
 
-    /* Zero out the previous rpath to prevent retained dependencies in
-       Nix. */
+    bool rpathStrShared = false;
     size_t rpathSize = 0;
     if (rpath) {
-        rpathSize = strlen(rpath);
+        std::string_view rpathView {rpath};
+        rpathSize = rpathView.size();
+
+        size_t rpathStrReferences = 0;
+        forAllStringReferences(shdrDynStr, [&] (auto refIdx) {
+            if (rpathView.end() == std::string_view(strTab + rdi(refIdx)).end())
+                rpathStrReferences++;
+        });
+        assert(rpathStrReferences >= 1);
+        debug("Number of rpath references: %lu\n", rpathStrReferences);
+        rpathStrShared = rpathStrReferences > 1;
+    }
+
+    /* Zero out the previous rpath to prevent retained dependencies in
+       Nix. */
+    if (rpath && !rpathStrShared) {
+        debug("Tainting old rpath with Xs\n");
         memset(rpath, 'X', rpathSize);
     }
 
     debug("new rpath is '%s'\n", newRPath.c_str());
 
 
-    if (newRPath.size() <= rpathSize) {
+    if (!rpathStrShared && newRPath.size() <= rpathSize) {
         if (rpath) memcpy(rpath, newRPath.c_str(), newRPath.size() + 1);
         return;
     }
 
     /* Grow the .dynstr section to make room for the new RPATH. */
-    debug("rpath is too long, resizing...\n");
+    debug("rpath is too long or shared, resizing...\n");
 
     std::string & newDynStr = replaceSection(".dynstr",
         rdi(shdrDynStr.sh_size) + newRPath.size() + 1);
@@ -2295,7 +2310,7 @@ void ElfFile<ElfFileParamNames>::modifyExecstack(ExecstackMode op)
 
 template<ElfFileParams>
 template<class StrIdxCallback>
-void ElfFile<ElfFileParamNames>::forAllStringReferences(Elf_Shdr& strTabHdr, StrIdxCallback&& fn)
+void ElfFile<ElfFileParamNames>::forAllStringReferences(const Elf_Shdr& strTabHdr, StrIdxCallback&& fn)
 {
     for (auto& sym : tryGetSectionSpan<Elf_Sym>(".dynsym"))
         fn(sym.st_name);
