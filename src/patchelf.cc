@@ -2293,6 +2293,42 @@ void ElfFile<ElfFileParamNames>::modifyExecstack(ExecstackMode op)
     printf("execstack: %c\n", result);
 }
 
+template<ElfFileParams>
+template<class StrIdxCallback>
+void ElfFile<ElfFileParamNames>::forAllStringReferences(Elf_Shdr& strTabHdr, StrIdxCallback&& fn)
+{
+    for (auto& sym : tryGetSectionSpan<Elf_Sym>(".dynsym"))
+        fn(sym.st_name);
+
+    for (auto& dyn : tryGetSectionSpan<Elf_Dyn>(".dynamic"))
+        switch (rdi(dyn.d_tag))
+        {
+            case DT_NEEDED:
+            case DT_SONAME:
+            case DT_RPATH:
+            case DT_RUNPATH: fn(dyn.d_un.d_val);
+            default:;
+        }
+
+    if (auto verdHdr = tryFindSectionHeader(".gnu.version_d"))
+    {
+        if (&shdrs.at(rdi(verdHdr->get().sh_link)) == &strTabHdr)
+            forAll_ElfVer(getSectionSpan<Elf_Verdef>(*verdHdr),
+                [] (auto& /*vd*/) {},
+                [&] (auto& vda) { fn(vda.vda_name); }
+            );
+    }
+
+    if (auto vernHdr = tryFindSectionHeader(".gnu.version_r"))
+    {
+        if (&shdrs.at(rdi(vernHdr->get().sh_link)) == &strTabHdr)
+            forAll_ElfVer(getSectionSpan<Elf_Verneed>(*vernHdr),
+                [&] (auto& vn) { fn(vn.vn_file); },
+                [&] (auto& vna) { fn(vna.vna_name); }
+            );
+    }
+}
+
 static bool printInterpreter = false;
 static bool printOsAbi = false;
 static bool setOsAbi = false;
@@ -2397,9 +2433,9 @@ static void patchElf()
         const std::string & outputFileName2 = outputFileName.empty() ? fileName : outputFileName;
 
         if (getElfType(fileContents).is32Bit)
-            patchElf2(ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym, Elf32_Verneed, Elf32_Versym, Elf32_Rel, Elf32_Rela, 32>(fileContents), fileContents, outputFileName2);
+            patchElf2(ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym, Elf32_Versym, Elf32_Verdef, Elf32_Verdaux, Elf32_Verneed, Elf32_Vernaux, Elf32_Rel, Elf32_Rela, 32>(fileContents), fileContents, outputFileName2);
         else
-            patchElf2(ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym, Elf64_Verneed, Elf64_Versym, Elf64_Rel, Elf64_Rela, 64>(fileContents), fileContents, outputFileName2);
+            patchElf2(ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym, Elf64_Versym, Elf64_Verdef, Elf64_Verdaux, Elf64_Verneed, Elf64_Vernaux, Elf64_Rel, Elf64_Rela, 64>(fileContents), fileContents, outputFileName2);
     }
 }
 
