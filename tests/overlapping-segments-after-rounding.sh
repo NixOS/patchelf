@@ -10,7 +10,7 @@ if test "$(uname -i)" = x86_64 && test "$(uname)" = Linux; then
     rm -rf "${SCRATCH}"
     mkdir -p "${SCRATCH}"
 
-    cp "${srcdir}/${EXEC_NAME}" "${SCRATCH}/"
+    cp "${srcdir:?}/${EXEC_NAME}" "${SCRATCH}/"
     cd "${SCRATCH}"
 
     ${PATCHELF} --force-rpath --remove-rpath --output modified1 "${EXEC_NAME}"

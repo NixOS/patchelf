@@ -3,17 +3,17 @@ set -x
 SCRATCH=scratch/no-rpath-pie-powerpc
 READELF=${READELF:-readelf}
 
-no_rpath_bin="${srcdir}/no-rpath-prebuild/no-rpath-pie-powerpc"
+no_rpath_bin="${srcdir:?}/no-rpath-prebuild/no-rpath-pie-powerpc"
 
-if [ ! -f $no_rpath_bin ]; then
-  echo "no 'no-rpath' binary for '$ARCH' in '${srcdir}/no-rpath-prebuild'"
+if [ ! -f "$no_rpath_bin" ]; then
+  echo "no 'no-rpath' binary for '$ARCH' in '${srcdir:?}/no-rpath-prebuild'"
   exit 1
 fi
 
 rm -rf ${SCRATCH}
 mkdir -p ${SCRATCH}
 
-cp $no_rpath_bin ${SCRATCH}/no-rpath
+cp "$no_rpath_bin" ${SCRATCH}/no-rpath
 
 oldRPath=$(../src/patchelf --print-rpath ${SCRATCH}/no-rpath)
 if test -n "$oldRPath"; then exit 1; fi
@@ -30,7 +30,7 @@ fi
 # Tests for powerpc PIE endianness regressions
 readelfData=$(${READELF} -l ${SCRATCH}/no-rpath 2>&1)
 
-if [ $(echo "$readelfData" | grep "PHDR" | wc -l) != 1 ]; then
+if [ "$(echo "$readelfData" | grep -c "PHDR")" != 1 ]; then
   # Triggered if PHDR errors appear on stderr
   echo "Unexpected number of occurences of PHDR in readelf results"
   exit 1

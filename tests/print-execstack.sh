@@ -1,14 +1,14 @@
 #! /bin/sh -e
-SCRATCH=scratch/$(basename $0 .sh)
+SCRATCH=scratch/$(basename "$0" .sh)
 PATCHELF=$(readlink -f "../src/patchelf")
 
-rm -rf ${SCRATCH}
-mkdir -p ${SCRATCH}
+rm -rf "${SCRATCH}"
+mkdir -p "${SCRATCH}"
 
-cp simple ${SCRATCH}/
-cp simple-execstack ${SCRATCH}/
+cp simple "${SCRATCH}"/
+cp simple-execstack "${SCRATCH}"/
 
-cd ${SCRATCH}
+cd "${SCRATCH}"
 
 if ! ${PATCHELF} --print-execstack simple | grep -q 'execstack: -'; then
 	echo "wrong execstack detection"
