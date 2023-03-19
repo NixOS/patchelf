@@ -103,8 +103,6 @@ private:
 
     void sortShdrs();
 
-    void shiftFile(unsigned int extraPages, size_t sizeOffset, size_t extraBytes);
-
     [[nodiscard]] std::string getSectionName(const Elf_Shdr & shdr) const;
 
     const Elf_Shdr & findSectionHeader(const SectionName & sectionName) const;
@@ -128,8 +126,6 @@ private:
     void rewriteHeaders(Elf_Addr phdrAddress);
 
     void rewriteSectionsLibrary();
-
-    void rewriteSectionsExecutable();
 
     void normalizeNoteSegments();
 
