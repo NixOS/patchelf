@@ -50,6 +50,7 @@ src_TESTS = \
   rename-dynamic-symbols.sh \
   overlapping-segments-after-rounding.sh \
   shared-rpath.sh \
+  short-first-segment.sh \
   empty-note.sh
 
 build_TESTS = \
@@ -58,7 +59,7 @@ build_TESTS = \
 TESTS = $(src_TESTS) $(build_TESTS)
 
 EXTRA_DIST = no-rpath-prebuild $(src_TESTS) no-rpath-prebuild.sh invalid-elf endianness empty-note \
-			 overlapping-segments-after-rounding
+			 overlapping-segments-after-rounding short-first-segment.gz
 
 TESTS_ENVIRONMENT = PATCHELF_DEBUG=1 STRIP=$(STRIP) OBJDUMP=$(OBJDUMP) READELF=$(READELF) OBJCOPY=$(OBJCOPY)
 
