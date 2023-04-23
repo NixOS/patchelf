@@ -131,6 +131,11 @@ old_name new_name
 
 Symbol names do not contain version specifier that are also shown in the output of the nm -D command from binutils. So instead of the name write@GLIBC_2.2.5 it is just write.
 
+.IP "--clean-strtab"
+Regenerates the ".dynstr" section removing all unused strings.
+
+Notice this may actually increase the size of ths section because it will undo string sharing between "vprintf" and "printf" some linkers create.
+
 .IP "--output FILE"
 Set the output file name.  If not specified, the input will be modified in place.
 

@@ -10,8 +10,8 @@
 
 using FileContents = std::shared_ptr<std::vector<unsigned char>>;
 
-#define ElfFileParams class Elf_Ehdr, class Elf_Phdr, class Elf_Shdr, class Elf_Addr, class Elf_Off, class Elf_Dyn, class Elf_Sym, class Elf_Verneed, class Elf_Versym, class Elf_Rel, class Elf_Rela, unsigned ElfClass
-#define ElfFileParamNames Elf_Ehdr, Elf_Phdr, Elf_Shdr, Elf_Addr, Elf_Off, Elf_Dyn, Elf_Sym, Elf_Verneed, Elf_Versym, Elf_Rel, Elf_Rela, ElfClass
+#define ElfFileParams class Elf_Ehdr, class Elf_Phdr, class Elf_Shdr, class Elf_Addr, class Elf_Off, class Elf_Dyn, class Elf_Sym, class Elf_Versym, class Elf_Verdef, class Elf_Verdaux, class Elf_Verneed, class Elf_Vernaux, class Elf_Rel, class Elf_Rela, unsigned ElfClass
+#define ElfFileParamNames Elf_Ehdr, Elf_Phdr, Elf_Shdr, Elf_Addr, Elf_Off, Elf_Dyn, Elf_Sym, Elf_Versym, Elf_Verdef, Elf_Verdaux, Elf_Verneed, Elf_Vernaux, Elf_Rel, Elf_Rela, ElfClass
 
 template<class T>
 struct span
@@ -175,6 +175,8 @@ public:
 
     void modifyExecstack(ExecstackMode op);
 
+    void cleanStrTab();
+
 private:
     struct GnuHashTable {
         using BloomWord = Elf_Addr;
@@ -226,7 +228,6 @@ private:
     void changeRelocTableSymIds(const Elf_Shdr& shdr, RemapFn&& old2newSymId)
     {
         static_assert(std::is_same_v<ElfRelType, Elf_Rel> || std::is_same_v<ElfRelType, Elf_Rela>);
-
         for (auto& r : getSectionSpan<ElfRelType>(shdr))
         {
             auto info = rdi(r.r_info);
@@ -234,6 +235,37 @@ private:
             auto newSymIdx = old2newSymId(oldSymIdx);
             if (newSymIdx != oldSymIdx)
                 wri(r.r_info, rel_setSymId(info, newSymIdx));
+        }
+    }
+
+    template<class T, class U>
+    auto follow(U* ptr, size_t offset) -> T* {
+        return offset ? (T*)(((char*)ptr)+offset) : nullptr;
+    };
+
+    template<class VdFn, class VaFn>
+    void forAll_ElfVer(span<Elf_Verdef> vdspan, VdFn&& vdfn, VaFn&& vafn)
+    {
+        auto* vd = vdspan.begin();
+        for (; vd; vd = follow<Elf_Verdef>(vd, rdi(vd->vd_next)))
+        {
+            vdfn(*vd);
+            auto va = follow<Elf_Verdaux>(vd, rdi(vd->vd_aux));
+            for (; va; va = follow<Elf_Verdaux>(va, rdi(va->vda_next)))
+                vafn(*va);
+        }
+    }
+
+    template<class VnFn, class VaFn>
+    void forAll_ElfVer(span<Elf_Verneed> vnspan, VnFn&& vnfn, VaFn&& vafn)
+    {
+        auto* vn = vnspan.begin();
+        for (; vn; vn = follow<Elf_Verneed>(vn, rdi(vn->vn_next)))
+        {
+            vnfn(*vn);
+            auto va = follow<Elf_Vernaux>(vn, rdi(vn->vn_aux));
+            for (; va; va = follow<Elf_Vernaux>(va, rdi(va->vna_next)))
+                vafn(*va);
         }
     }
 

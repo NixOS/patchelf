@@ -29,6 +29,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <variant>
 #include <vector>
 
 #include <cassert>
@@ -1940,6 +1941,88 @@ void ElfFile<ElfFileParamNames>::noDefaultLib()
 }
 
 template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::cleanStrTab()
+{
+    std::unordered_map<std::string, unsigned> requiredStrs2Idx {{"",0}};
+
+    // A collection of pairs, each containing:
+    //     - a pointer to the field that refer to str indices
+    //     - a pointer to the new index in `requiredStrs2Idx`
+    using StrIndexPtr = std::variant<Elf32_Word*, Elf64_Xword*>;
+    std::vector<std::pair<StrIndexPtr, unsigned*>> strRefs;
+
+    auto& strTabHdr = findSectionHeader(".dynstr");
+    auto strTab = getSectionSpan<char>(strTabHdr);
+
+    // Utility to collect a string index field from any table
+    auto collect = [&] (auto& idx) {
+        auto [it, _] = requiredStrs2Idx.emplace(&strTab[rdi(idx)], 0);
+        strRefs.emplace_back(&idx, &it->second);
+    };
+
+    // Iterate on tables known to store references to .dynstr
+    for (auto& sym : tryGetSectionSpan<Elf_Sym>(".dynsym"))
+        collect(sym.st_name);
+
+    for (auto& dyn : tryGetSectionSpan<Elf_Dyn>(".dynamic"))
+        switch (rdi(dyn.d_tag))
+        {
+            case DT_NEEDED:
+            case DT_SONAME:
+            case DT_RPATH:
+            case DT_RUNPATH: collect(dyn.d_un.d_val);
+            default:;
+        }
+
+    if (auto verdHdr = tryFindSectionHeader(".gnu.version_d"))
+    {
+        // Only collect fields if they use the strtab we are cleaning
+        if (&shdrs.at(rdi(verdHdr->get().sh_link)) == &strTabHdr)
+            forAll_ElfVer(getSectionSpan<Elf_Verdef>(*verdHdr),
+                [] (auto& /*vd*/) {},
+                [&] (auto& vda) { collect(vda.vda_name); }
+            );
+    }
+
+    if (auto vernHdr = tryFindSectionHeader(".gnu.version_r"))
+    {
+        // Only collect fields if they use the strtab we are cleaning
+        if (&shdrs.at(rdi(vernHdr->get().sh_link)) == &strTabHdr)
+            forAll_ElfVer(getSectionSpan<Elf_Verneed>(*vernHdr),
+                [&] (auto& vn) { collect(vn.vn_file); },
+                [&] (auto& vna) { collect(vna.vna_name); }
+            );
+    }
+
+    // Iterate on all required strings calculating the new position
+    size_t curIdx = 1;
+    for (auto& [str,idx] : requiredStrs2Idx)
+    {
+        idx = curIdx;
+        curIdx += str.size() + /*null terminator*/1;
+    }
+
+    // Add required strings to the new dynstr section
+    auto& newStrSec = replaceSection(".dynstr", curIdx);
+    for (auto& [str,idx] : requiredStrs2Idx)
+        std::copy(str.begin(), str.end()+1, &newStrSec[idx]);
+
+    // Iterate on all fields on all tables setting the new index value 
+    for (auto& [oldIndexPtr, newIdxPtr_] : strRefs)
+    {
+        auto newIdxPtr = newIdxPtr_; // Some compilers complain about 
+                                     // capturing structured bindings
+        std::visit(
+            [&] (auto* ptr) { wri(*ptr, *newIdxPtr); },
+            oldIndexPtr
+        );
+    }
+
+    changed = true;
+    this->rewriteSections();
+}
+
+template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::addDebugTag()
 {
     auto shdrDynamic = findSectionHeader(".dynamic");
@@ -2307,6 +2390,7 @@ static bool removeRPath = false;
 static bool setRPath = false;
 static bool addRPath = false;
 static bool addDebugTag = false;
+static bool cleanStrTab = false;
 static bool renameDynamicSymbols = false;
 static bool printRPath = false;
 static std::string newRPath;
@@ -2378,6 +2462,9 @@ static void patchElf2(ElfFile && elfFile, const FileContents & fileContents, con
     if (renameDynamicSymbols)
         elfFile.renameDynamicSymbols(symbolsToRename);
 
+    if (cleanStrTab)
+        elfFile.cleanStrTab();
+
     if (elfFile.isChanged()){
         writeFile(fileName, elfFile.fileContents);
     } else if (alwaysWrite) {
@@ -2397,9 +2484,9 @@ static void patchElf()
         const std::string & outputFileName2 = outputFileName.empty() ? fileName : outputFileName;
 
         if (getElfType(fileContents).is32Bit)
-            patchElf2(ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym, Elf32_Verneed, Elf32_Versym, Elf32_Rel, Elf32_Rela, 32>(fileContents), fileContents, outputFileName2);
+            patchElf2(ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym, Elf32_Versym, Elf32_Verdef, Elf32_Verdaux, Elf32_Verneed, Elf32_Vernaux, Elf32_Rel, Elf32_Rela, 32>(fileContents), fileContents, outputFileName2);
         else
-            patchElf2(ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym, Elf64_Verneed, Elf64_Versym, Elf64_Rel, Elf64_Rela, 64>(fileContents), fileContents, outputFileName2);
+            patchElf2(ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym, Elf64_Versym, Elf64_Verdef, Elf64_Verdaux, Elf64_Verneed, Elf64_Vernaux, Elf64_Rel, Elf64_Rela, 64>(fileContents), fileContents, outputFileName2);
     }
 }
 
@@ -2442,6 +2529,7 @@ static void showHelp(const std::string & progName)
   [--clear-execstack]\n\
   [--set-execstack]\n\
   [--rename-dynamic-symbols NAME_MAP_FILE]\tRenames dynamic symbols. The map file should contain two symbols (old_name new_name) per line\n\
+  [--clean-strtab]\n\
   [--output FILE]\n\
   [--debug]\n\
   [--version]\n\
@@ -2572,6 +2660,9 @@ static int mainWrapped(int argc, char * * argv)
         }
         else if (arg == "--add-debug-tag") {
             addDebugTag = true;
+        }
+        else if (arg == "--clean-strtab") {
+            cleanStrTab = true;
         }
         else if (arg == "--rename-dynamic-symbols") {
             renameDynamicSymbols = true;
