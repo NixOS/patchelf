@@ -1030,6 +1030,18 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
 
         firstPage -= neededPages * getPageSize();
         startOffset += neededPages * getPageSize();
+    } else {
+        Elf_Off rewrittenSectionsOffset = sizeof(Elf_Ehdr) + phdrs.size() * sizeof(Elf_Phdr);
+        for (auto& phdr : phdrs)
+            if (rdi(phdr.p_type) == PT_LOAD &&
+                rdi(phdr.p_offset) <= rewrittenSectionsOffset &&
+                rdi(phdr.p_offset) + rdi(phdr.p_filesz) > rewrittenSectionsOffset &&
+                rdi(phdr.p_filesz) < neededSpace)
+            {
+                wri(phdr.p_filesz, neededSpace);
+                wri(phdr.p_memsz, neededSpace);
+                break;
+            }
     }
 
 
