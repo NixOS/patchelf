@@ -664,14 +664,14 @@ template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
     Elf_Addr startAddr, Elf_Off startOffset)
 {
-    /* Overwrite the old section contents with 'X's.  Do this
+    /* Overwrite the old section contents with 'Z's.  Do this
        *before* writing the new section contents (below) to prevent
        clobbering previously written new section contents. */
     for (auto & i : replacedSections) {
         const std::string & sectionName = i.first;
         const Elf_Shdr & shdr = findSectionHeader(sectionName);
         if (rdi(shdr.sh_type) != SHT_NOBITS)
-            memset(fileContents->data() + rdi(shdr.sh_offset), 'X', rdi(shdr.sh_size));
+            memset(fileContents->data() + rdi(shdr.sh_offset), 'Z', rdi(shdr.sh_size));
     }
 
     std::set<unsigned int> noted_phdrs = {};
@@ -1538,7 +1538,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
 
     /* !!! We assume that the virtual address in the DT_STRTAB entry
        of the dynamic section corresponds to the .dynstr section. */
-    auto shdrDynStr = findSectionHeader(".dynstr");
+    auto& shdrDynStr = findSectionHeader(".dynstr");
     char * strTab = (char *) fileContents->data() + rdi(shdrDynStr.sh_offset);
 
 
@@ -1621,24 +1621,39 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
     }
     changed = true;
 
-    /* Zero out the previous rpath to prevent retained dependencies in
-       Nix. */
+    bool rpathStrShared = false;
     size_t rpathSize = 0;
     if (rpath) {
-        rpathSize = strlen(rpath);
+        std::string_view rpathView {rpath};
+        rpathSize = rpathView.size();
+
+        size_t rpathStrReferences = 0;
+        forAllStringReferences(shdrDynStr, [&] (auto refIdx) {
+            if (rpathView.end() == std::string_view(strTab + rdi(refIdx)).end())
+                rpathStrReferences++;
+        });
+        assert(rpathStrReferences >= 1);
+        debug("Number of rpath references: %lu\n", rpathStrReferences);
+        rpathStrShared = rpathStrReferences > 1;
+    }
+
+    /* Zero out the previous rpath to prevent retained dependencies in
+       Nix. */
+    if (rpath && !rpathStrShared) {
+        debug("Tainting old rpath with Xs\n");
         memset(rpath, 'X', rpathSize);
     }
 
     debug("new rpath is '%s'\n", newRPath.c_str());
 
 
-    if (newRPath.size() <= rpathSize) {
+    if (!rpathStrShared && newRPath.size() <= rpathSize) {
         if (rpath) memcpy(rpath, newRPath.c_str(), newRPath.size() + 1);
         return;
     }
 
     /* Grow the .dynstr section to make room for the new RPATH. */
-    debug("rpath is too long, resizing...\n");
+    debug("rpath is too long or shared, resizing...\n");
 
     std::string & newDynStr = replaceSection(".dynstr",
         rdi(shdrDynStr.sh_size) + newRPath.size() + 1);
@@ -2293,6 +2308,42 @@ void ElfFile<ElfFileParamNames>::modifyExecstack(ExecstackMode op)
     printf("execstack: %c\n", result);
 }
 
+template<ElfFileParams>
+template<class StrIdxCallback>
+void ElfFile<ElfFileParamNames>::forAllStringReferences(const Elf_Shdr& strTabHdr, StrIdxCallback&& fn)
+{
+    for (auto& sym : tryGetSectionSpan<Elf_Sym>(".dynsym"))
+        fn(sym.st_name);
+
+    for (auto& dyn : tryGetSectionSpan<Elf_Dyn>(".dynamic"))
+        switch (rdi(dyn.d_tag))
+        {
+            case DT_NEEDED:
+            case DT_SONAME:
+            case DT_RPATH:
+            case DT_RUNPATH: fn(dyn.d_un.d_val);
+            default:;
+        }
+
+    if (auto verdHdr = tryFindSectionHeader(".gnu.version_d"))
+    {
+        if (&shdrs.at(rdi(verdHdr->get().sh_link)) == &strTabHdr)
+            forAll_ElfVer(getSectionSpan<Elf_Verdef>(*verdHdr),
+                [] (auto& /*vd*/) {},
+                [&] (auto& vda) { fn(vda.vda_name); }
+            );
+    }
+
+    if (auto vernHdr = tryFindSectionHeader(".gnu.version_r"))
+    {
+        if (&shdrs.at(rdi(vernHdr->get().sh_link)) == &strTabHdr)
+            forAll_ElfVer(getSectionSpan<Elf_Verneed>(*vernHdr),
+                [&] (auto& vn) { fn(vn.vn_file); },
+                [&] (auto& vna) { fn(vna.vna_name); }
+            );
+    }
+}
+
 static bool printInterpreter = false;
 static bool printOsAbi = false;
 static bool setOsAbi = false;
@@ -2397,9 +2448,9 @@ static void patchElf()
         const std::string & outputFileName2 = outputFileName.empty() ? fileName : outputFileName;
 
         if (getElfType(fileContents).is32Bit)
-            patchElf2(ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym, Elf32_Verneed, Elf32_Versym, Elf32_Rel, Elf32_Rela, 32>(fileContents), fileContents, outputFileName2);
+            patchElf2(ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym, Elf32_Versym, Elf32_Verdef, Elf32_Verdaux, Elf32_Verneed, Elf32_Vernaux, Elf32_Rel, Elf32_Rela, 32>(fileContents), fileContents, outputFileName2);
         else
-            patchElf2(ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym, Elf64_Verneed, Elf64_Versym, Elf64_Rel, Elf64_Rela, 64>(fileContents), fileContents, outputFileName2);
+            patchElf2(ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym, Elf64_Versym, Elf64_Verdef, Elf64_Verdaux, Elf64_Verneed, Elf64_Vernaux, Elf64_Rel, Elf64_Rela, 64>(fileContents), fileContents, outputFileName2);
     }
 }
 
