@@ -50,7 +50,7 @@ TESTS = $(src_TESTS) $(build_TESTS)
 
 EXTRA_DIST = no-rpath-prebuild $(src_TESTS) no-rpath-prebuild.sh invalid-elf endianness
 
-TESTS_ENVIRONMENT = PATCHELF_DEBUG=1 STRIP=$(STRIP) OBJDUMP=$(OBJDUMP) READELF=$(READELF) OBJCOPY=$(OBJCOPY)
+TESTS_ENVIRONMENT = PATCHELF_DEBUG=1 STRIP=$(STRIP) NM=$(NM) OBJDUMP=$(OBJDUMP) READELF=$(READELF) OBJCOPY=$(OBJCOPY) STRINGS=$(STRINGS)
 
 $(no_rpath_arch_TESTS): no-rpath-prebuild.sh
 	@ln -s $< $@
