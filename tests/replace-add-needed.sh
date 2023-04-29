@@ -11,7 +11,17 @@ cp libbar.so "${SCRATCH}"/
 
 cd "${SCRATCH}"
 
-libcldd=$(ldd ./simple | awk '/ => / { print $3 }' | grep -E "(libc(-[0-9.]*)*.so|ld-musl)")
+# QEMU & ldd are not playing well together in certain cases
+CHECK_QEMU=0
+libcldd=$(ldd ./simple | awk '/ => / { print $3 }' | grep -E "(libc(-[0-9.]*)*.so|ld-musl)") || CHECK_QEMU=1
+if [ "${CHECK_QEMU}" -ne 0 ]; then
+    if [ -f /lib64/libc.so.6 ] && grep qemu /proc/1/cmdline >/dev/null 2>&1; then
+        libcldd=/lib64/libc.so.6
+    else
+        echo "ldd ./simple failed"
+        exit 1
+    fi
+fi
 
 # We have to set the soname on these libraries
 ${PATCHELF} --set-soname libbar.so ./libbar.so
