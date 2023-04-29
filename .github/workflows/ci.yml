@@ -28,3 +28,28 @@ jobs:
         mkdir build && cd build
         ../configure --with-asan --with-ubsan
         make -j$(nproc) check
+  centos7:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ["x86_64", "i686", "ppc64le", "aarch64", "s390x"]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up QEMU
+      if: matrix.platform != 'x86_64'
+      uses: docker/setup-qemu-action@v2
+    - run: |
+        cat <<EOF > build.sh
+        set -e
+        set -x
+        c++ --version
+        ld --version
+        autoconf --version
+        ./bootstrap.sh
+        mkdir build && cd build
+        ../configure
+        make -j$(nproc) check || (cat tests/test-suite.log; exit 1)
+        EOF
+
+        docker run -v $(pwd):/gha quay.io/pypa/manylinux2014_${{ matrix.platform }}:latest sh -ec "cd /gha && sh ./build.sh"
