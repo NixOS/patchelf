@@ -28,3 +28,91 @@ jobs:
         mkdir build && cd build
         ../configure --with-asan --with-ubsan
         make -j$(nproc) check
+
+  distro_matrix:
+    name: build distribution matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - id: matrix
+        name: build matrix
+        shell: python
+        run: |
+          import os
+          import json
+          runner = {
+              "x86_64": "ubuntu-24.04",
+              "i686": "ubuntu-24.04",
+              "aarch64": "ubuntu-24.04-arm",
+              "armv7l": "ubuntu-24.04-arm",
+              "ppc64le": "ubuntu-24.04",
+              "s390x": "ubuntu-24.04",
+              "riscv64": "ubuntu-24.04",
+          }
+          reduced = [
+              ("almalinux:8",  ("x86_64", "aarch64", "ppc64le", "s390x")),
+              ("almalinux:9",  ("x86_64", "aarch64", "ppc64le", "s390x")),
+              ("centos:7",     ("x86_64", "i686", "aarch64", "ppc64le", "s390x")),
+              ("debian:10",    ("x86_64", "i686", "aarch64", "armv7l")),
+              ("debian:11",    ("x86_64", "i686", "aarch64", "armv7l")),
+              ("debian:12",    ("x86_64", "i686", "aarch64", "armv7l", "ppc64le", "s390x")),
+              ("ubuntu:18.04", ("x86_64", "i686", "aarch64", "armv7l", "ppc64le", "s390x")),
+              ("ubuntu:20.04", ("x86_64", "aarch64", "armv7l", "ppc64le", "s390x", "riscv64")),
+              ("ubuntu:22.04", ("x86_64", "aarch64", "armv7l", "ppc64le", "s390x", "riscv64")),
+              ("ubuntu:24.04", ("x86_64", "aarch64", "armv7l", "ppc64le", "s390x", "riscv64")),
+          ]
+          expanded = [{"distro": distro, "platform": platform, "runner": runner[platform]} for distro, platforms in reduced for platform in platforms]
+          print(json.dumps(expanded, indent=2))
+          with open(os.environ["GITHUB_OUTPUT"], "at") as f:
+              f.write(f"matrix={json.dumps(expanded)}")
+
+  distro_check:
+    needs: distro_matrix
+    name: ${{ matrix.distro }} ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.distro_matrix.outputs.matrix) }}
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up QEMU
+      if: runner.arch == 'X64' && matrix.platform != 'x86_64'
+      uses: docker/setup-qemu-action@v3
+    - run: |
+        # ${{ matrix.distro }} ${{ matrix.platform }} tests
+        cat <<EOF > build.sh
+        set -e
+        set -x
+
+        case "${{ matrix.distro }}" in
+            ubuntu*|debian*) apt-get update && apt-get -y install automake g++ make;;
+        esac
+
+        c++ --version
+        ld --version
+        autoconf --version
+        ./bootstrap.sh
+        mkdir build && cd build
+        ../configure
+        make -j$(nproc) check || (cat tests/test-suite.log; exit 1)
+        EOF
+
+        case "${{ matrix.platform }}" in
+            x86_64) DOCKER_PLATFORM=amd64;;
+            i686) DOCKER_PLATFORM=386;;
+            aarch64) DOCKER_PLATFORM=arm64/v8;;
+            armv7l) DOCKER_PLATFORM=arm/v7;;
+            *) DOCKER_PLATFORM=${{ matrix.platform }};;
+        esac
+
+        case "${{ matrix.distro }}" in
+            centos:7) IMAGE=quay.io/pypa/manylinux2014_${{ matrix.platform }}:latest;;
+            almalinux:8) IMAGE=quay.io/pypa/manylinux_2_28_${{ matrix.platform }}:latest;;
+            almalinux:9) IMAGE=quay.io/pypa/manylinux_2_34_${{ matrix.platform }}:latest;;
+            *) IMAGE=${{ matrix.distro }}
+        esac
+
+        docker run --platform linux/${DOCKER_PLATFORM} -v $(pwd):/gha ${IMAGE} sh -ec "cd /gha && bash ./build.sh"
