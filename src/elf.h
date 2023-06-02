@@ -1,5 +1,5 @@
 /* This file defines standard ELF types, structures, and macros.
-   Copyright (C) 1995-2022 Free Software Foundation, Inc.
+   Copyright (C) 1995-2023 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -210,7 +210,7 @@ typedef struct
 #define EM_68HC12	53	/* Motorola M68HC12 */
 #define EM_MMA		54	/* Fujitsu MMA Multimedia Accelerator */
 #define EM_PCP		55	/* Siemens PCP */
-#define EM_NCPU		56	/* Sony nCPU embeeded RISC */
+#define EM_NCPU		56	/* Sony nCPU embedded RISC */
 #define EM_NDR1		57	/* Denso NDR1 microprocessor */
 #define EM_STARCORE	58	/* Motorola Start*Core processor */
 #define EM_ME16		59	/* Toyota ME16 processor */
@@ -559,7 +559,7 @@ typedef struct
 
 /* Possible bitmasks for si_flags.  */
 #define SYMINFO_FLG_DIRECT	0x0001	/* Direct bound symbol */
-#define SYMINFO_FLG_PASSTHRU	0x0002	/* Pass-thru symbol for translator */
+#define SYMINFO_FLG_PASSTHRU	0x0002	/* Pass-through symbol for translator */
 #define SYMINFO_FLG_COPY	0x0004	/* Symbol is a copy-reloc */
 #define SYMINFO_FLG_LAZYLOAD	0x0008	/* Symbol bound to object to be lazy
 					   loaded */
@@ -728,6 +728,7 @@ typedef struct
 #define PT_GNU_STACK	0x6474e551	/* Indicates stack executability */
 #define PT_GNU_RELRO	0x6474e552	/* Read-only after relocation */
 #define PT_GNU_PROPERTY	0x6474e553	/* GNU property */
+#define PT_GNU_SFRAME	0x6474e554	/* SFrame segment.  */
 #define PT_LOSUNW	0x6ffffffa
 #define PT_SUNWBSS	0x6ffffffa	/* Sun Specific segment */
 #define PT_SUNWSTACK	0x6ffffffb	/* Stack segment */
@@ -1222,6 +1223,9 @@ typedef struct
 
 #define AT_HWCAP2	26		/* More machine-dependent hints about
 					   processor capabilities.  */
+
+#define AT_RSEQ_FEATURE_SIZE	27	/* rseq supported feature size.  */
+#define AT_RSEQ_ALIGN	28		/* rseq allocation alignment.  */
 
 #define AT_EXECFN	31		/* Filename of executable.  */
 
@@ -4159,6 +4163,55 @@ enum
 #define R_LARCH_GNU_VTINHERIT  57
 #define R_LARCH_GNU_VTENTRY  58
 
+/* reserved 59-63 */
+
+#define R_LARCH_B16 64
+#define R_LARCH_B21 65
+#define R_LARCH_B26 66
+#define R_LARCH_ABS_HI20 67
+#define R_LARCH_ABS_LO12 68
+#define R_LARCH_ABS64_LO20 69
+#define R_LARCH_ABS64_HI12 70
+#define R_LARCH_PCALA_HI20 71
+#define R_LARCH_PCALA_LO12 72
+#define R_LARCH_PCALA64_LO20 73
+#define R_LARCH_PCALA64_HI12 74
+#define R_LARCH_GOT_PC_HI20 75
+#define R_LARCH_GOT_PC_LO12 76
+#define R_LARCH_GOT64_PC_LO20 77
+#define R_LARCH_GOT64_PC_HI12 78
+#define R_LARCH_GOT_HI20 79
+#define R_LARCH_GOT_LO12 80
+#define R_LARCH_GOT64_LO20 81
+#define R_LARCH_GOT64_HI12 82
+#define R_LARCH_TLS_LE_HI20 83
+#define R_LARCH_TLS_LE_LO12 84
+#define R_LARCH_TLS_LE64_LO20 85
+#define R_LARCH_TLS_LE64_HI12 86
+#define R_LARCH_TLS_IE_PC_HI20 87
+#define R_LARCH_TLS_IE_PC_LO12 88
+#define R_LARCH_TLS_IE64_PC_LO20 89
+#define R_LARCH_TLS_IE64_PC_HI12 90
+#define R_LARCH_TLS_IE_HI20 91
+#define R_LARCH_TLS_IE_LO12 92
+#define R_LARCH_TLS_IE64_LO20 93
+#define R_LARCH_TLS_IE64_HI12 94
+#define R_LARCH_TLS_LD_PC_HI20 95
+#define R_LARCH_TLS_LD_HI20 96
+#define R_LARCH_TLS_GD_PC_HI20 97
+#define R_LARCH_TLS_GD_HI20 98
+#define R_LARCH_32_PCREL 99
+#define R_LARCH_RELAX 100
+
+/* ARC specific declarations.  */
+
+/* Processor specific flags for the Ehdr e_flags field.  */
+#define EF_ARC_MACH_MSK	    0x000000ff
+#define EF_ARC_OSABI_MSK    0x00000f00
+#define EF_ARC_ALL_MSK	    (EF_ARC_MACH_MSK | EF_ARC_OSABI_MSK)
+
+/* Processor specific values for the Shdr sh_type field.  */
+#define SHT_ARC_ATTRIBUTES	(SHT_LOPROC + 1) /* ARC attributes section.  */
 
 /* ARCompact/ARCv2 specific relocs.  */
 #define R_ARC_NONE		0x0
@@ -4166,7 +4219,7 @@ enum
 #define R_ARC_16		0x2
 #define R_ARC_24		0x3
 #define R_ARC_32		0x4
-#define R_ARC_B26		0x5
+
 #define R_ARC_B22_PCREL		0x6
 #define R_ARC_H30		0x7
 #define R_ARC_N8		0x8
@@ -4206,16 +4259,23 @@ enum
 #define R_ARC_SECTOFF_ME_2	0x2A
 #define R_ARC_SECTOFF_1		0x2B
 #define R_ARC_SECTOFF_2		0x2C
+#define R_ARC_SDA_12		0x2D
+#define R_ARC_SDA16_ST2		0x30
+#define R_ARC_32_PCREL		0x31
 #define R_ARC_PC32		0x32
 #define R_ARC_GOTPC32		0x33
 #define R_ARC_PLT32		0x34
 #define R_ARC_COPY		0x35
 #define R_ARC_GLOB_DAT		0x36
-#define R_ARC_JUMP_SLOT		0x37
+#define R_ARC_JMP_SLOT		0x37
 #define R_ARC_RELATIVE		0x38
 #define R_ARC_GOTOFF		0x39
 #define R_ARC_GOTPC		0x3A
 #define R_ARC_GOT32		0x3B
+#define R_ARC_S21W_PCREL_PLT	0x3C
+#define R_ARC_S25H_PCREL_PLT	0x3D
+
+#define R_ARC_JLI_SECTOFF	0x3F
 
 #define R_ARC_TLS_DTPMOD	0x42
 #define R_ARC_TLS_DTPOFF	0x43
@@ -4224,9 +4284,12 @@ enum
 #define R_ARC_TLS_GD_LD	        0x46
 #define R_ARC_TLS_GD_CALL	0x47
 #define R_ARC_TLS_IE_GOT	0x48
-#define R_ARC_TLS_DTPOFF_S9	0x4a
-#define R_ARC_TLS_LE_S9		0x4a
-#define R_ARC_TLS_LE_32		0x4b
+#define R_ARC_TLS_DTPOFF_S9	0x49
+#define R_ARC_TLS_LE_S9		0x4A
+#define R_ARC_TLS_LE_32		0x4B
+#define R_ARC_S25W_PCREL_PLT	0x4C
+#define R_ARC_S21H_PCREL_PLT	0x4D
+#define R_ARC_NPS_CMEM16	0x4E
 
 /* OpenRISC 1000 specific relocs.  */
 #define R_OR1K_NONE		0
