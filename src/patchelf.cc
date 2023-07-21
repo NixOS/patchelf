@@ -1459,6 +1459,11 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string &
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::setInterpreter(const std::string & newInterpreter)
 {
+    if (getInterpreter() == newInterpreter) {
+        debug("given interpreter is already set\n");
+        return;
+    }
+
     std::string & section = replaceSection(".interp", newInterpreter.size() + 1);
     setSubstr(section, 0, newInterpreter + '\0');
     changed = true;
