@@ -52,7 +52,8 @@ src_TESTS = \
   overlapping-segments-after-rounding.sh \
   shared-rpath.sh \
   short-first-segment.sh \
-  empty-note.sh
+  empty-note.sh \
+  set-interpreter-same.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)
