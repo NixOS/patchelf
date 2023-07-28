@@ -843,7 +843,13 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
         neededSpace += headerTableSpace;
     debug("needed space is %d\n", neededSpace);
 
-    Elf_Off startOffset = roundUp(fileContents->size(), getPageSize());
+    /* glibc earlier than 2.35 requires that the LOAD segment satisfies
+       (p_vaddr mod p_align) == (p_offset mod p_align).
+       The ELF specification requires that loadable process segments satisfy
+       (p_vaddr mod pagesize) == (p_offset mod pagesize), so glibc is probably
+       wrong, but here startOffset is calculated according to p_align for
+       compatibility. */
+    Elf_Off startOffset = roundUp(fileContents->size(), alignStartPage);
 
     // In older version of binutils (2.30), readelf would check if the dynamic
     // section segment is strictly smaller than the file (and not same size).
