@@ -885,7 +885,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
         rdi(lastSeg.p_type) == PT_LOAD &&
         rdi(lastSeg.p_flags) == (PF_R | PF_W) &&
         rdi(lastSeg.p_align) == alignStartPage) {
-        auto segEnd = roundUp(rdi(lastSeg.p_offset) + rdi(lastSeg.p_memsz), getPageSize());
+        auto segEnd = roundUp(rdi(lastSeg.p_offset) + rdi(lastSeg.p_memsz), alignStartPage);
         if (segEnd == startOffset) {
             auto newSz = startOffset + neededSpace - rdi(lastSeg.p_offset);
             wri(lastSeg.p_filesz, wri(lastSeg.p_memsz, newSz));
