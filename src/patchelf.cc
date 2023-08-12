@@ -2069,7 +2069,7 @@ void ElfFile<ElfFileParamNames>::rebuildGnuHashTable(span<char> strTab, span<Elf
     // all tables that refer to symbols through indexes in the symbol table
     auto reorderSpan = [] (auto dst, auto& old2new)
     {
-        std::vector tmp(dst.begin(), dst.end());
+        std::vector<std::remove_reference_t<decltype(dst[0])>> tmp(dst.begin(), dst.end());
         for (size_t i = 0; i < tmp.size(); ++i)
             dst[old2new[i]] = tmp[i];
     };
