@@ -4002,8 +4002,11 @@ enum
 #define R_RISCV_SET32		56
 #define R_RISCV_32_PCREL	57
 #define R_RISCV_IRELATIVE	58
+#define R_RISCV_PLT32		59
+#define R_RISCV_SET_ULEB128	60
+#define R_RISCV_SUB_ULEB128	61
 
-#define R_RISCV_NUM		59
+#define R_RISCV_NUM		62
 
 /* RISC-V specific values for the st_other field.  */
 #define STO_RISCV_VARIANT_CC	0x80	/* Function uses variant calling
