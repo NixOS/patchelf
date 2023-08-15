@@ -1,4 +1,10 @@
-## Release History
+# Release History
+
+## 0.16.4 (August 12, 2025)
+
+* Update to a later glibc `elf.h`.
+
+  This should not result in any behavioral changes, except for possibly better architecture-specific support.
 
 ## 0.15.3 (August 12, 2025)
 
