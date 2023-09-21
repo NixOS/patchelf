@@ -131,6 +131,15 @@ old_name new_name
 
 Symbol names do not contain version specifier that are also shown in the output of the nm -D command from binutils. So instead of the name write@GLIBC_2.2.5 it is just write.
 
+.IP "--no-clobber-old-sections"
+Do not clobber old section values.
+
+patchelf defaults to overwriting replaced header sections with garbage to ensure they are not
+used accidentally. This option allows to opt out of that behavior, so that binaries that attempt
+to read their own headers from a fixed offset (e.g. Firefox) continue working.
+
+Use sparingly and with caution.
+
 .IP "--output FILE"
 Set the output file name.  If not specified, the input will be modified in place.
 
