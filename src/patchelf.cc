@@ -58,6 +58,7 @@
 static bool debugMode = false;
 
 static bool forceRPath = false;
+static bool clobberOldSections = true;
 
 static std::vector<std::string> fileNames;
 static std::string outputFileName;
@@ -664,14 +665,16 @@ template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
     Elf_Addr startAddr, Elf_Off startOffset)
 {
-    /* Overwrite the old section contents with 'Z's.  Do this
-       *before* writing the new section contents (below) to prevent
-       clobbering previously written new section contents. */
-    for (auto & i : replacedSections) {
-        const std::string & sectionName = i.first;
-        const Elf_Shdr & shdr = findSectionHeader(sectionName);
-        if (rdi(shdr.sh_type) != SHT_NOBITS)
-            memset(fileContents->data() + rdi(shdr.sh_offset), 'Z', rdi(shdr.sh_size));
+    if (clobberOldSections) {
+        /* Overwrite the old section contents with 'Z's.  Do this
+           *before* writing the new section contents (below) to prevent
+           clobbering previously written new section contents. */
+        for (auto & i : replacedSections) {
+            const std::string & sectionName = i.first;
+            const Elf_Shdr & shdr = findSectionHeader(sectionName);
+            if (rdi(shdr.sh_type) != SHT_NOBITS)
+                memset(fileContents->data() + rdi(shdr.sh_offset), 'Z', rdi(shdr.sh_size));
+        }
     }
 
     std::set<unsigned int> noted_phdrs = {};
@@ -2505,6 +2508,7 @@ static void showHelp(const std::string & progName)
   [--clear-execstack]\n\
   [--set-execstack]\n\
   [--rename-dynamic-symbols NAME_MAP_FILE]\tRenames dynamic symbols. The map file should contain two symbols (old_name new_name) per line\n\
+  [--no-clobber-old-sections]\t\tDo not clobber old section values - only use when the binary expects to find section info at the old location.\n\
   [--output FILE]\n\
   [--debug]\n\
   [--version]\n\
@@ -2660,6 +2664,9 @@ static int mainWrapped(int argc, char * * argv)
                 lineCount++;
                 symbolsToRename[*symbolsToRenameKeys.insert(from).first] = to;
             }
+        }
+        else if (arg == "--no-clobber-old-sections") {
+            clobberOldSections = false;
         }
         else if (arg == "--help" || arg == "-h" ) {
             showHelp(argv[0]);
