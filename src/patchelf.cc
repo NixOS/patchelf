@@ -2697,6 +2697,11 @@ static int mainWrapped(int argc, char * * argv)
 
 int main(int argc, char * * argv)
 {
+#ifdef __OpenBSD__
+    if (pledge("stdio rpath wpath cpath", NULL) == -1)
+        error("pledge");
+#endif
+
     try {
         return mainWrapped(argc, argv);
     } catch (std::exception & e) {
