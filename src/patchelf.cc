@@ -2520,6 +2520,7 @@ static void showHelp(const std::string & progName)
   [--print-rpath]\n\
   [--force-rpath]\n\
   [--append-null-phdr]\t\tAppends a PT_NULL program header to the end of the table; may be used multiple times\n\
+  [--append-null-phdrs N]\t\tAppends N PT_NULL program headers to the end of the table; may be used multiple times\n\
   [--add-needed LIBRARY]\n\
   [--remove-needed LIBRARY]\n\
   [--replace-needed LIBRARY NEW_LIBRARY]\n\
@@ -2626,6 +2627,10 @@ static int mainWrapped(int argc, char * * argv)
         }
         else if (arg == "--append-null-phdr") {
             ++nullPhdrsToAppend;
+        }
+        else if (arg == "--append-null-phdrs") {
+            if (++i == argc) error("missing argument");
+            nullPhdrsToAppend += std::stoi(argv[i]);
         }
         else if (arg == "--add-needed") {
             if (++i == argc) error("missing argument");
