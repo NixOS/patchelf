@@ -3,6 +3,7 @@ LIBS =
 check_PROGRAMS = simple-pie simple simple-execstack main too-many-strtab main-scoped big-dynstr no-rpath contiguous-note-sections
 
 no_rpath_arch_TESTS = \
+  no-rpath-alpha.sh \
   no-rpath-amd64.sh \
   no-rpath-armel.sh \
   no-rpath-armhf.sh \
@@ -80,7 +81,7 @@ export NIX_LDFLAGS=
 simple_SOURCES = simple.c
 # no -fpic for simple.o
 simple_CFLAGS =
-simple_LDFLAGS = -Wl,-z,noexecstack
+simple_LDFLAGS = -Wl,-z,noexecstack -no-pie
 
 simple_pie_SOURCES = simple.c
 simple_pie_CFLAGS = -fPIC -pie
@@ -171,6 +172,7 @@ libmany_syms_so_LDFLAGS = $(LDFLAGS_sharedlib)
 no_rpath_SOURCES = no-rpath.c
 # no -fpic for no-rpath.o
 no_rpath_CFLAGS =
+no_rpath_LDFLAGS = -no-pie
 
 contiguous_note_sections_SOURCES = contiguous-note-sections.s contiguous-note-sections.ld
 contiguous_note_sections_LDFLAGS = -nostdlib -T $(srcdir)/contiguous-note-sections.ld
