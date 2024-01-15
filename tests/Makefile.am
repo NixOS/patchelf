@@ -164,7 +164,7 @@ many_syms_main_SOURCES = many-syms-main.c
 many_syms_main_LDFLAGS = $(LDFLAGS_local) 
 many_syms_main_LDADD = -lmany-syms $(AM_LDADD)
 many_syms_main_DEPENDENCIES = libmany-syms.so
-many_syms_main_CFLAGS = -pie
+many_syms_main_CFLAGS = -fPIC -pie
 libmany_syms_so_SOURCES = many-syms.c
 libmany_syms_so_LDFLAGS = $(LDFLAGS_sharedlib)
 
