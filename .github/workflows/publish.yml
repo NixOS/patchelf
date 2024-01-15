@@ -20,7 +20,7 @@ jobs:
           nix build -L .#hydraJobs.tarball
           install -D ./result/tarballs/*.tar.bz2 ./dist/patchelf-$(cat version).tar.bz2
           install -D ./result/tarballs/*.tar.gz ./dist/patchelf-$(cat version).tar.gz
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: patchelf
           path: dist/*
@@ -37,7 +37,7 @@ jobs:
           nix build -L .#patchelf-win32 .#patchelf-win64
           install -D ./result/bin/patchelf.exe ./dist/patchelf-win32-$(cat version).exe
           install -D ./result-1/bin/patchelf.exe ./dist/patchelf-win64-$(cat version).exe
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: patchelf
           path: dist/*
@@ -110,7 +110,7 @@ jobs:
           ./bin/patchelf --version
           EOF
           docker run -v $(pwd):/gha ${{ matrix.platform }}/debian:unstable-slim sh -ec "cd /gha && sh ./check.sh"
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: patchelf
           path: dist/*
