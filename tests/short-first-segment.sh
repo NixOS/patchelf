@@ -11,8 +11,8 @@ if ! gzip --version >/dev/null; then
     exit 77
 fi
 
-if test "$(uname -i)" != x86_64 || test "$(uname)" != Linux; then
-    echo "skipping test: not supported on x86_64 Linux"
+if test "$(uname -m)" != amd64 || test "$(uname)" != Linux; then
+    echo "skipping test: amd64 Linux required"
     exit 77
 fi
 
