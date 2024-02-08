@@ -24,8 +24,10 @@ cd "${SCRATCH}"
 
 ldd "${EXEC_NAME}"
 
-${PATCHELF} --add-rpath lalalalalalalala --output modified1 "${EXEC_NAME}"
+${PATCHELF} --set-rpath "$(tr -dc A-Za-z0-9 </dev/urandom | head -c 4096)" --output modified1 "${EXEC_NAME}"
+${PATCHELF} --add-rpath "$(tr -dc A-Za-z0-9 </dev/urandom | head -c 4096)" modified1
+
 ldd modified1
 
-${PATCHELF}  --add-needed "libXcursor.so.1" --output modified2 modified1
+${PATCHELF} --add-needed "libXcursor.so.1" --output modified2 modified1
 ldd modified2
