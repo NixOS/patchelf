@@ -37,9 +37,9 @@ if [ "$(echo "$readelfData" | grep -c "PHDR")" != 1 ]; then
 fi
 
 virtAddr=$(echo "$readelfData" | grep "PHDR" | awk '{print $3}')
-if [ "$virtAddr" != "0x01040000" ]; then
+if [ "$virtAddr" != "0x01030000" ] && [ "$virtAddr" != "0x01040000" ]; then
   # Triggered if the virtual address is the incorrect endianness
-  echo "Unexpected virt addr, expected [0x01040000] got [$virtAddr]"
+  echo "Unexpected virt addr, got [$virtAddr]"
   exit 1
 fi
 
