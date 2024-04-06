@@ -1,5 +1,25 @@
 #compdef patchelf
 
+function _get_dep() {
+    if [ -f $words[2] ] && [[ $words[2] =~ [^.]+ ]]; then # check if arg #1 is a elf file and not a so
+        deps=($(patchelf --print-needed $words[2] 2>/dev/null)) # discard error
+        if [ $? -ne 0 ] || [ ${#deps[*]} -eq 0 ]; then # if no dependency or not a elf
+            _files                                     # fallback to _files
+        else
+            _values "LIBS" ${deps[*]} # else use dependencies of the file as candidates
+        fi
+    elif [ -f $words[-1] ] && [[ $words[-1] =~ [^.]+ ]]; then # check arg #-1, as most people do like this
+        deps=($(patchelf --print-needed $words[-1] 2>/dev/null))
+        if [ $? -ne 0 ] || [ ${#deps[*]} -eq 0 ]; then
+            _files
+        else
+            _values "LIBS" ${deps[*]}
+        fi
+    else
+        _files
+    fi
+}
+
 local options=(
   '--page-size[Uses the given page size]:SIZE'
   '--set-interpreter[Change the dynamic loader of executable]:INTERPRETER:_files'
@@ -16,9 +36,9 @@ local options=(
   '(- : *)--print-rpath[Prints the DT_RUNPATH or DT_RPATH for an executable or library]'
   '--force-rpath[Forces the use of the obsolete DT_RPATH in the file instead of DT_RUNPATH]'
   '--add-needed[Adds a declared dependency on a dynamic library]:LIBRARY:_files'
-  '*--replace-needed[Replaces a declared dependency on a dynamic library with another one]:LIB_ORIG:_files:LIB_NEW:_files'
-  '--remove-needed[Removes a declared dependency on LIBRARY]:LIBRARY:_files'
-  '(- : *)--print-needed[Prints all DT_NEEDED entries of the executable]'
+  '*--replace-needed[Replaces a declared dependency on a dynamic library with another one]:LIB_ORIG:_get_dep:LIB_NEW:_files'
+  '--remove-needed[Removes a declared dependency on LIBRARY]:LIBRARY:_get_dep'
+  '(- : *)--print-needed[Prints all DT_NEEDED entries of the executable]:ELF:_files'
   '--no-default-lib[Marks the object so that the search for dependencies of this object will ignore any default library search paths]'
   '--no-sort[Do not sort program headers or section headers]'
   '--add-debug-tag[Adds DT_DEBUG tag to the .dynamic section if not yet present in an ELF object]'
