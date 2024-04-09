@@ -21,7 +21,7 @@ function _get_dep() {
 }
 
 local options=(
-  '--page-size[Uses the given page size]:SIZE'
+  '--page-size[Uses the given page size]:SIZE:'
   '--set-interpreter[Change the dynamic loader of executable]:INTERPRETER:_files'
   '(- : *)--print-interpreter[Prints the ELF interpreter of the executable]'
   '(- : *)--print-os-abi[Prints the OS ABI of the executable]'
@@ -38,14 +38,14 @@ local options=(
   '--add-needed[Adds a declared dependency on a dynamic library]:LIBRARY:_files'
   '*--replace-needed[Replaces a declared dependency on a dynamic library with another one]:LIB_ORIG:_get_dep:LIB_NEW:_files'
   '--remove-needed[Removes a declared dependency on LIBRARY]:LIBRARY:_get_dep'
-  '(- : *)--print-needed[Prints all DT_NEEDED entries of the executable]:ELF:_files'
+  '(- : *)--print-needed[Prints all DT_NEEDED entries of the executable]'
   '--no-default-lib[Marks the object so that the search for dependencies of this object will ignore any default library search paths]'
   '--no-sort[Do not sort program headers or section headers]'
   '--add-debug-tag[Adds DT_DEBUG tag to the .dynamic section if not yet present in an ELF object]'
   '(- : *)--print-execstack[Prints the state of the executable flag of the GNU_STACK program header, if present]'
   '--clear-execstack[Clears the executable flag of the GNU_STACK program header, or adds a new header]'
   '--set-execstack[Sets the executable flag of the GNU_STACK program header, or adds a new header]'
-  '--rename-dynamic-symbols[Renames dynamic symbols]:NAME_MAP_FILE:'
+  '--rename-dynamic-symbols[Renames dynamic symbols]:NAME_MAP_FILE:_files'
   '--output[Set the output file name]:FILE:_files'
   '--debug[Prints details of the changes made to the input file]'
   '--version[Shows the version of patchelf]'
