@@ -1,23 +1,25 @@
 #compdef patchelf
 
-function _get_dep() {
-    if [ -f $words[2] ] && [[ $words[2] =~ [^.]+ ]]; then # check if arg #1 is a elf file and not a so
-        deps=($(patchelf --print-needed $words[2] 2>/dev/null)) # discard error
-        if [ $? -ne 0 ] || [ ${#deps[*]} -eq 0 ]; then # if no dependency or not a elf
-            _files                                     # fallback to _files
-        else
-            _values "LIBS" ${deps[*]} # else use dependencies of the file as candidates
-        fi
-    elif [ -f $words[-1] ] && [[ $words[-1] =~ [^.]+ ]]; then # check arg #-1, as most people do like this
-        deps=($(patchelf --print-needed $words[-1] 2>/dev/null))
-        if [ $? -ne 0 ] || [ ${#deps[*]} -eq 0 ]; then
+_get_dep() {
+    # preparm have fewer checks, as they can't be the so to replace
+    if [[ -f $words[2] ]] {  # check if arg #1 is a elf file and not a so
+        local deps=($(patchelf --print-needed $words[2] 2>/dev/null)) # discard error
+        if [[ $? -ne 0 ]] || [[ $#deps -eq 0 ]] {           # if no dependency or not a elf
+            _files                                      # fallback to _files
+        } else {
+            _values "LIBS" $deps # else use dependencies of the file as candidates
+        }
+    # postparm need to check
+    } elif [[ -f $words[-1] ]] && [[ -z ${words[-1]:e} ]] { # check arg #-1, as most people do like this
+        local deps=($(patchelf --print-needed $words[-1] 2>/dev/null))
+        if [[ $? -ne 0 ]] || [[ $#deps -eq 0 ]] {
             _files
-        else
-            _values "LIBS" ${deps[*]}
-        fi
-    else
+        } else {
+            _values "LIBS" $deps
+        }
+    } else {
         _files
-    fi
+    }       
 }
 
 local options=(
