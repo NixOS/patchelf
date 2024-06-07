@@ -6,13 +6,13 @@ READELF=${READELF:-readelf}
 
 EXEC_NAME="short-first-segment"
 
-if ! gzip --version >/dev/null; then
-    echo "skipping test: gzip not found"
+if test "$(uname -m)" != amd64 || test "$(uname)" != Linux; then
+    echo "skipping test: amd64 Linux required"
     exit 77
 fi
 
-if test "$(uname -m)" != amd64 || test "$(uname)" != Linux; then
-    echo "skipping test: amd64 Linux required"
+if ! gzip --version >/dev/null; then
+    echo "skipping test: gzip not found"
     exit 77
 fi
 
