@@ -2228,7 +2228,7 @@ void ElfFile<ElfFileParamNames>::removeNeededVersion(const std::map<std::string,
     auto & shdrVersionR = shdrs.at(idxVersionR);
     Elf_Shdr & shdrVersionRStrings = shdrs.at(rdi(shdrVersionR.sh_link));
 
-    auto spanVersyms = tryGetSectionSpan<Elf_Versym>(".gnu.version");
+    auto mapOffset = rdi(shdrVersionR.sh_addr) - rdi(shdrVersionR.sh_offset);
 
     size_t verNeedNum = rdi(shdrVersionR.sh_info);
     std::set<size_t> removedVersionIds;
@@ -2237,6 +2237,8 @@ void ElfFile<ElfFileParamNames>::removeNeededVersion(const std::map<std::string,
     char * verStrTab = (char *) fileContents->data() + rdi(shdrVersionRStrings.sh_offset);
 
     debug("found .gnu.version_r with %i entries\n", verNeedNum);
+
+    bool removeEntireSection = false;
 
     auto vn = (Elf_Verneed *)(fileContents->data() + rdi(shdrVersionR.sh_offset));
     Elf_Verneed * prevVn = nullptr;
@@ -2296,9 +2298,9 @@ void ElfFile<ElfFileParamNames>::removeNeededVersion(const std::map<std::string,
                     if (next) {
                         wri(shdrVersionR.sh_offset, rdi(shdrVersionR.sh_offset) + next);
                     } else {
-                        // FIXME: remove entire section?
-                        wri(shdrVersionR.sh_offset, 0);
                         wri(shdrVersionR.sh_size, 0);
+                        
+                        removeEntireSection = true;
                     }
                 }
                 wri(shdrVersionR.sh_info, rdi(shdrVersionR.sh_info) - 1);
@@ -2313,19 +2315,39 @@ void ElfFile<ElfFileParamNames>::removeNeededVersion(const std::map<std::string,
             vn = follow<Elf_Verneed>(vn, next);
         }
     }
-    // virtual address and file offset need to be the same for .gnu.version_r
-    shdrVersionR.sh_addr = shdrVersionR.sh_offset;
+
+    // virtual address and file offset need to be the same
+    if (!removeEntireSection) {
+        wri(shdrVersionR.sh_addr, mapOffset + rdi(shdrVersionR.sh_offset));
+    }
 
     if (auto shdrDynamic = tryFindSectionHeader(".dynamic")) {
         auto dyn = (Elf_Dyn *)(fileContents->data() + rdi(shdrDynamic->get().sh_offset));
 
-        // keep DT_VERNEED and DT_VERNEEDNUM in sync, DT_VERNEEDNUM handled by rewriteHeaders
+        // keep DT_VERNEED and DT_VERNEEDNUM in sync, DT_VERNEED handled by rewriteHeaders
+        Elf_Dyn * last = dyn;
         for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
             if (rdi(dyn->d_tag) == DT_VERNEEDNUM) {
-                dyn->d_un.d_val = shdrVersionR.sh_info;
+                if (!removeEntireSection) {
+                    dyn->d_un.d_val = shdrVersionR.sh_info;
+                    *last++ = *dyn;
+                }
+            } else if (rdi(dyn->d_tag) == DT_VERNEED) {
+                if (!removeEntireSection) {
+                    *last++ = *dyn;
+                }
+            } else if (rdi(dyn->d_tag) == DT_VERSYM) {
+                if (!removeEntireSection) {
+                    *last++ = *dyn;
+                }
+            } else {
+                *last++ = *dyn;
             }
         }
+        memset(last, 0, sizeof(Elf_Dyn) * (dyn - last));
     }
+
+    auto spanVersyms = tryGetSectionSpan<Elf_Versym>(".gnu.version");
 
     if (spanVersyms) {
         for (auto & versym : spanVersyms) {
@@ -2335,8 +2357,30 @@ void ElfFile<ElfFileParamNames>::removeNeededVersion(const std::map<std::string,
         }
     }
 
-    debug("remaining entries in .gnu.version_r: %i\n", rdi(shdrVersionR.sh_info));
-    this->rewriteSections(true);
+    if (removeEntireSection) {
+        debug("removing .gnu.version_r and .gnu.version section\n");
+        wri(shdrVersionR.sh_type, SHT_NULL);
+        auto idxVersion = getSectionIndex(".gnu.version");
+        if (idxVersion) {
+            auto & shdrVersion = shdrs.at(idxVersion);
+            wri(shdrVersion.sh_type, SHT_NULL);
+            memset(fileContents->data() + rdi(shdrVersion.sh_offset), 0, rdi(shdrVersion.sh_size));
+            wri(shdrVersion.sh_size, 0);
+        }
+    } else {
+        debug("remaining entries in .gnu.version_r: %i\n", rdi(shdrVersionR.sh_info));
+    }
+
+    // we did not change phdrAddress, rewrite it in place
+    Elf_Addr phdrAddress;
+    for (auto & phdr : phdrs) {
+        if (rdi(phdr.p_type) == PT_PHDR) {
+            phdrAddress = rdi(phdr.p_vaddr);
+            break;
+        }
+    }
+
+    rewriteHeaders(phdrAddress);
 }
 
 template<ElfFileParams>
