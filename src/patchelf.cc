@@ -847,7 +847,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
         neededSpace += headerTableSpace;
     debug("needed space is %d\n", neededSpace);
 
-    Elf_Off startOffset = roundUp(fileContents->size(), getPageSize());
+    Elf_Off startOffset = roundUp(fileContents->size(), alignStartPage);
 
     // In older version of binutils (2.30), readelf would check if the dynamic
     // section segment is strictly smaller than the file (and not same size).
@@ -883,7 +883,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
         rdi(lastSeg.p_type) == PT_LOAD &&
         rdi(lastSeg.p_flags) == (PF_R | PF_W) &&
         rdi(lastSeg.p_align) == alignStartPage) {
-        auto segEnd = roundUp(rdi(lastSeg.p_offset) + rdi(lastSeg.p_memsz), getPageSize());
+        auto segEnd = roundUp(rdi(lastSeg.p_offset) + rdi(lastSeg.p_memsz), alignStartPage);
         if (segEnd == startOffset) {
             auto newSz = startOffset + neededSpace - rdi(lastSeg.p_offset);
             wri(lastSeg.p_filesz, wri(lastSeg.p_memsz, newSz));
@@ -902,6 +902,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
         wri(phdr.p_filesz, wri(phdr.p_memsz, neededSpace));
         wri(phdr.p_flags, PF_R | PF_W);
         wri(phdr.p_align, alignStartPage);
+        assert(startPage % alignStartPage == startOffset % alignStartPage);
     }
 
     normalizeNoteSegments();
