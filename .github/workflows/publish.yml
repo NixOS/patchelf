@@ -22,7 +22,7 @@ jobs:
           install -D ./result/tarballs/*.tar.gz ./dist/patchelf-$(cat version).tar.gz
       - uses: actions/upload-artifact@v4
         with:
-          name: patchelf
+          name: patchelf-tarball
           path: dist/*
 
   build_windows:
@@ -39,7 +39,7 @@ jobs:
           install -D ./result-1/bin/patchelf.exe ./dist/patchelf-win64-$(cat version).exe
       - uses: actions/upload-artifact@v4
         with:
-          name: patchelf
+          name: patchelf-windows
           path: dist/*
 
   test_windows:
@@ -50,7 +50,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/download-artifact@v4
         with:
-          name: patchelf
+          name: patchelf-windows
           path: dist
       - name: Show binaries
         run: dir .\\dist
@@ -85,7 +85,7 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: patchelf
+          name: patchelf-tarball
           path: dist
       - name: Build binaries
         env:
@@ -122,7 +122,7 @@ jobs:
           docker run --platform "$DOCKER_PLATFORM" -v $(pwd):/gha ${{ matrix.platform }}/debian:unstable-slim sh -ec "cd /gha && sh ./check.sh"
       - uses: actions/upload-artifact@v4
         with:
-          name: patchelf
+          name: patchelf-${{ matrix.platform }}
           path: dist/*
 
   publish:
@@ -133,7 +133,8 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: patchelf
+          pattern: patchelf-*
+          merge-multiple: true
           path: dist
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
