@@ -11,7 +11,7 @@ if test "$(uname -m)" != amd64 || test "$(uname)" != Linux; then
     exit 77
 fi
 
-if ! gzip --version >/dev/null; then
+if ! command -v gzip >/dev/null; then
     echo "skipping test: gzip not found"
     exit 77
 fi
