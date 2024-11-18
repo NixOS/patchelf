@@ -12,23 +12,23 @@ mkdir -p "${SCRATCH}"
 cp simple "${SCRATCH}"/
 
 echo "set the same interpreter as the current one"
-before_checksum=$(sha256sum ${SCRATCH}/simple)
+before_checksum=$(sha256sum "${SCRATCH}/simple")
 ../src/patchelf --set-interpreter "${curInterpreter}" "${SCRATCH}/simple"
-after_checksum=$(sha256sum ${SCRATCH}/simple)
+after_checksum=$(sha256sum "${SCRATCH}/simple")
 
 if [ "$before_checksum" != "$after_checksum" ]; then
     echo "--set-interpreter should be NOP, but the file has been changed."
     exit 1
 fi
 
-${SCRATCH}/simple
+"${SCRATCH}/simple"
 
 dummyInterpreter="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
 echo "set the dummy interpreter"
-before_checksum=$(sha256sum ${SCRATCH}/simple)
+before_checksum=$(sha256sum "${SCRATCH}/simple")
 ../src/patchelf --set-interpreter "${dummyInterpreter}" "${SCRATCH}/simple"
-after_checksum=$(sha256sum ${SCRATCH}/simple)
+after_checksum=$(sha256sum "${SCRATCH}/simple")
 
 if [ "$before_checksum" = "$after_checksum" ]; then
     echo "--set-interpreter should be run, but the file has not been changed."
@@ -41,9 +41,9 @@ if "${SCRATCH}/simple"; then
 fi
 
 echo "set the same interpreter as the current one"
-before_checksum=$(sha256sum ${SCRATCH}/simple)
+before_checksum=$(sha256sum "${SCRATCH}/simple")
 ../src/patchelf --set-interpreter "${dummyInterpreter}" "${SCRATCH}/simple"
-after_checksum=$(sha256sum ${SCRATCH}/simple)
+after_checksum=$(sha256sum "${SCRATCH}/simple")
 
 if [ "$before_checksum" != "$after_checksum" ]; then
     echo "--set-interpreter should be NOP, but the file has been changed."
