@@ -828,13 +828,11 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
        to overlap the program header table in memory; we need to shift the first
        few segments to someplace else. */
     /* Some sections may already be replaced so account for that */
-    unsigned int i = 1;
     Elf_Addr pht_size = sizeof(Elf_Ehdr) + (phdrs.size() + num_notes + 1)*sizeof(Elf_Phdr);
-    while( i < rdi(hdr()->e_shnum) && rdi(shdrs.at(i).sh_offset) <= pht_size ) {
-        if (not haveReplacedSection(getSectionName(shdrs.at(i))))
-            replaceSection(getSectionName(shdrs.at(i)), rdi(shdrs.at(i).sh_size));
-        i++;
-    }
+    for (unsigned int i = 1; i < rdi(hdr()->e_shnum); ++i)
+        if (rdi(shdrs.at(i).sh_offset) <= pht_size)
+            if (not haveReplacedSection(getSectionName(shdrs.at(i))))
+                replaceSection(getSectionName(shdrs.at(i)), rdi(shdrs.at(i).sh_size));
     bool moveHeaderTableToTheEnd = rdi(hdr()->e_shoff) < pht_size;
 
     /* Compute the total space needed for the replaced sections */
