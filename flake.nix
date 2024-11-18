@@ -36,6 +36,11 @@
             versionSuffix = ""; # obsolete
             src = self;
             preAutoconf = "echo ${version} > version";
+
+            # portable configure shouldn't have a shebang pointing to the nix store
+            postConfigure = ''
+              sed -i '1s|^.*$|#!/bin/sh|' ./configure
+            '';
             postDist = ''
               cp README.md $out/
               echo "doc readme $out/README.md" >> $out/nix-support/hydra-build-products
