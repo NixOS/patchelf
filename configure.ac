@@ -41,5 +41,10 @@ AC_ARG_WITH([ubsan],
 )
 AM_CONDITIONAL([WITH_UBSAN], [test x"$with_ubsan" = xyes])
 
+AC_ARG_WITH([static],
+   AS_HELP_STRING([--with-static], [Build static binary])
+)
+AM_CONDITIONAL([WITH_STATIC], [test x"$with_static" = xyes])
+
 AC_CONFIG_FILES([Makefile src/Makefile tests/Makefile patchelf.spec])
 AC_OUTPUT

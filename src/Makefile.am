@@ -17,6 +17,10 @@ AM_CXXFLAGS += $(SAN_FLAGS)
 endif
 endif
 
+if WITH_STATIC
+AM_CXXFLAGS += -static
+endif
+
 bin_PROGRAMS = patchelf
 
 patchelf_SOURCES = patchelf.cc elf.h patchelf.h

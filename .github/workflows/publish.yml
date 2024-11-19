@@ -89,7 +89,7 @@ jobs:
           path: dist
       - name: Build binaries
         env:
-          CXXFLAGS: "-D_FORTIFY_SOURCE=2 -fstack-protector-strong -Wformat -Werror=format-security -O2 -static"
+          CXXFLAGS: "-D_FORTIFY_SOURCE=2 -fstack-protector-strong -Wformat -Werror=format-security -O2"
         run: |
           cat <<EOF > build.sh
           set -e
@@ -98,7 +98,7 @@ jobs:
           tar -xf dist/*.tar.bz2
           rm -f dist/*
           cd patchelf-*
-          ./configure --prefix /patchelf
+          ./configure --prefix /patchelf --with-static
           make check || (cat tests/test-suite.log; exit 1)
           make install-strip
           cd -
