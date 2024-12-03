@@ -33,14 +33,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        glibc: ["2_17", "2_27", "2_28"]
-        platform: ["x86_64", "i686", "ppc64le", "aarch64", "s390x", "armv7l"]
-        exclude:
+        glibc: ["2_17", "2_27", "2_28", "2_34"]
+        platform: ["x86_64", "ppc64le", "aarch64", "s390x"]
+        include:
         - glibc: "2_17"
-          platform: "armv7l"
-        - glibc: "2_28"
           platform: "i686"
-        - glibc: "2_28"
+        - glibc: "2_27"
+          platform: "i686"
+        - glibc: "2_27"
           platform: "armv7l"
     runs-on: ubuntu-latest
     steps:
@@ -89,6 +89,8 @@ jobs:
         elif [ "${{ matrix.glibc }}" == "2_27" ]; then
             IMAGE=${DH_PREFIX}/ubuntu:18.04
         elif [ "${{ matrix.glibc }}" == "2_28" ]; then
+            IMAGE=quay.io/pypa/manylinux_${{ matrix.glibc }}_${{ matrix.platform }}:latest
+        elif [ "${{ matrix.glibc }}" == "2_34" ]; then
             IMAGE=quay.io/pypa/manylinux_${{ matrix.glibc }}_${{ matrix.platform }}:latest
         else
             exit 1
