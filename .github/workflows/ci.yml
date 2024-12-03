@@ -33,7 +33,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        glibc: ["2_17", "2_27", "2_28", "2_34"]
+        glibc: ["2_17", "2_27", "2_28", "2_31", "2_34", "2_35", "2_39"]
         platform: ["x86_64", "ppc64le", "aarch64", "s390x"]
         include:
         - glibc: "2_17"
@@ -42,12 +42,18 @@ jobs:
           platform: "i686"
         - glibc: "2_27"
           platform: "armv7l"
+        - glibc: "2_31"
+          platform: "armv7l"
+        - glibc: "2_35"
+          platform: "armv7l"
+        - glibc: "2_39"
+          platform: "armv7l"
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
     - name: Set up QEMU
       if: matrix.platform != 'x86_64'
-      uses: docker/setup-qemu-action@v2
+      uses: docker/setup-qemu-action@v3
     - run: |
         cat <<EOF > build.sh
         set -e
@@ -61,6 +67,9 @@ jobs:
             apt-get -y install automake g++-11 make
             update-alternatives --install /usr/bin/c++ c++ $(which g++-11) 100
             update-alternatives --install /usr/bin/cc cc $(which gcc-11) 100
+        elif [ "${{ matrix.glibc }}" == "2_31" ] || [ "${{ matrix.glibc }}" == "2_35" ] || [ "${{ matrix.glibc }}" == "2_39" ]; then
+            apt-get update
+            apt-get -y install automake g++ make
         fi
 
         c++ --version
@@ -73,27 +82,33 @@ jobs:
         EOF
 
         if [ "${{ matrix.platform }}" == "x86_64" ]; then
-            DH_PREFIX=amd64
+            DOCKER_PLATFORM=amd64
         elif [ "${{ matrix.platform }}" == "i686" ]; then
-            DH_PREFIX=i386
+            DOCKER_PLATFORM=386
         elif [ "${{ matrix.platform }}" == "aarch64" ]; then
-            DH_PREFIX=arm64v8
+            DOCKER_PLATFORM=arm64/v8
         elif [ "${{ matrix.platform }}" == "armv7l" ]; then
-            DH_PREFIX=arm32v7
+            DOCKER_PLATFORM=arm/v7
         else
-            DH_PREFIX=${{ matrix.platform }}
+            DOCKER_PLATFORM=${{ matrix.platform }}
         fi
 
         if [ "${{ matrix.glibc }}" == "2_17" ]; then
             IMAGE=quay.io/pypa/manylinux2014_${{ matrix.platform }}:latest
         elif [ "${{ matrix.glibc }}" == "2_27" ]; then
-            IMAGE=${DH_PREFIX}/ubuntu:18.04
+            IMAGE=ubuntu:18.04
         elif [ "${{ matrix.glibc }}" == "2_28" ]; then
             IMAGE=quay.io/pypa/manylinux_${{ matrix.glibc }}_${{ matrix.platform }}:latest
+        elif [ "${{ matrix.glibc }}" == "2_31" ]; then
+            IMAGE=ubuntu:20.04
         elif [ "${{ matrix.glibc }}" == "2_34" ]; then
             IMAGE=quay.io/pypa/manylinux_${{ matrix.glibc }}_${{ matrix.platform }}:latest
+        elif [ "${{ matrix.glibc }}" == "2_35" ]; then
+            IMAGE=ubuntu:22.04
+        elif [ "${{ matrix.glibc }}" == "2_39" ]; then
+            IMAGE=ubuntu:24.04
         else
             exit 1
         fi
 
-        docker run -v $(pwd):/gha ${IMAGE} sh -ec "cd /gha && bash ./build.sh"
+        docker run --platform linux/${DOCKER_PLATFORM} -v $(pwd):/gha ${IMAGE} sh -ec "cd /gha && bash ./build.sh"
