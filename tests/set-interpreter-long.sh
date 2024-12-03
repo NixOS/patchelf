@@ -6,7 +6,8 @@ SCRATCH=scratch/$(basename "$0" .sh)
 oldInterpreter=$(../src/patchelf --print-interpreter ./simple)
 echo "current interpreter is $oldInterpreter"
 
-if test "$(uname)" = Linux; then
+# QEMU & ldd/ld.so are not playing well together in certain cases
+if test "$(uname)" = Linux && ldd ./simple >/dev/null 2>&1; then
     echo "running with explicit interpreter..."
     "$oldInterpreter" ./simple
 fi
@@ -28,7 +29,7 @@ echo "running with new interpreter..."
 ln -s "$oldInterpreter" "$newInterpreter"
 "${SCRATCH}"/simple
 
-if test "$(uname)" = Linux; then
+if test "$(uname)" = Linux && ldd ./simple >/dev/null 2>&1; then
     echo "running with explicit interpreter..."
     "$oldInterpreter" "${SCRATCH}/simple"
 fi
