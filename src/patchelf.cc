@@ -367,6 +367,7 @@ unsigned int ElfFile<ElfFileParamNames>::getPageSize() const noexcept
     // requirements. There is no authoritative list of these values. The
     // current list is extracted from GNU gold's source code (abi_pagesize).
     switch (rdi(hdr()->e_machine)) {
+      case EM_ALPHA:
       case EM_IA_64:
       case EM_MIPS:
       case EM_PPC:
@@ -554,8 +555,7 @@ void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, size_t start
 
     assert(splitIndex != -1);
 
-    /* Add a segment that maps the new program/section headers and
-       PT_INTERP segment into memory.  Otherwise glibc will choke. */
+    /* Add another PT_LOAD segment loading the data we've split above. */
     phdrs.resize(rdi(hdr()->e_phnum) + 1);
     wri(hdr()->e_phnum, rdi(hdr()->e_phnum) + 1);
     Elf_Phdr & phdr = phdrs.at(rdi(hdr()->e_phnum) - 1);
@@ -635,9 +635,17 @@ unsigned int ElfFile<ElfFileParamNames>::getSectionIndex(const SectionName & sec
 }
 
 template<ElfFileParams>
-bool ElfFile<ElfFileParamNames>::haveReplacedSection(const SectionName & sectionName) const
+bool ElfFile<ElfFileParamNames>::hasReplacedSection(const SectionName & sectionName) const
 {
     return replacedSections.count(sectionName);
+}
+
+template<ElfFileParams>
+bool ElfFile<ElfFileParamNames>::canReplaceSection(const SectionName & sectionName) const
+{
+    auto shdr = findSectionHeader(sectionName);
+
+    return sectionName == ".interp" || rdi(shdr.sh_type) != SHT_PROGBITS;
 }
 
 template<ElfFileParams>
@@ -822,75 +830,94 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
     unsigned int num_notes = std::count_if(shdrs.begin(), shdrs.end(),
         [this](Elf_Shdr shdr) { return rdi(shdr.sh_type) == SHT_NOTE; });
 
-    /* Because we're adding a new section header, we're necessarily increasing
-       the size of the program header table.  This can cause the first section
-       to overlap the program header table in memory; we need to shift the first
-       few segments to someplace else. */
-    /* Some sections may already be replaced so account for that */
+    /* Compute the total space needed for the replaced sections, pessimistically
+       assuming we're going to need one more to account for new PT_LOAD covering
+       relocated PHDR */
+    off_t phtSize = roundUp((phdrs.size() + num_notes + 1) * sizeof(Elf_Phdr) + sizeof(Elf_Ehdr), sectionAlignment);
+    off_t shtSize = roundUp(rdi(hdr()->e_shnum) * rdi(hdr()->e_shentsize), sectionAlignment);
+
+    /* Check if we can keep PHT at the beginning of the file.
+
+       We'd like to do that, because it preverves compatibility with older
+       kernels¹ - but if the PHT has grown too much, we have no other option but
+       to move it at the end of the file.
+
+       ¹ older kernels had a bug that prevented them from loading ELFs with
+         PHDRs not located at the beginning of the file; it was fixed over
+         0da1d5002745cdc721bc018b582a8a9704d56c42 (2022-03-02) */
+    bool relocatePht = false;
     unsigned int i = 1;
-    Elf_Addr pht_size = sizeof(Elf_Ehdr) + (phdrs.size() + num_notes + 1)*sizeof(Elf_Phdr);
-    while( i < rdi(hdr()->e_shnum) && rdi(shdrs.at(i).sh_offset) <= pht_size ) {
-        if (not haveReplacedSection(getSectionName(shdrs.at(i))))
-            replaceSection(getSectionName(shdrs.at(i)), rdi(shdrs.at(i).sh_size));
+
+    while (i < rdi(hdr()->e_shnum) && ((off_t) rdi(shdrs.at(i).sh_offset)) <= phtSize) {
+        const auto & sectionName = getSectionName(shdrs.at(i));
+
+        if (!hasReplacedSection(sectionName) && !canReplaceSection(sectionName)) {
+            relocatePht = true;
+            break;
+        }
+
         i++;
     }
-    bool moveHeaderTableToTheEnd = rdi(hdr()->e_shoff) < pht_size;
 
-    /* Compute the total space needed for the replaced sections */
-    off_t neededSpace = 0;
+    if (!relocatePht) {
+        unsigned int i = 1;
+
+        while (i < rdi(hdr()->e_shnum) && ((off_t) rdi(shdrs.at(i).sh_offset)) <= phtSize) {
+            const auto & sectionName = getSectionName(shdrs.at(i));
+            const auto sectionSize = rdi(shdrs.at(i).sh_size);
+
+            if (!hasReplacedSection(sectionName)) {
+                replaceSection(sectionName, sectionSize);
+            }
+
+            i++;
+        }
+    }
+
+    /* Calculate how much space we'll need. */
+    off_t neededSpace = shtSize;
+
+    if (relocatePht) {
+        neededSpace += phtSize;
+    }
+
     for (auto & s : replacedSections)
         neededSpace += roundUp(s.second.size(), sectionAlignment);
 
-    off_t headerTableSpace = roundUp(rdi(hdr()->e_shnum) * rdi(hdr()->e_shentsize), sectionAlignment);
-    if (moveHeaderTableToTheEnd)
-        neededSpace += headerTableSpace;
     debug("needed space is %d\n", neededSpace);
 
-    Elf_Off startOffset = roundUp(fileContents->size(), getPageSize());
+    Elf_Off startOffset = roundUp(fileContents->size(), alignStartPage);
 
     // In older version of binutils (2.30), readelf would check if the dynamic
     // section segment is strictly smaller than the file (and not same size).
     // By making it one byte larger, we don't break readelf.
     off_t binutilsQuirkPadding = 1;
+
     fileContents->resize(startOffset + neededSpace + binutilsQuirkPadding, 0);
 
-    /* Even though this file is of type ET_DYN, it could actually be
-       an executable.  For instance, Gold produces executables marked
-       ET_DYN as does LD when linking with pie. If we move PT_PHDR, it
-       has to stay in the first PT_LOAD segment or any subsequent ones
-       if they're continuous in memory due to linux kernel constraints
-       (see BUGS). Since the end of the file would be after bss, we can't
-       move PHDR there, we therefore choose to leave PT_PHDR where it is but
-       move enough following sections such that we can add the extra PT_LOAD
-       section to it. This PT_LOAD segment ensures the sections at the end of
-       the file are mapped into memory for ld.so to process.
-       We can't use the approach in rewriteSectionsExecutable()
-       since DYN executables tend to start at virtual address 0, so
-       rewriteSectionsExecutable() won't work because it doesn't have
-       any virtual address space to grow downwards into. */
-    if (isExecutable && startOffset > startPage) {
-        debug("shifting new PT_LOAD segment by %d bytes to work around a Linux kernel bug\n", startOffset - startPage);
-        startPage = startOffset;
-    }
-
-    wri(hdr()->e_phoff, sizeof(Elf_Ehdr));
-
-    bool needNewSegment = true;
     auto& lastSeg = phdrs.back();
-    /* Try to extend the last segment to include replaced sections */
+    Elf_Addr lastSegAddr = 0;
+
+    /* As an optimization, instead of allocating a new PT_LOAD segment, try
+       expanding the last one */
     if (!phdrs.empty() &&
         rdi(lastSeg.p_type) == PT_LOAD &&
         rdi(lastSeg.p_flags) == (PF_R | PF_W) &&
         rdi(lastSeg.p_align) == alignStartPage) {
-        auto segEnd = roundUp(rdi(lastSeg.p_offset) + rdi(lastSeg.p_memsz), getPageSize());
+        auto segEnd = roundUp(rdi(lastSeg.p_offset) + rdi(lastSeg.p_memsz), alignStartPage);
+
         if (segEnd == startOffset) {
             auto newSz = startOffset + neededSpace - rdi(lastSeg.p_offset);
+
             wri(lastSeg.p_filesz, wri(lastSeg.p_memsz, newSz));
-            needNewSegment = false;
+
+            lastSegAddr = rdi(lastSeg.p_vaddr) + newSz - neededSpace;
         }
     }
 
-    if (needNewSegment) {
+    if (lastSegAddr == 0) {
+        debug("allocating new PT_LOAD segment\n");
+
         /* Add a segment that maps the replaced sections into memory. */
         phdrs.resize(rdi(hdr()->e_phnum) + 1);
         wri(hdr()->e_phnum, rdi(hdr()->e_phnum) + 1);
@@ -901,25 +928,44 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
         wri(phdr.p_filesz, wri(phdr.p_memsz, neededSpace));
         wri(phdr.p_flags, PF_R | PF_W);
         wri(phdr.p_align, alignStartPage);
+        assert(startPage % alignStartPage == startOffset % alignStartPage);
+
+        lastSegAddr = startPage;
     }
 
     normalizeNoteSegments();
 
-
     /* Write out the replaced sections. */
     Elf_Off curOff = startOffset;
 
-    if (moveHeaderTableToTheEnd) {
-        debug("Moving the shtable to offset %d\n", curOff);
-        wri(hdr()->e_shoff, curOff);
-        curOff += headerTableSpace;
+    if (relocatePht) {
+        debug("rewriting pht from offset 0x%x to offset 0x%x (size %d)\n",
+            rdi(hdr()->e_phoff), curOff, phtSize);
+
+        wri(hdr()->e_phoff, curOff);
+        curOff += phtSize;
     }
 
+    // ---
+
+    debug("rewriting sht from offset 0x%x to offset 0x%x (size %d)\n",
+        rdi(hdr()->e_shoff), curOff, shtSize);
+
+    wri(hdr()->e_shoff, curOff);
+    curOff += shtSize;
+
+    // ---
+
+    /* Write out the replaced sections. */
     writeReplacedSections(curOff, startPage, startOffset);
     assert(curOff == startOffset + neededSpace);
 
     /* Write out the updated program and section headers */
-    rewriteHeaders(firstPage + rdi(hdr()->e_phoff));
+    if (relocatePht) {
+        rewriteHeaders(lastSegAddr);
+    } else {
+        rewriteHeaders(firstPage + rdi(hdr()->e_phoff));
+    }
 }
 
 static bool noSort = false;
@@ -1033,32 +1079,35 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
 
         firstPage -= neededPages * getPageSize();
         startOffset += neededPages * getPageSize();
-    } else {
-        Elf_Off rewrittenSectionsOffset = sizeof(Elf_Ehdr) + phdrs.size() * sizeof(Elf_Phdr);
-        for (auto& phdr : phdrs)
-            if (rdi(phdr.p_type) == PT_LOAD &&
-                rdi(phdr.p_offset) <= rewrittenSectionsOffset &&
-                rdi(phdr.p_offset) + rdi(phdr.p_filesz) > rewrittenSectionsOffset &&
-                rdi(phdr.p_filesz) < neededSpace)
-            {
-                wri(phdr.p_filesz, neededSpace);
-                wri(phdr.p_memsz, neededSpace);
-                break;
-            }
     }
 
+    Elf_Off curOff = sizeof(Elf_Ehdr) + phdrs.size() * sizeof(Elf_Phdr);
+
+    /* Ensure PHDR is covered by a LOAD segment.
+
+       Because PHDR is supposed to have been covered by such section before, in
+       here we assume that we don't have to create any new section, but rather
+       extend the existing one. */
+    for (auto& phdr : phdrs)
+        if (rdi(phdr.p_type) == PT_LOAD &&
+            rdi(phdr.p_offset) <= curOff &&
+            rdi(phdr.p_offset) + rdi(phdr.p_filesz) > curOff &&
+            rdi(phdr.p_filesz) < neededSpace)
+        {
+            wri(phdr.p_filesz, neededSpace);
+            wri(phdr.p_memsz, neededSpace);
+            break;
+        }
 
     /* Clear out the free space. */
-    Elf_Off curOff = sizeof(Elf_Ehdr) + phdrs.size() * sizeof(Elf_Phdr);
     debug("clearing first %d bytes\n", startOffset - curOff);
     memset(fileContents->data() + curOff, 0, startOffset - curOff);
-
 
     /* Write out the replaced sections. */
     writeReplacedSections(curOff, firstPage, 0);
     assert(curOff == neededSpace);
 
-
+    /* Write out the updated program and section headers */
     rewriteHeaders(firstPage + rdi(hdr()->e_phoff));
 }
 
@@ -1457,6 +1506,11 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string &
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::setInterpreter(const std::string & newInterpreter)
 {
+    if (getInterpreter() == newInterpreter) {
+        debug("given interpreter is already set\n");
+        return;
+    }
+
     std::string & section = replaceSection(".interp", newInterpreter.size() + 1);
     setSubstr(section, 0, newInterpreter + '\0');
     changed = true;
@@ -2872,6 +2926,11 @@ static int mainWrapped(int argc, char * * argv)
 
 int main(int argc, char * * argv)
 {
+#ifdef __OpenBSD__
+    if (pledge("stdio rpath wpath cpath", NULL) == -1)
+        error("pledge");
+#endif
+
     try {
         return mainWrapped(argc, argv);
     } catch (std::exception & e) {

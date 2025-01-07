@@ -34,7 +34,7 @@ load_segments_after=$(${READELF} -W -l libbar.so | grep -c LOAD)
 # To be even more strict, check that we don't add too many extra LOAD entries
 ###############################################################################
 echo "Segments before: ${load_segments_before} and after: ${load_segments_after}"
-if [ "${load_segments_after}" -gt $((load_segments_before + 2)) ]
+if [ "${load_segments_after}" -gt $((load_segments_before + 3)) ]
 then
     exit 1
 fi

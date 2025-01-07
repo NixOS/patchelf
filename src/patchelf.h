@@ -121,7 +121,8 @@ private:
     std::string & replaceSection(const SectionName & sectionName,
         unsigned int size);
 
-    [[nodiscard]] bool haveReplacedSection(const SectionName & sectionName) const;
+    [[nodiscard]] bool hasReplacedSection(const SectionName & sectionName) const;
+    [[nodiscard]] bool canReplaceSection(const SectionName & sectionName) const;
 
     void writeReplacedSections(Elf_Off & curOff,
         Elf_Addr startAddr, Elf_Off startOffset);

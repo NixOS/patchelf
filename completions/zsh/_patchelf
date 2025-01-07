@@ -1,22 +1,45 @@
 #compdef patchelf
 
+_get_dep() {
+    # preparm have fewer checks, as they can't be the so to replace
+    if [[ -f $words[2] ]] {  # check if arg #1 is a elf file and not a so
+        local deps=($(patchelf --print-needed $words[2] 2>/dev/null)) # discard error
+        if [[ $? -ne 0 ]] || [[ $#deps -eq 0 ]] {           # if no dependency or not a elf
+            _files                                      # fallback to _files
+        } else {
+            _values "LIBS" $deps # else use dependencies of the file as candidates
+        }
+    # postparm need to check
+    } elif [[ -f $words[-1] ]] && [[ -z ${words[-1]:e} ]] { # check arg #-1, as most people do like this
+        local deps=($(patchelf --print-needed $words[-1] 2>/dev/null))
+        if [[ $? -ne 0 ]] || [[ $#deps -eq 0 ]] {
+            _files
+        } else {
+            _values "LIBS" $deps
+        }
+    } else {
+        _files
+    }       
+}
+
 local options=(
-  '--page-size[Uses the given page size]:SIZE'
-  '--set-interpreter[Change the dynamic loader of executable]:INTERPRETER:dynamic loader:_files'
+  '--page-size[Uses the given page size]:SIZE:'
+  '--set-interpreter[Change the dynamic loader of executable]:INTERPRETER:_files'
   '(- : *)--print-interpreter[Prints the ELF interpreter of the executable]'
   '(- : *)--print-os-abi[Prints the OS ABI of the executable]'
   '--set-os-abi[Changes the OS ABI of the executable]:ABI:(none sysv hpux netbsd gnu linux solaris aix irix freebsd tru64 modesto openbsd arm_aeabi arm standalone)'
   '(- : *)--print-soname[Prints DT_SONAME entry of .dynamic section]'
-  '--set-soname[Sets DT_SONAME entry of a library to SONAME]:SONAME'
+  '--set-soname[Sets DT_SONAME entry of a library to SONAME]:SONAME:'
   '--set-rpath[Change the DT_RUNPATH of the executable or library to RUNPATH]:RUNPATH:_dirs'
+  '--add-rpath[Add RUNPATH to the existing DT_RUNPATH of the executable or library.]:RUNPATH:_dirs'
   '--remove-rpath[Removes the DT_RPATH or DT_RUNPATH entry of the executable or library]'
   '--shrink-rpath[Remove from the DT_RUNPATH or DT_RPATH all directories that do not contain a library referenced by DT_NEEDED fields of the executable or library]'
-  '--allowed-rpath-prefixes[Combined with the "--shrink-rpath" option, this can be used for further rpath tuning]:PREFIXES'
+  '--allowed-rpath-prefixes[Combined with the "--shrink-rpath" option, this can be used for further rpath tuning]:PREFIXES:'
   '(- : *)--print-rpath[Prints the DT_RUNPATH or DT_RPATH for an executable or library]'
   '--force-rpath[Forces the use of the obsolete DT_RPATH in the file instead of DT_RUNPATH]'
-  '--add-needed[Adds a declared dependency on a dynamic library]:LIBRARY'
-  '*--replace-needed[Replaces a declared dependency on a dynamic library with another one]:a declared dependency:LIB_ORIG:another declared dependency:LIB_NEW'
-  '--remove-needed[Removes a declared dependency on LIBRARY]:LIBRARY'
+  '--add-needed[Adds a declared dependency on a dynamic library]:LIBRARY:_files'
+  '*--replace-needed[Replaces a declared dependency on a dynamic library with another one]:LIB_ORIG:_get_dep:LIB_NEW:_files'
+  '--remove-needed[Removes a declared dependency on LIBRARY]:LIBRARY:_get_dep'
   '(- : *)--print-needed[Prints all DT_NEEDED entries of the executable]'
   '--no-default-lib[Marks the object so that the search for dependencies of this object will ignore any default library search paths]'
   '--no-sort[Do not sort program headers or section headers]'
@@ -24,7 +47,7 @@ local options=(
   '(- : *)--print-execstack[Prints the state of the executable flag of the GNU_STACK program header, if present]'
   '--clear-execstack[Clears the executable flag of the GNU_STACK program header, or adds a new header]'
   '--set-execstack[Sets the executable flag of the GNU_STACK program header, or adds a new header]'
-  '--rename-dynamic-symbols[Renames dynamic symbols]:NAME_MAP_FILE'
+  '--rename-dynamic-symbols[Renames dynamic symbols]:NAME_MAP_FILE:_files'
   '--output[Set the output file name]:FILE:_files'
   '--debug[Prints details of the changes made to the input file]'
   '--version[Shows the version of patchelf]'

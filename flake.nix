@@ -1,12 +1,12 @@
 {
   description = "A tool for modifying ELF executables and libraries";
 
-  inputs.nixpkgs.url = "nixpkgs/nixpkgs-unstable";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 
   outputs = { self, nixpkgs }:
 
     let
-      supportedSystems = [ "x86_64-linux" "i686-linux" "aarch64-linux" ];
+      supportedSystems = [ "x86_64-linux" "i686-linux" "aarch64-linux" "riscv64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
 
       version = nixpkgs.lib.removeSuffix "\n" (builtins.readFile ./version);
@@ -36,6 +36,11 @@
             versionSuffix = ""; # obsolete
             src = self;
             preAutoconf = "echo ${version} > version";
+
+            # portable configure shouldn't have a shebang pointing to the nix store
+            postConfigure = ''
+              sed -i '1s|^.*$|#!/bin/sh|' ./configure
+            '';
             postDist = ''
               cp README.md $out/
               echo "doc readme $out/README.md" >> $out/nix-support/hydra-build-products
@@ -76,10 +81,12 @@
               [ self.hydraJobs.tarball
                 self.hydraJobs.build.x86_64-linux
                 self.hydraJobs.build.i686-linux
-                # FIXME: add aarch64 emulation to our github action...
+                # FIXME: add aarch64/riscv64 emulation to our github action...
                 #self.hydraJobs.build.aarch64-linux
+                #self.hydraJobs.build.riscv64-linux
                 self.hydraJobs.build-sanitized.x86_64-linux
                 #self.hydraJobs.build-sanitized.aarch64-linux
+                #self.hydraJobs.build-sanitized.riscv64-linux
                 self.hydraJobs.build-sanitized.i686-linux
                 self.hydraJobs.build-sanitized-clang.x86_64-linux
               ];

@@ -4,6 +4,7 @@ check_PROGRAMS = simple-pie simple simple-execstack main too-many-strtab main-sc
 				 symver
 
 no_rpath_arch_TESTS = \
+  no-rpath-alpha.sh \
   no-rpath-amd64.sh \
   no-rpath-armel.sh \
   no-rpath-armhf.sh \
@@ -53,7 +54,8 @@ src_TESTS = \
   shared-rpath.sh \
   short-first-segment.sh \
   empty-note.sh \
-  remove-needed-version.sh
+  remove-needed-version.sh \
+  set-interpreter-same.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)
@@ -167,13 +169,14 @@ many_syms_main_SOURCES = many-syms-main.c
 many_syms_main_LDFLAGS = $(LDFLAGS_local) 
 many_syms_main_LDADD = -lmany-syms $(AM_LDADD)
 many_syms_main_DEPENDENCIES = libmany-syms.so
-many_syms_main_CFLAGS = -pie
+many_syms_main_CFLAGS = -pie -fPIE
 libmany_syms_so_SOURCES = many-syms.c
 libmany_syms_so_LDFLAGS = $(LDFLAGS_sharedlib)
 
 no_rpath_SOURCES = no-rpath.c
 # no -fpic for no-rpath.o
 no_rpath_CFLAGS =
+no_rpath_LDFLAGS =
 
 contiguous_note_sections_SOURCES = contiguous-note-sections.s contiguous-note-sections.ld
 contiguous_note_sections_LDFLAGS = -nostdlib -T $(srcdir)/contiguous-note-sections.ld
