@@ -6,7 +6,7 @@
   outputs = { self, nixpkgs }:
 
     let
-      supportedSystems = [ "x86_64-linux" "i686-linux" "aarch64-linux" "riscv64-linux" ];
+      supportedSystems = [ "x86_64-linux" "i686-linux" "aarch64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
 
       version = nixpkgs.lib.removeSuffix "\n" (builtins.readFile ./version);
@@ -81,12 +81,10 @@
               [ self.hydraJobs.tarball
                 self.hydraJobs.build.x86_64-linux
                 self.hydraJobs.build.i686-linux
-                # FIXME: add aarch64/riscv64 emulation to our github action...
+                # FIXME: add aarch64 emulation to our github action...
                 #self.hydraJobs.build.aarch64-linux
-                #self.hydraJobs.build.riscv64-linux
                 self.hydraJobs.build-sanitized.x86_64-linux
                 #self.hydraJobs.build-sanitized.aarch64-linux
-                #self.hydraJobs.build-sanitized.riscv64-linux
                 self.hydraJobs.build-sanitized.i686-linux
                 self.hydraJobs.build-sanitized-clang.x86_64-linux
               ];
