@@ -1471,6 +1471,15 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string &
 
     debug("new SONAME is '%s'\n", newSoname.c_str());
 
+    /* If new SONAME fits in existing space, overwrite. This works around
+       issue #44. */
+    if (newSoname.size() <= sonameSize) {
+       debug("overwriting old SONAME with new...\n");
+       strcpy(soname, newSoname.c_str());
+       changed = true;
+       return;
+    }
+
     /* Grow the .dynstr section to make room for the new SONAME. */
     debug("SONAME is too long, resizing...\n");
 
