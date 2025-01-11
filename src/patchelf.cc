@@ -322,6 +322,8 @@ ElfFile<ElfFileParamNames>::ElfFile(FileContents fContents)
         if (rdi(phdrs[i].p_type) == PT_INTERP) isExecutable = true;
     }
 
+    trailingNullPhdrs = 0;
+
     for (int i = 0; i < rdi(hdr()->e_shnum); ++i) {
         Elf_Shdr *shdr = (Elf_Shdr *) (fileContents->data() + rdi(hdr()->e_shoff)) + i;
 
@@ -1211,13 +1213,24 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
         if (rdi(phdr.p_type) == PT_PHDR) {
             phdr.p_offset = hdr()->e_phoff;
             wri(phdr.p_vaddr, wri(phdr.p_paddr, phdrAddress));
-            wri(phdr.p_filesz, wri(phdr.p_memsz, phdrs.size() * sizeof(Elf_Phdr)));
+            wri(phdr.p_filesz, wri(phdr.p_memsz, (phdrs.size() + trailingNullPhdrs) * sizeof(Elf_Phdr)));
             break;
         }
     }
 
     if (!noSort) {
         sortPhdrs();
+    }
+
+    if (trailingNullPhdrs) {
+        Elf_Phdr nullPhdr = {};
+        nullPhdr.p_type = PT_NULL;
+
+        for (int i = 0; i < trailingNullPhdrs; ++i) {
+            phdrs.push_back(nullPhdr);
+        }
+
+        wri(hdr()->e_phnum, rdi(hdr()->e_phnum) + trailingNullPhdrs);
     }
 
     for (unsigned int i = 0; i < phdrs.size(); ++i)
@@ -1347,7 +1360,13 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
     }
 }
 
-
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::appendNullPhdrs(int count)
+{
+  trailingNullPhdrs += count;
+  rewriteHeaders(rdi(hdr()->e_phoff));
+  changed = true;
+}
 
 static void setSubstr(std::string & s, unsigned int pos, const std::string & t)
 {
@@ -2430,6 +2449,7 @@ static bool addDebugTag = false;
 static bool renameDynamicSymbols = false;
 static bool printRPath = false;
 static std::string newRPath;
+static int nullPhdrsToAppend;
 static std::set<std::string> neededLibsToRemove;
 static std::map<std::string, std::string> neededLibsToReplace;
 static std::set<std::string> neededLibsToAdd;
@@ -2498,6 +2518,9 @@ static void patchElf2(ElfFile && elfFile, const FileContents & fileContents, con
     if (renameDynamicSymbols)
         elfFile.renameDynamicSymbols(symbolsToRename);
 
+    if (nullPhdrsToAppend)
+        elfFile.appendNullPhdrs(nullPhdrsToAppend);
+
     if (elfFile.isChanged()){
         writeFile(fileName, elfFile.fileContents);
     } else if (alwaysWrite) {
@@ -2550,6 +2573,8 @@ static void showHelp(const std::string & progName)
   [--allowed-rpath-prefixes PREFIXES]\t\tWith '--shrink-rpath', reject rpath entries not starting with the allowed prefix\n\
   [--print-rpath]\n\
   [--force-rpath]\n\
+  [--append-null-phdr]\t\tAppends a PT_NULL program header to the end of the table; may be used multiple times\n\
+  [--append-null-phdrs N]\t\tAppends N PT_NULL program headers to the end of the table; may be used multiple times\n\
   [--add-needed LIBRARY]\n\
   [--remove-needed LIBRARY]\n\
   [--replace-needed LIBRARY NEW_LIBRARY]\n\
@@ -2653,6 +2678,13 @@ static int mainWrapped(int argc, char * * argv)
         }
         else if (arg == "--no-sort") {
             noSort = true;
+        }
+        else if (arg == "--append-null-phdr") {
+            ++nullPhdrsToAppend;
+        }
+        else if (arg == "--append-null-phdrs") {
+            if (++i == argc) error("missing argument");
+            nullPhdrsToAppend += std::stoi(argv[i]);
         }
         else if (arg == "--add-needed") {
             if (++i == argc) error("missing argument");
