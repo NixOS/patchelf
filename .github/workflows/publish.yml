@@ -72,6 +72,11 @@ jobs:
       - name: Set up QEMU
         if: matrix.platform != 'amd64'
         uses: docker/setup-qemu-action@v3
+        with:
+          # This should be temporary
+          # xref https://github.com/docker/setup-qemu-action/issues/188
+          # xref https://github.com/tonistiigi/binfmt/issues/215
+          image: tonistiigi/binfmt:qemu-v8.1.5
 
       - name: Set docker arch
         run: |
