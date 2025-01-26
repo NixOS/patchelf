@@ -57,7 +57,7 @@ jobs:
               ("debian:10",    ("x86_64", "i686", "aarch64", "armv7l")),
               ("debian:11",    ("x86_64", "i686", "aarch64", "armv7l")),
               ("debian:12",    ("x86_64", "i686", "aarch64", "armv7l", "ppc64le", "s390x")),
-              ("ubuntu:18.04", ("x86_64", "i686", "aarch64", "armv7l", "ppc64le", "s390x")),
+              ("ubuntu:18.04", ("x86_64", "aarch64", "armv7l", "ppc64le", "s390x")),
               ("ubuntu:20.04", ("x86_64", "aarch64", "armv7l", "ppc64le", "s390x", "riscv64")),
               ("ubuntu:22.04", ("x86_64", "aarch64", "armv7l", "ppc64le", "s390x", "riscv64")),
               ("ubuntu:24.04", ("x86_64", "aarch64", "armv7l", "ppc64le", "s390x", "riscv64")),
