@@ -492,7 +492,7 @@ void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, size_t start
 {
     assert(startOffset >= sizeof(Elf_Ehdr));
 
-    unsigned int oldSize = fileContents->size();
+    auto oldSize = fileContents->size();
     assert(oldSize > startOffset);
 
     /* Move the entire contents of the file after 'startOffset' by 'extraPages' pages further. */
