@@ -2270,6 +2270,174 @@ void ElfFile<ElfFileParamNames>::renameDynamicSymbols(const std::unordered_map<s
 }
 
 template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::removeNeededVersion(const std::map<std::string, std::set<std::string>> & verMap)
+{
+    if (verMap.empty()) return;
+
+    auto idxVersionR = getSectionIndex(".gnu.version_r");
+    if (!idxVersionR) {
+        error("no .gnu.version_r section found\n");
+        return;
+    }
+    auto & shdrVersionR = shdrs.at(idxVersionR);
+    Elf_Shdr & shdrVersionRStrings = shdrs.at(rdi(shdrVersionR.sh_link));
+
+    auto mapOffset = rdi(shdrVersionR.sh_addr) - rdi(shdrVersionR.sh_offset);
+
+    size_t verNeedNum = rdi(shdrVersionR.sh_info);
+    std::set<size_t> removedVersionIds;
+
+    // file names and versions here
+    char * verStrTab = (char *) fileContents->data() + rdi(shdrVersionRStrings.sh_offset);
+
+    debug("found .gnu.version_r with %i entries\n", verNeedNum);
+
+    bool removeEntireSection = false;
+
+    auto vn = (Elf_Verneed *)(fileContents->data() + rdi(shdrVersionR.sh_offset));
+    Elf_Verneed * prevVn = nullptr;
+    for (size_t i = 0; i < verNeedNum; ++i) {
+        char * file = verStrTab + rdi(vn->vn_file);
+
+        if (verMap.count(file)) {
+            size_t verNauxNum = rdi(vn->vn_cnt);
+            size_t newVerNauxNum = 0;
+
+            auto va = (follow<Elf_Vernaux>(vn, rdi(vn->vn_aux)));
+            Elf_Vernaux * prevVa = nullptr;
+
+            auto & versions = verMap.at(file);
+
+            for (size_t j = 0; j < verNauxNum; ++j) {
+                char * name = verStrTab + rdi(va->vna_name);
+
+                auto version = rdi(va->vna_other);
+                off_t next = rdi(va->vna_next);
+                if (versions.count(name)) {
+                    debug("removing symbol %s with version %d in entry %s\n", name, version, file);
+                    // 1 for unversioned symbol
+                    removedVersionIds.insert(version);
+
+                    if (prevVa) {
+                        wri(prevVa->vna_next, next ? rdi(prevVa->vna_next) + next : 0);
+                    } else {
+                        wri(vn->vn_aux, next ? rdi(vn->vn_aux) + next : 0);
+                    }
+                    changed = true;
+
+                    auto nextVa = follow<Elf_Vernaux>(va, next);
+                    // remove the version data
+                    memset(va, 0, sizeof(Elf_Vernaux));
+                    va = nextVa;
+                } else {
+                    debug("keeping symbol %s with version %d in entry %s\n", name, version, file);
+                    ++newVerNauxNum;
+                    prevVa = va;
+                    va = follow<Elf_Vernaux>(va, next);
+                }
+            }
+            
+            off_t next = rdi(vn->vn_next);
+            // there are versions left
+            if (prevVa) {
+                wri(vn->vn_cnt, newVerNauxNum);
+                prevVn = vn;
+                vn = follow<Elf_Verneed>(vn, next);
+            } else {
+                // remove entire file entry
+                if (prevVn) {
+                    wri(prevVn->vn_next, next ? rdi(prevVn->vn_next) + next : 0);
+                } else {
+                    // there are file entries left
+                    if (next) {
+                        wri(shdrVersionR.sh_offset, rdi(shdrVersionR.sh_offset) + next);
+                    } else {
+                        wri(shdrVersionR.sh_size, 0);
+                        
+                        removeEntireSection = true;
+                    }
+                }
+                wri(shdrVersionR.sh_info, rdi(shdrVersionR.sh_info) - 1);
+
+                Elf_Verneed * nextVn = follow<Elf_Verneed>(vn, next);
+                memset(vn, 0, sizeof(Elf_Verneed));
+                vn = nextVn;
+            }
+        } else {
+            off_t next = rdi(vn->vn_next);
+            prevVn = vn;
+            vn = follow<Elf_Verneed>(vn, next);
+        }
+    }
+
+    // virtual address and file offset need to be the same
+    if (!removeEntireSection) {
+        wri(shdrVersionR.sh_addr, mapOffset + rdi(shdrVersionR.sh_offset));
+    }
+
+    if (auto shdrDynamic = tryFindSectionHeader(".dynamic")) {
+        auto dyn = (Elf_Dyn *)(fileContents->data() + rdi(shdrDynamic->get().sh_offset));
+
+        // keep DT_VERNEED and DT_VERNEEDNUM in sync, DT_VERNEED handled by rewriteHeaders
+        Elf_Dyn * last = dyn;
+        for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+            if (rdi(dyn->d_tag) == DT_VERNEEDNUM) {
+                if (!removeEntireSection) {
+                    dyn->d_un.d_val = shdrVersionR.sh_info;
+                    *last++ = *dyn;
+                }
+            } else if (rdi(dyn->d_tag) == DT_VERNEED) {
+                if (!removeEntireSection) {
+                    *last++ = *dyn;
+                }
+            } else if (rdi(dyn->d_tag) == DT_VERSYM) {
+                if (!removeEntireSection) {
+                    *last++ = *dyn;
+                }
+            } else {
+                *last++ = *dyn;
+            }
+        }
+        memset(last, 0, sizeof(Elf_Dyn) * (dyn - last));
+    }
+
+    auto spanVersyms = tryGetSectionSpan<Elf_Versym>(".gnu.version");
+
+    if (spanVersyms) {
+        for (auto & versym : spanVersyms) {
+            if (removedVersionIds.count(versym)) {
+                wri(versym, 1);
+            }
+        }
+    }
+
+    if (removeEntireSection) {
+        debug("removing .gnu.version_r and .gnu.version section\n");
+        wri(shdrVersionR.sh_type, SHT_NULL);
+        auto idxVersion = getSectionIndex(".gnu.version");
+        if (idxVersion) {
+            auto & shdrVersion = shdrs.at(idxVersion);
+            wri(shdrVersion.sh_type, SHT_NULL);
+            memset(fileContents->data() + rdi(shdrVersion.sh_offset), 0, rdi(shdrVersion.sh_size));
+            wri(shdrVersion.sh_size, 0);
+        }
+    } else {
+        debug("remaining entries in .gnu.version_r: %i\n", rdi(shdrVersionR.sh_info));
+    }
+
+    // we did not change phdrAddress, rewrite it in place
+    Elf_Addr phdrAddress;
+    for (auto & phdr : phdrs) {
+        if (rdi(phdr.p_type) == PT_PHDR) {
+            phdrAddress = rdi(phdr.p_vaddr);
+            break;
+        }
+    }
+
+    rewriteHeaders(phdrAddress);
+}
+
+template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::clearSymbolVersions(const std::set<std::string> & syms)
 {
     if (syms.empty()) return;
@@ -2430,6 +2598,7 @@ static bool addDebugTag = false;
 static bool renameDynamicSymbols = false;
 static bool printRPath = false;
 static std::string newRPath;
+static std::map<std::string, std::set<std::string>> neededVersionsToRemove;
 static std::set<std::string> neededLibsToRemove;
 static std::map<std::string, std::string> neededLibsToReplace;
 static std::set<std::string> neededLibsToAdd;
@@ -2484,6 +2653,7 @@ static void patchElf2(ElfFile && elfFile, const FileContents & fileContents, con
 
     if (printNeeded) elfFile.printNeededLibs();
 
+    elfFile.removeNeededVersion(neededVersionsToRemove);
     elfFile.removeNeeded(neededLibsToRemove);
     elfFile.replaceNeeded(neededLibsToReplace);
     elfFile.addNeeded(neededLibsToAdd);
@@ -2559,6 +2729,7 @@ static void showHelp(const std::string & progName)
   [--clear-symbol-version SYMBOL]\n\
   [--add-debug-tag]\n\
   [--print-execstack]\t\tPrints whether the object requests an executable stack\n\
+  [--remove-needed-version LIBRARY VERSION_SYMBOL]\n\
   [--clear-execstack]\n\
   [--set-execstack]\n\
   [--rename-dynamic-symbols NAME_MAP_FILE]\tRenames dynamic symbols. The map file should contain two symbols (old_name new_name) per line\n\
@@ -2665,6 +2836,11 @@ static int mainWrapped(int argc, char * * argv)
         else if (arg == "--replace-needed") {
             if (i+2 >= argc) error("missing argument(s)");
             neededLibsToReplace[ argv[i+1] ] = argv[i+2];
+            i += 2;
+        }
+        else if (arg == "--remove-needed-version") {
+            if (i+2 >= argc) error("missing argument(s)");
+            neededVersionsToRemove[ argv[i+1] ].insert(resolveArgument(argv[i+2]));
             i += 2;
         }
         else if (arg == "--clear-symbol-version") {
