@@ -36,3 +36,4 @@ rm -rf $RPM_BUILD_ROOT
 %{_bindir}/patchelf
 %doc %{_docdir}/patchelf/README.md
 %{_mandir}/man1/patchelf.1.gz
+%{_datadir}/zsh/site-functions/_patchelf
