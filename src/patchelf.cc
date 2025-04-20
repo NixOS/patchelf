@@ -997,9 +997,6 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
        Stop when we reach an irreplacable section (such as one of type
        SHT_PROGBITS).  These cannot be moved in virtual address space
        since that would invalidate absolute references to them. */
-    assert(lastReplaced + 1 < shdrs.size()); /* !!! I'm lazy. */
-    size_t startOffset = rdi(shdrs.at(lastReplaced + 1).sh_offset);
-    Elf_Addr startAddr = rdi(shdrs.at(lastReplaced + 1).sh_addr);
     std::string prevSection;
     for (unsigned int i = 1; i <= lastReplaced; ++i) {
         Elf_Shdr & shdr(shdrs.at(i));
@@ -1010,8 +1007,6 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
         if ((rdi(shdr.sh_type) == SHT_PROGBITS && sectionName != ".interp")
             || prevSection == ".dynstr")
         {
-            startOffset = rdi(shdr.sh_offset);
-            startAddr = rdi(shdr.sh_addr);
             lastReplaced = i - 1;
             break;
         }
@@ -1021,6 +1016,13 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
         }
         prevSection = std::move(sectionName);
     }
+
+    while (lastReplaced < shdrs.size() && shdrs.at(lastReplaced).sh_type == SHT_NOBITS)
+        ++lastReplaced;
+
+    assert(lastReplaced + 1 < shdrs.size()); /* !!! I'm lazy. */
+    size_t startOffset = rdi(shdrs.at(lastReplaced + 1).sh_offset);
+    Elf_Addr startAddr = rdi(shdrs.at(lastReplaced + 1).sh_addr);
 
     debug("first reserved offset/addr is 0x%x/0x%llx\n",
         startOffset, (unsigned long long) startAddr);
