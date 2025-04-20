@@ -53,7 +53,8 @@ src_TESTS = \
   shared-rpath.sh \
   short-first-segment.sh \
   empty-note.sh \
-  set-interpreter-same.sh
+  set-interpreter-same.sh \
+  debug-interp.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)
