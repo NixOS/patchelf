@@ -1240,7 +1240,7 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
        section.  Note that not all executables have .dynamic sections
        (e.g., those produced by klibc's klcc). */
     auto shdrDynamic = tryFindSectionHeader(".dynamic");
-    if (shdrDynamic) {
+    if (shdrDynamic && rdi((*shdrDynamic).get().sh_type) != SHT_NOBITS) {
         auto dyn_table = (Elf_Dyn *) (fileContents->data() + rdi((*shdrDynamic).get().sh_offset));
         unsigned int d_tag;
         for (auto dyn = dyn_table; (d_tag = rdi(dyn->d_tag)) != DT_NULL; dyn++)
