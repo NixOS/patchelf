@@ -52,8 +52,8 @@ jobs:
               "riscv64": "ubuntu-24.04",
           }
           reduced = [
-              ("almalinux:8",  ("x86_64", "aarch64", "ppc64le", "s390x")),
-              ("almalinux:9",  ("x86_64", "aarch64", "ppc64le", "s390x")),
+              ("almalinux:8",  ("x86_64", "i686", "aarch64", "ppc64le", "s390x")),
+              ("almalinux:9",  ("x86_64", "i686", "aarch64", "ppc64le", "s390x")),
               ("centos:7",     ("x86_64", "i686", "aarch64", "ppc64le", "s390x")),
               ("debian:10",    ("x86_64", "i686", "aarch64", "armv7l")),
               ("debian:11",    ("x86_64", "i686", "aarch64", "armv7l")),
