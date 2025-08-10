@@ -1,3 +1,5 @@
+# PatchELF
+
 PatchELF is a simple utility for modifying existing ELF executables and
 libraries.  In particular, it can do the following:
 
@@ -78,6 +80,7 @@ make
 make check
 sudo make install
 ```
+
 ### Via Nix
 
 You can build with Nix in several ways.
@@ -85,6 +88,10 @@ You can build with Nix in several ways.
 1. Building via `nix build` will produce the result in `./result/bin/patchelf`. If you would like to build _patchelf_ with _musl_ try `nix build .#patchelf-musl`
 
 2. You can launch a development environment with `nix develop` and follow the autotools steps above. If you would like to develop with _musl_ try `nix develop .#musl`
+
+## Help and resources
+
+- Matrix: [#patchelf:nixos.org](https://matrix.to/#/#patchelf:nixos.org)
 
 ## Author
 
