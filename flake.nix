@@ -49,7 +49,6 @@
 
       patchelfFor =
         pkgs:
-        # this is only
         pkgs.callPackage ./package.nix {
           inherit version src;
         };
@@ -192,6 +191,27 @@
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
+
+          patchelfForWindowsStatic =
+            pkgs:
+            (pkgs.callPackage ./package.nix {
+              inherit version src;
+              # On windows we use win32 threads to get a static binary,
+              # otherwise `-static` below doesn't work.
+              stdenv = pkgs.overrideCC pkgs.stdenv (
+                pkgs.buildPackages.wrapCC (
+                  pkgs.buildPackages.gcc-unwrapped.override ({
+                    threadsCross = {
+                      model = "win32";
+                      package = null;
+                    };
+                  })
+                )
+              );
+            }).overrideAttrs
+              (old: {
+                NIX_CFLAGS_COMPILE = "-static";
+              });
         in
         {
           patchelf = patchelfFor pkgs;
@@ -201,13 +221,8 @@
           # tests if our testsuite uses target-prefixed executable names.
           patchelf-musl-cross = patchelfFor pkgs.pkgsCross.musl64;
           patchelf-netbsd-cross = patchelfFor pkgs.pkgsCross.x86_64-netbsd;
-
-          patchelf-win32 = (patchelfFor pkgs.pkgsCross.mingw32).overrideAttrs (old: {
-            NIX_CFLAGS_COMPILE = "-static";
-          });
-          patchelf-win64 = (patchelfFor pkgs.pkgsCross.mingwW64).overrideAttrs (old: {
-            NIX_CFLAGS_COMPILE = "-static";
-          });
+          patchelf-win32 = patchelfForWindowsStatic pkgs.pkgsCross.mingw32;
+          patchelf-win64 = patchelfForWindowsStatic pkgs.pkgsCross.mingwW64;
         }
         // lib.optionalAttrs (system != "i686-linux") {
           patchelf-musl = patchelfFor nixpkgs.legacyPackages.${system}.pkgsMusl;
