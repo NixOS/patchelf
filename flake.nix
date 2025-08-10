@@ -50,7 +50,7 @@
       patchelfFor =
         pkgs:
         # this is only
-        pkgs.callPackage ./patchelf.nix {
+        pkgs.callPackage ./package.nix {
           inherit version src;
         };
 
