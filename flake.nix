@@ -7,15 +7,34 @@
     { self, nixpkgs }:
 
     let
+      inherit (nixpkgs) lib;
+
       supportedSystems = [
         "x86_64-linux"
         "i686-linux"
         "aarch64-linux"
       ];
-      forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
+      forAllSystems = lib.genAttrs supportedSystems;
 
-      version = nixpkgs.lib.removeSuffix "\n" (builtins.readFile ./version);
+      version = lib.removeSuffix "\n" (builtins.readFile ./version);
       pkgs = nixpkgs.legacyPackages.x86_64-linux;
+
+      src = lib.fileset.toSource {
+        root = ./.;
+        fileset = lib.fileset.unions [
+          ./COPYING
+          ./Makefile.am
+          ./README.md
+          ./completions
+          ./configure.ac
+          ./m4
+          ./patchelf.1
+          ./patchelf.spec.in
+          ./src
+          ./tests
+          ./version
+        ];
+      };
 
       patchelfFor =
         pkgs:
@@ -23,8 +42,7 @@
           # this is only
         in
         pkgs.callPackage ./patchelf.nix {
-          inherit version;
-          src = self;
+          inherit version src;
         };
 
     in
@@ -38,9 +56,8 @@
       hydraJobs = {
         tarball = pkgs.releaseTools.sourceTarball rec {
           name = "patchelf-tarball";
-          inherit version;
+          inherit version src;
           versionSuffix = ""; # obsolete
-          src = self;
           preAutoconf = "echo ${version} > version";
 
           # portable configure shouldn't have a shebang pointing to the nix store
@@ -81,7 +98,7 @@
         );
 
         # x86_64-linux seems to be only working clangStdenv at the moment
-        build-sanitized-clang = nixpkgs.lib.genAttrs [ "x86_64-linux" ] (
+        build-sanitized-clang = lib.genAttrs [ "x86_64-linux" ] (
           system:
           self.hydraJobs.build-sanitized.${system}.override {
             stdenv = nixpkgs.legacyPackages.${system}.llvmPackages_latest.libcxxStdenv;
@@ -119,7 +136,7 @@
           glibc = self.packages.${system}.patchelf;
           default = self.devShells.${system}.glibc;
         }
-        // nixpkgs.lib.optionalAttrs (system != "i686-linux") {
+        // lib.optionalAttrs (system != "i686-linux") {
           musl = self.packages.${system}.patchelf-musl;
         }
       );
@@ -145,7 +162,7 @@
             NIX_CFLAGS_COMPILE = "-static";
           });
         }
-        // nixpkgs.lib.optionalAttrs (system != "i686-linux") {
+        // lib.optionalAttrs (system != "i686-linux") {
           patchelf-musl = patchelfFor nixpkgs.legacyPackages.${system}.pkgsMusl;
         }
       );
