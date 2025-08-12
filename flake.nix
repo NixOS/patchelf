@@ -36,19 +36,37 @@
         ./completions
         ./patchelf.1
         ./patchelf.spec.in
-        ./src
-        ./tests
+        (lib.fileset.difference ./src (
+          lib.fileset.unions [
+            ./src/Makefile.am
+            ./src/meson.build
+          ]
+        ))
+        (lib.fileset.difference ./tests (
+          lib.fileset.unions [
+            ./tests/Makefile.am
+            #./tests/meson.build
+          ]
+        ))
         ./version
       ];
 
       autotoolsSrcFiles = [
         ./Makefile.am
+        ./src/Makefile.am
+        ./tests/Makefile.am
         ./configure.ac
         ./m4
       ];
 
       cmakeSrcFiles = [
         ./CMakeLists.txt
+      ];
+
+      mesonSrcFiles = [
+        ./meson.build
+        ./meson.options
+        ./src/meson.build
       ];
 
       autotoolsSrc = lib.fileset.toSource {
@@ -89,7 +107,7 @@
           inherit version;
           src = lib.fileset.toSource {
             root = ./.;
-            fileset = lib.fileset.unions (baseSrcFiles ++ autotoolsSrcFiles ++ cmakeSrcFiles);
+            fileset = lib.fileset.unions (baseSrcFiles ++ autotoolsSrcFiles ++ cmakeSrcFiles ++ mesonSrcFiles);
           };
           versionSuffix = ""; # obsolete
           preAutoconf = "echo ${version} > version";
@@ -133,6 +151,8 @@
 
         build-cmake = forAllSystems (system: self.packages.${system}.patchelf-cmake);
 
+        build-meson = forAllSystems (system: self.packages.${system}.patchelf-meson);
+
         # x86_64-linux seems to be only working clangStdenv at the moment
         build-sanitized-clang = lib.genAttrs [ "x86_64-linux" ] (
           system:
@@ -151,6 +171,7 @@
             self.hydraJobs.build.x86_64-linux
             self.hydraJobs.build.i686-linux
             self.hydraJobs.build-cmake.x86_64-linux
+            self.hydraJobs.build-meson.x86_64-linux
             # FIXME: add aarch64 emulation to our github action...
             #self.hydraJobs.build.aarch64-linux
             self.hydraJobs.build-sanitized.x86_64-linux
@@ -190,6 +211,7 @@
                 };
                 nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [
                   #pkgs.buildPackages.cmake
+                  #pkgs.buildPackages.meson
                   #pkgs.buildPackages.ninja
                   modular.pre-commit.settings.package
                   (pkgs.buildPackages.writeScriptBin "pre-commit-hooks-install" modular.pre-commit.settings.installationScript)
@@ -242,6 +264,14 @@
             src = lib.fileset.toSource {
               root = ./.;
               fileset = lib.fileset.unions (baseSrcFiles ++ cmakeSrcFiles);
+            };
+          };
+
+          patchelf-meson = pkgs.callPackage ./package-meson.nix {
+            inherit version;
+            src = lib.fileset.toSource {
+              root = ./.;
+              fileset = lib.fileset.unions (baseSrcFiles ++ mesonSrcFiles);
             };
           };
 
