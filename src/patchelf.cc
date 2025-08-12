@@ -1067,7 +1067,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
         debug("needed space is %d\n", neededSpace);
 
         /* Calculate how many bytes are needed out of the additional pages. */
-        size_t extraSpace = neededSpace - startOffset; 
+        size_t extraSpace = neededSpace - startOffset;
         // Always give one extra page to avoid colliding with segments that start at
         // unaligned addresses and will be rounded down when loaded
         unsigned int neededPages = 1 + roundUp(extraSpace, getPageSize()) / getPageSize();
@@ -2152,7 +2152,7 @@ void ElfFile<ElfFileParamNames>::rebuildGnuHashTable(span<char> strTab, span<Elf
     }
 
     // Update bloom filters
-    std::fill(ght.m_bloomFilters.begin(), ght.m_bloomFilters.end(), 0); 
+    std::fill(ght.m_bloomFilters.begin(), ght.m_bloomFilters.end(), 0);
     for (size_t i = 0; i < entries.size(); ++i)
     {
         auto h = entries[i].hash;
@@ -2164,7 +2164,7 @@ void ElfFile<ElfFileParamNames>::rebuildGnuHashTable(span<char> strTab, span<Elf
     }
 
     // Fill buckets
-    std::fill(ght.m_buckets.begin(), ght.m_buckets.end(), 0); 
+    std::fill(ght.m_buckets.begin(), ght.m_buckets.end(), 0);
     for (size_t i = 0; i < entries.size(); ++i)
     {
         auto symBucketIdx = entries[i].bucketIdx;

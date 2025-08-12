@@ -283,7 +283,7 @@ private:
     constexpr inline I wri(I & t, U i) const
     {
         I val = static_cast<I>(i);
-        if (static_cast<U>(val) != i)            
+        if (static_cast<U>(val) != i)
             throw std::runtime_error { "value truncation" };
         t = rdi(val);
         return val;
