@@ -3,8 +3,19 @@
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 
+  # dev tooling
+  inputs.flake-parts.url = "github:hercules-ci/flake-parts";
+  inputs.git-hooks-nix.url = "github:cachix/git-hooks.nix";
+  # work around https://github.com/NixOS/nix/issues/7730
+  inputs.flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
+  inputs.git-hooks-nix.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.git-hooks-nix.inputs.nixpkgs-stable.follows = "nixpkgs";
+  # work around 7730 and https://github.com/NixOS/nix/issues/7807
+  inputs.git-hooks-nix.inputs.flake-compat.follows = "";
+  inputs.git-hooks-nix.inputs.gitignore.follows = "";
+
   outputs =
-    { self, nixpkgs }:
+    inputs@{ self, nixpkgs, ... }:
 
     let
       inherit (nixpkgs) lib;
@@ -38,12 +49,22 @@
 
       patchelfFor =
         pkgs:
-        let
-          # this is only
-        in
+        # this is only
         pkgs.callPackage ./patchelf.nix {
           inherit version src;
         };
+
+      # We don't apply flake-parts to the whole flake so that non-development attributes
+      # load without fetching any development inputs.
+      devFlake = inputs.flake-parts.lib.mkFlake { inherit inputs; } {
+        imports = [ ./maintainers/flake-module.nix ];
+        systems = supportedSystems;
+        perSystem =
+          { system, ... }:
+          {
+            _module.args.pkgs = nixpkgs.legacyPackages.${system};
+          };
+      };
 
     in
 
@@ -126,18 +147,44 @@
 
       };
 
-      checks = forAllSystems (system: {
-        build = self.hydraJobs.build.${system};
-      });
+      checks = forAllSystems (
+        system:
+        {
+          build = self.hydraJobs.build.${system};
+        }
+        // devFlake.checks.${system} or { }
+      );
 
       devShells = forAllSystems (
         system:
+        let
+          mkShell =
+            patchelf:
+            patchelf.overrideAttrs (
+              old:
+              let
+                pkgs = nixpkgs.legacyPackages.${system};
+                modular = devFlake.getSystem pkgs.stdenv.buildPlatform.system;
+              in
+              {
+                env = (old.env or { }) // {
+                  _NIX_PRE_COMMIT_HOOKS_CONFIG = "${(pkgs.formats.yaml { }).generate "pre-commit-config.yaml"
+                    modular.pre-commit.settings.rawConfig
+                  }";
+                };
+                nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [
+                  modular.pre-commit.settings.package
+                  (pkgs.writeScriptBin "pre-commit-hooks-install" modular.pre-commit.settings.installationScript)
+                ];
+              }
+            );
+        in
         {
-          glibc = self.packages.${system}.patchelf;
+          glibc = mkShell self.packages.${system}.patchelf;
           default = self.devShells.${system}.glibc;
         }
         // lib.optionalAttrs (system != "i686-linux") {
-          musl = self.packages.${system}.patchelf-musl;
+          musl = mkShell self.packages.${system}.patchelf-musl;
         }
       );
 
