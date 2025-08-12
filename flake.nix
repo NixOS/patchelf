@@ -39,12 +39,14 @@
         (lib.fileset.difference ./src (
           lib.fileset.unions [
             ./src/Makefile.am
+            ./src/CMakeLists.txt
             ./src/meson.build
           ]
         ))
         (lib.fileset.difference ./tests (
           lib.fileset.unions [
             ./tests/Makefile.am
+            #./tests/CMakeLists.txt
             #./tests/meson.build
           ]
         ))
@@ -61,12 +63,15 @@
 
       cmakeSrcFiles = [
         ./CMakeLists.txt
+        ./src/CMakeLists.txt
+        #./tests/CMakeLists.txt
       ];
 
       mesonSrcFiles = [
         ./meson.build
         ./meson.options
         ./src/meson.build
+        #./tests/meson.build
       ];
 
       autotoolsSrc = lib.fileset.toSource {

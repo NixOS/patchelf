@@ -81,12 +81,22 @@ make check
 sudo make install
 ```
 
-## Via [CMake](https://cmake.org/) (and [Ninja](https://ninja-build.org/))
+### Via [CMake](https://cmake.org/) (and [Ninja](https://ninja-build.org/))
 
 ```console
 mkdir build
 cd build
 cmake .. -GNinja
+ninja all
+sudo ninja install
+```
+
+### Via [Meson](https://mesonbuild.com/) (and [Ninja](https://ninja-build.org/))
+
+```console
+mkdir build
+meson configure build
+cd build
 ninja all
 sudo ninja install
 ```
