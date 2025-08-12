@@ -1,5 +1,13 @@
 ## Release History
 
+## 0.15.3 (yet to be released)
+
+This is a backport release made from the simplest fixes from 0.16.0.
+
+* Handle `glibc-hwcaps` on `ppc64le` on CentOS/RHEL/Rocky 8 for `tests/replace-add-needed.sh` (fixes #406) by @robert-scheck in https://github.com/NixOS/patchelf/pull/407
+* Fix Out-of-bounds read in the function `modifyRPath` by @xiaoxiaoafeifei in https://github.com/NixOS/patchelf/pull/419
+* Fix out of bounds access when increasing program header table by @Bo98 in https://github.com/NixOS/patchelf/pull/411
+
 ## 0.15.2 (August 12, 2025)
 
 * In the autotools build system for the tests, pass a few more tool env vars in `TESTS_ENVIRONMENT`.
