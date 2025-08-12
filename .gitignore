@@ -18,6 +18,8 @@ Makefile
 .deps
 *.o
 
+CMakeLists.txt.user
+
 /tests/*.log
 /tests/*.trs
 /tests/no-rpath
@@ -32,6 +34,7 @@ Makefile
 /tests/libbig-dynstr.debug
 /tests/contiguous-note-sections
 /tests/simple-pie
+/tests/simple-execstack
 
 .direnv/
 .vscode/

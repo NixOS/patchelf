@@ -1,28 +1,33 @@
 #! /bin/sh -e
-SCRATCH=scratch/$(basename $0 .sh)
+SCRATCH=scratch/$(basename "$0" .sh)
+OBJDUMP=${OBJDUMP:-objdump}
 
-rm -rf ${SCRATCH}
-mkdir -p ${SCRATCH}
+rm -rf "${SCRATCH}"
+mkdir -p "${SCRATCH}"
 
 SCRATCHFILE=${SCRATCH}/libfoo.so
-cp libfoo.so $SCRATCHFILE
+cp libfoo.so "$SCRATCHFILE"
 
 doit() {
-    echo patchelf $*
-    ../src/patchelf $* $SCRATCHFILE
+    set +x
+    ../src/patchelf "$@" "$SCRATCHFILE"
+    set -x
 }
 
 expect() {
-    out=$(echo $(objdump -x $SCRATCHFILE | grep PATH))
+    out=$("$OBJDUMP" -x "$SCRATCHFILE" | grep PATH || true)
 
-    if [ "$out" != "$*" ]; then
-        echo "Expected '$*' but got '$out'"
-        exit 1
-    fi
+    for i in $out; do
+        if [ "$i" != "$1" ]; then
+            echo "Expected '$*' but got '$out'"
+            exit 1
+        fi
+        shift
+    done
 }
 
 doit --remove-rpath
-expect
+expect ""
 doit --set-rpath foo
 expect RUNPATH foo
 doit --force-rpath --set-rpath foo
