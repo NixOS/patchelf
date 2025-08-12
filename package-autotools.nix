@@ -1,4 +1,9 @@
-{ stdenv, autoreconfHook, version, src }:
+{
+  stdenv,
+  autoreconfHook,
+  version,
+  src,
+}:
 
 stdenv.mkDerivation {
   pname = "patchelf";
