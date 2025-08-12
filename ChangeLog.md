@@ -1,5 +1,11 @@
 ## Release History
 
+## 0.15.2 (August 12, 2025)
+
+* In the autotools build system for the tests, pass a few more tool env vars in `TESTS_ENVIRONMENT`.
+
+  Some of them are not used yet (at all, or at least not in this backport to the `0.15-maintenance` branch), but at least `STRIP` is.
+
 ## 0.15.1 (August 12, 2025)
 
 The objective is to prepare a very conservative patch release which can be bumped in Nixpkgs immediately.
