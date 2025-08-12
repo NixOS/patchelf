@@ -1,5 +1,15 @@
 ## Release History
 
+0.15.0 (Jul 16, 2022):
+
+* Add --add-debug option by @deadw00d in https://github.com/NixOS/patchelf/pull/367
+* Add O_BINARY flag when opening files to allow compilation for Windows by @JagoGyselinck in https://github.com/NixOS/patchelf/pull/372
+* Document --print-needed by @klemensn in https://github.com/NixOS/patchelf/pull/375
+* modifyRPath: return early if new and old rpath are empty by @ehmry in https://github.com/NixOS/patchelf/pull/376
+* Add comment explaining calculation for DT_MIPS_RLD_MAP_REL by @amjoseph-nixpkgs in https://github.com/NixOS/patchelf/pull/379
+* Add --no-sort option by @amjoseph-nixpkgs in https://github.com/NixOS/patchelf/pull/378
+* Handle DT_MIPS_XHASH and .MIPS.xhash by @amjoseph-nixpkgs in https://github.com/NixOS/patchelf/pull/380
+
 0.14.5 (February 21, 2022):
 
 * fix faulty version in 0.14.4
