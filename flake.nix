@@ -198,16 +198,16 @@
               inherit version src;
               # On windows we use win32 threads to get a static binary,
               # otherwise `-static` below doesn't work.
-              stdenv = pkgs.overrideCC pkgs.stdenv (
-                pkgs.buildPackages.wrapCC (
-                  pkgs.buildPackages.gcc-unwrapped.override ({
+              stdenv = pkgs.stdenv.override (old: {
+                cc = old.cc.override (old: {
+                  cc = old.cc.override {
                     threadsCross = {
                       model = "win32";
                       package = null;
                     };
-                  })
-                )
-              );
+                  };
+                });
+              });
             }).overrideAttrs
               (old: {
                 NIX_CFLAGS_COMPILE = "-static";
