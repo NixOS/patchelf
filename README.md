@@ -1,3 +1,5 @@
+# PatchELF
+
 PatchELF is a simple utility for modifying existing ELF executables and
 libraries.  In particular, it can do the following:
 
@@ -70,7 +72,7 @@ libraries.  In particular, it can do the following:
 
 ## Compiling and Testing
 
-### Via Autotools
+### Via [GNU Autotools](https://www.gnu.org/software/automake/manual/html_node/Autotools-Introduction.html)
 ```console
 ./bootstrap.sh
 ./configure
@@ -78,6 +80,27 @@ make
 make check
 sudo make install
 ```
+
+### Via [CMake](https://cmake.org/) (and [Ninja](https://ninja-build.org/))
+
+```console
+mkdir build
+cd build
+cmake .. -GNinja
+ninja all
+sudo ninja install
+```
+
+### Via [Meson](https://mesonbuild.com/) (and [Ninja](https://ninja-build.org/))
+
+```console
+mkdir build
+meson configure build
+cd build
+ninja all
+sudo ninja install
+```
+
 ### Via Nix
 
 You can build with Nix in several ways.
@@ -85,6 +108,10 @@ You can build with Nix in several ways.
 1. Building via `nix build` will produce the result in `./result/bin/patchelf`. If you would like to build _patchelf_ with _musl_ try `nix build .#patchelf-musl`
 
 2. You can launch a development environment with `nix develop` and follow the autotools steps above. If you would like to develop with _musl_ try `nix develop .#musl`
+
+## Help and resources
+
+- Matrix: [#patchelf:nixos.org](https://matrix.to/#/#patchelf:nixos.org)
 
 ## Author
 

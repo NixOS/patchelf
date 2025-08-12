@@ -1,0 +1,26 @@
+# EditorConfig configuration for PatchELF
+# http://EditorConfig.org
+
+# Top-most EditorConfig file
+root = true
+
+# Unix-style newlines with a newline ending every file, UTF-8 charset
+[*]
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+charset = utf-8
+
+# Match Nix files, set indent to spaces with width of two
+[*.nix]
+indent_style = space
+indent_size = 2
+
+# Match C++/C/shell, set indent to spaces with width of four
+[*.{hpp,cc,hh,c,h,sh}]
+indent_style = space
+indent_size = 4
+
+# Match diffs, avoid to trim trailing whitespace
+[*.{diff,patch}]
+trim_trailing_whitespace = false

@@ -1,0 +1,26 @@
+queue_rules:
+  - name: default
+    merge_conditions:
+      - check-success=Build static musl binaries (amd64)
+      - check-success=Build static musl binaries (arm32v7)
+      - check-success=Build static musl binaries (arm64v8)
+      - check-success=Build static musl binaries (i386)
+      - check-success=Build static musl binaries (ppc64le)
+      - check-success=Build static musl binaries (riscv64)
+      - check-success=Build static musl binaries (s390x)
+      - check-success=Build tarballs
+      - check-success=Build windows executable
+      - check-success=Publish tarballs & binaries
+      - check-success=Test windows binaries
+      - check-success=nix
+      - check-success=shellcheck
+      - check-success=ubuntu
+    merge_method: rebase
+    batch_size: 5
+pull_request_rules:
+  - name: merge using the merge queue
+    conditions:
+      - base=master
+      - label~=merge-queue|dependencies
+    actions:
+      queue: {}

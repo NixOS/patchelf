@@ -1,0 +1,7 @@
+option(
+  'page_size',
+  type : 'combo',
+  value : 'auto',
+  choices : [ 'auto', '4096', '65536', '16384', '8192' ],
+  description : 'Default page size, or "auto" to detect at runtime',
+)
