@@ -37,6 +37,9 @@
               fi
             ''}";
           };
+          cmake-format = {
+            enable = true;
+          };
           nixfmt-rfc-style = {
             enable = true;
           };
