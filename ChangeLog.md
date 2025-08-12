@@ -1,6 +1,6 @@
 ## Release History
 
-## 0.15.1 (not yet released)
+## 0.15.1 (August 12, 2025)
 
 The objective is to prepare a very conservative patch release which can be bumped in Nixpkgs immediately.
 
@@ -10,7 +10,7 @@ The objective is to prepare a very conservative patch release which can be bumpe
 
 The behavior of this version should be essentially the same as 0.15.0.
 
-## 0.15.0 (Jul 16, 2022)
+## 0.15.0 (July 16, 2022)
 
 * Add --add-debug option by @deadw00d in https://github.com/NixOS/patchelf/pull/367
 * Add O_BINARY flag when opening files to allow compilation for Windows by @JagoGyselinck in https://github.com/NixOS/patchelf/pull/372
