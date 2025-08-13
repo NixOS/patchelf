@@ -86,8 +86,8 @@ Changes compared to 0.13:
 * Bug fixes:
   - fix setting empty rpath
   - use memcpy instead of strcpy to set rpath
-  - Don't try to parse `.dynamic section` of type NOBITS
-  - fix use-after-free in normalizeNoteSegments
+  - Don't try to parse `.dynamic section` of type `NOBITS`
+  - fix use-after-free in `normalizeNoteSegments`
   - correct `EINTR` handling in writeFile
   - Adjust `PT_MIPS_ABIFLAGS` segment if present
   - Adjust `DT_MIPS_RLD_MAP_REL` dynamic section entry if present
