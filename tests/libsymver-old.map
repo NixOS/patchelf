@@ -1,0 +1,4 @@
+V1 {
+    global: foo;
+    local: foo_v1;
+};

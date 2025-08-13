@@ -114,6 +114,11 @@ This means that when a shared library has an entry point (so that it
 can be run as an executable), the debugger does not connect to it correctly and
 symbols are not resolved.
 
+.IP "--remove-needed-version LIBRARY VERSION_SYMBOL"
+Removes VERSION_SYMBOL from LIBRARY in .gnu.version_r and resets entries referenced
+the version in .gnu.version, could be used to remove symbol versioning. LIBRARY and
+VERSION_SYMBOL can be retrieved from the output of "readelf -V".
+
 .IP "--print-execstack"
 Prints the state of the executable flag of the GNU_STACK program header, if present.
 
