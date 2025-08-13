@@ -1,17 +1,26 @@
 # Release History
 
+## 0.16.2 (Yet to be released)
+
+The release combines the 0.15.1 through 0.15.4 backports with 0.16.1.
+
+* Code quality and infra changes just like 0.15.{1,2}
+* Update to a later glibc `elf.h`, just like 0.15.4
+
 ## 0.16.1 (October 28, 2022)
 
 This release only fixes the incorrect reported version by the 0.16.0 release.
 
 ## 0.16.0 (October 27, 2022)
 
-These notes are the remainder of 0.16.0 that was not backported to 0.15.3.
-Originally, 0.16.0 would have freshly contained all items from both releases.
+Changes from 0.15.3:
 
 * Add `--print-os-abi` and `--set-os-abi` options by @dmsck in https://github.com/NixOS/patchelf/pull/381
 * Sync `.note.gnu.property` to `PT_GNU_PROPERTY` by @Bo98 in https://github.com/NixOS/patchelf/pull/414
 * Rework file shifting to avoid sections crossing multiple segments by @Bo98 in https://github.com/NixOS/patchelf/pull/415
+
+(These notes are the remainder of 0.16.0 that was not backported to 0.15.3.
+Originally, 0.16.0 was branched from 0.15.0, and those changes were fresh in this release, having never been backported.)
 
 ## 0.15.4 (August 12, 2025)
 
