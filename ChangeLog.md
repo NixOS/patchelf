@@ -22,6 +22,17 @@ Changes from 0.15.3:
 (These notes are the remainder of 0.16.0 that was not backported to 0.15.3.
 Originally, 0.16.0 was branched from 0.15.0, and those changes were fresh in this release, having never been backported.)
 
+## 0.15.5 (August 12, 2025)
+
+Bugfix backports from 0.18.0:
+
+* Adjust `roundUp` for 0 as input by @cgzones in https://github.com/NixOS/patchelf/pull/466
+
+Bugfix backports from 0.17.{0, 1}:
+
+* Fix page size constants for Itanium and SPARC.
+* Fix Out-of-bounds read in the function `modifySoname` by @yairKoskas in https://github.com/NixOS/patchelf/pull/451
+
 ## 0.15.4 (August 12, 2025)
 
 * Update to a later glibc `elf.h`.
@@ -170,7 +181,7 @@ Changes compared to 0.13:
 * Rewrite section indices in symbol tables. This for instance allows
   gdb to show proper backtraces.
 
-* Added `--remove-needed' option.
+* Added `--remove-needed` option.
 
 ## 0.6 (November 7, 2011)
 
@@ -186,7 +197,7 @@ Changes compared to 0.13:
 
 * Various bugfixes.
 
-* `--force-rpath' now deletes the `DT_RUNPATH` if it is present.
+* `--force-rpath` now deletes the `DT_RUNPATH` if it is present.
 
 ## 0.4 (June 4, 2008)
 
@@ -196,18 +207,18 @@ Changes compared to 0.13:
 
 * FreeBSD support.
 
-* `--set-rpath', `--shrink-rpath' and `--print-rpath' now prefer
+* `--set-rpath`, `--shrink-rpath` and `--print-rpath` now prefer
   `DT_RUNPATH` over `DT_RPATH`, which is obsolete.  When updating, if both
   are present, both are updated.  If only `DT_RPATH` is present, it is
-  converted to `DT_RUNPATH` unless `--force-rpath' is specified.  If
-  neither is present, a `DT_RUNPATH` is added unless `--force-rpath' is
+  converted to `DT_RUNPATH` unless `--force-rpath` is specified.  If
+  neither is present, a `DT_RUNPATH` is added unless `--force-rpath` is
   specified, in which case a `DT_RPATH` is added.
 
 ## 0.3 (May 24, 2007)
 
-* Support for 64-bit ELF binaries (such as on x86_64-linux).
+* Support for 64-bit ELF binaries (such as on `x86_64-linux`).
 
-* Support for big-endian ELF binaries (such as on powerpc-linux).
+* Support for big-endian ELF binaries (such as on `powerpc-linux`).
 
 * Various bugfixes.
 
