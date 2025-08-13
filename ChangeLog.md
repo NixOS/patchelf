@@ -1,6 +1,6 @@
 # Release History
 
-## 0.16.4 (August 12, 2025)
+## 0.15.4 (August 12, 2025)
 
 * Update to a later glibc `elf.h`.
 
