@@ -1,6 +1,6 @@
 ## Release History
 
-## 0.15.3 (yet to be released)
+## 0.15.3 (August 12, 2025)
 
 This is a backport release made from the simplest fixes from 0.16.0.
 
