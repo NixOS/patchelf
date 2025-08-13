@@ -1,4 +1,51 @@
-## Release History
+# Release History
+
+## 0.16.2 (Yet to be released)
+
+The release combines the 0.15.1 through 0.15.4 backports with 0.16.1.
+
+* Code quality and infra changes just like 0.15.{1,2}
+* Update to a later glibc `elf.h`, just like 0.15.4
+
+## 0.16.1 (October 28, 2022)
+
+This release only fixes the incorrect reported version by the 0.16.0 release.
+
+## 0.16.0 (October 27, 2022)
+
+Changes from 0.15.3:
+
+* Add `--print-os-abi` and `--set-os-abi` options by @dmsck in https://github.com/NixOS/patchelf/pull/381
+* Sync `.note.gnu.property` to `PT_GNU_PROPERTY` by @Bo98 in https://github.com/NixOS/patchelf/pull/414
+* Rework file shifting to avoid sections crossing multiple segments by @Bo98 in https://github.com/NixOS/patchelf/pull/415
+
+(These notes are the remainder of 0.16.0 that was not backported to 0.15.3.
+Originally, 0.16.0 was branched from 0.15.0, and those changes were fresh in this release, having never been backported.)
+
+## 0.15.5 (August 12, 2025)
+
+Bugfix backports from 0.18.0:
+
+* Adjust `roundUp` for 0 as input by @cgzones in https://github.com/NixOS/patchelf/pull/466
+
+Bugfix backports from 0.17.{0, 1}:
+
+* Fix page size constants for Itanium and SPARC.
+* Fix Out-of-bounds read in the function `modifySoname` by @yairKoskas in https://github.com/NixOS/patchelf/pull/451
+
+## 0.15.4 (August 12, 2025)
+
+* Update to a later glibc `elf.h`.
+
+  This should not result in any behavioral changes, except for possibly better architecture-specific support.
+
+## 0.15.3 (August 12, 2025)
+
+This is a backport release made from the simplest fixes from 0.16.0.
+
+* Handle `glibc-hwcaps` on `ppc64le` on CentOS/RHEL/Rocky 8 for `tests/replace-add-needed.sh` (fixes #406) by @robert-scheck in https://github.com/NixOS/patchelf/pull/407
+* Fix Out-of-bounds read in the function `modifyRPath` by @xiaoxiaoafeifei in https://github.com/NixOS/patchelf/pull/419
+* Fix out of bounds access when increasing program header table by @Bo98 in https://github.com/NixOS/patchelf/pull/411
 
 ## 0.15.2 (August 12, 2025)
 
@@ -18,13 +65,13 @@ The behavior of this version should be essentially the same as 0.15.0.
 
 ## 0.15.0 (July 16, 2022)
 
-* Add --add-debug option by @deadw00d in https://github.com/NixOS/patchelf/pull/367
-* Add O_BINARY flag when opening files to allow compilation for Windows by @JagoGyselinck in https://github.com/NixOS/patchelf/pull/372
-* Document --print-needed by @klemensn in https://github.com/NixOS/patchelf/pull/375
+* Add `--add-debug` option by @deadw00d in https://github.com/NixOS/patchelf/pull/367
+* Add `O_BINARY flag` when opening files to allow compilation for Windows by @JagoGyselinck in https://github.com/NixOS/patchelf/pull/372
+* Document `--print-needed` by @klemensn in https://github.com/NixOS/patchelf/pull/375
 * modifyRPath: return early if new and old rpath are empty by @ehmry in https://github.com/NixOS/patchelf/pull/376
-* Add comment explaining calculation for DT_MIPS_RLD_MAP_REL by @amjoseph-nixpkgs in https://github.com/NixOS/patchelf/pull/379
-* Add --no-sort option by @amjoseph-nixpkgs in https://github.com/NixOS/patchelf/pull/378
-* Handle DT_MIPS_XHASH and .MIPS.xhash by @amjoseph-nixpkgs in https://github.com/NixOS/patchelf/pull/380
+* Add comment explaining calculation for `DT_MIPS_RLD_MAP_REL` by @amjoseph-nixpkgs in https://github.com/NixOS/patchelf/pull/379
+* Add `--no-sort option` by @amjoseph-nixpkgs in https://github.com/NixOS/patchelf/pull/378
+* Handle `DT_MIPS_XHASH` and `.MIPS.xhash` by @amjoseph-nixpkgs in https://github.com/NixOS/patchelf/pull/380
 
 ## 0.14.5 (February 21, 2022)
 
@@ -36,7 +83,7 @@ The behavior of this version should be essentially the same as 0.15.0.
 * Allow multiple modifications in same call by @fzakaria in https://github.com/NixOS/patchelf/pull/361
 * Add support to build with musl by @fzakaria in https://github.com/NixOS/patchelf/pull/362
 * Fix typo: s/folllow/follow/ by @bjornfor in https://github.com/NixOS/patchelf/pull/366
-* mips: fix incorrect polarity on dyn_offset; closes #364 by @a-m-joseph in https://github.com/NixOS/patchelf/pull/365
+* mips: fix incorrect polarity on `dyn_offset`; closes #364 by @a-m-joseph in https://github.com/NixOS/patchelf/pull/365
 
 ## 0.14.3 (December 05, 2021)
 
@@ -55,13 +102,13 @@ The behavior of this version should be essentially the same as 0.15.0.
 Changes compared to 0.13:
 
 * Bug fixes:
-  - Fix corrupted library names when using --replace-needed multiple times
+  - Fix corrupted library names when using `--replace-needed` multiple times
   - Fix setting an empty rpath
-  - Don't try to parse .dynamic section of type NOBITS
-  - Fix use-after-free in normalizeNoteSegments
-  - Correct EINTR handling in writeFile
-  - MIPS: Adjust PT_MIPS_ABIFLAGS segment and DT_MIPS_RLD_MAP_REL dynamic section if present
-  - Fix binaries without .gnu.hash section
+  - Don't try to parse `.dynamic section` of type `NOBITS`
+  - Fix use-after-free in `normalizeNoteSegments`
+  - Correct `EINTR` handling in writeFile
+  - MIPS: Adjust `PT_MIPS_ABIFLAGS` segment and `DT_MIPS_RLD_MAP_REL` dynamic section if present
+  - Fix binaries without `.gnu.hash` section
 * Support loongarch architecture
 * Remove limits on output file size for elf files
 * Allow reading rpath from file
@@ -72,12 +119,12 @@ Changes compared to 0.13:
 * Bug fixes:
   - fix setting empty rpath
   - use memcpy instead of strcpy to set rpath
-  - Don't try to parse .dynamic section of type NOBITS
-  - fix use-after-free in normalizeNoteSegments
-  - correct EINTR handling in writeFile
-  - Adjust PT_MIPS_ABIFLAGS segment if present
-  - Adjust DT_MIPS_RLD_MAP_REL dynamic section entry if present
-  - fix binaries without .gnu.hash section
+  - Don't try to parse `.dynamic section` of type `NOBITS`
+  - fix use-after-free in `normalizeNoteSegments`
+  - correct `EINTR` handling in writeFile
+  - Adjust `PT_MIPS_ABIFLAGS` segment if present
+  - Adjust `DT_MIPS_RLD_MAP_REL` dynamic section entry if present
+  - fix binaries without `.gnu.hash` section
 
 ## 0.13 (August 5, 2021)
 
@@ -105,7 +152,7 @@ Changes compared to 0.13:
 
 * Many bug fixes. Please refer to the Git commit log:
 
-    https://github.com/NixOS/patchelf/commits/master
+    https://github.com/NixOS/patchelf/commits/0.10
 
   This release has contributions from Adam Trhoň, Benjamin Hipple,
   Bernardo Ramos, Bjørn Forsman, Domen Kožar, Eelco Dolstra, Ezra
@@ -117,7 +164,7 @@ Changes compared to 0.13:
 
 * Lots of new features. Please refer to the Git commit log:
 
-    https://github.com/NixOS/patchelf/commits/master
+    https://github.com/NixOS/patchelf/commits/0.9
 
   This release has contributions from Aaron D. Marasco, Adrien
   Devresse, Alexandre Pretyman, Changli Gao, Chingis Dugarzhapov,
@@ -134,7 +181,7 @@ Changes compared to 0.13:
 * Rewrite section indices in symbol tables. This for instance allows
   gdb to show proper backtraces.
 
-* Added `--remove-needed' option.
+* Added `--remove-needed` option.
 
 ## 0.6 (November 7, 2011)
 
@@ -150,7 +197,7 @@ Changes compared to 0.13:
 
 * Various bugfixes.
 
-* `--force-rpath' now deletes the DT_RUNPATH if it is present.
+* `--force-rpath` now deletes the `DT_RUNPATH` if it is present.
 
 ## 0.4 (June 4, 2008)
 
@@ -160,18 +207,18 @@ Changes compared to 0.13:
 
 * FreeBSD support.
 
-* `--set-rpath', `--shrink-rpath' and `--print-rpath' now prefer
-  DT_RUNPATH over DT_RPATH, which is obsolete.  When updating, if both
-  are present, both are updated.  If only DT_RPATH is present, it is
-  converted to DT_RUNPATH unless `--force-rpath' is specified.  If
-  neither is present, a DT_RUNPATH is added unless `--force-rpath' is
-  specified, in which case a DT_RPATH is added.
+* `--set-rpath`, `--shrink-rpath` and `--print-rpath` now prefer
+  `DT_RUNPATH` over `DT_RPATH`, which is obsolete.  When updating, if both
+  are present, both are updated.  If only `DT_RPATH` is present, it is
+  converted to `DT_RUNPATH` unless `--force-rpath` is specified.  If
+  neither is present, a `DT_RUNPATH` is added unless `--force-rpath` is
+  specified, in which case a `DT_RPATH` is added.
 
 ## 0.3 (May 24, 2007)
 
-* Support for 64-bit ELF binaries (such as on x86_64-linux).
+* Support for 64-bit ELF binaries (such as on `x86_64-linux`).
 
-* Support for big-endian ELF binaries (such as on powerpc-linux).
+* Support for big-endian ELF binaries (such as on `powerpc-linux`).
 
 * Various bugfixes.
 
