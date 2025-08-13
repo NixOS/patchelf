@@ -322,7 +322,7 @@ unsigned int ElfFile<ElfFileParamNames>::getPageSize() const noexcept
     // requirements. There is no authoritative list of these values. The
     // current list is extracted from GNU gold's source code (abi_pagesize).
     switch (rdi(hdr()->e_machine)) {
-      case EM_SPARC:
+      case EM_IA_64:
       case EM_MIPS:
       case EM_PPC:
       case EM_PPC64:
@@ -330,6 +330,10 @@ unsigned int ElfFile<ElfFileParamNames>::getPageSize() const noexcept
       case EM_TILEGX:
       case EM_LOONGARCH:
         return 0x10000;
+      case EM_SPARC: // This should be sparc 32-bit. According to the linux
+                     // kernel 4KB should be also fine, but it seems that solaris is doing 8KB
+      case EM_SPARCV9: /* SPARC64 support */
+        return 0x2000;
       default:
         return 0x1000;
     }
@@ -431,6 +435,8 @@ static void writeFile(const std::string & fileName, const FileContents & content
 
 static uint64_t roundUp(uint64_t n, uint64_t m)
 {
+    if (n == 0)
+        return m;
     return ((n - 1) / m + 1) * m;
 }
 
@@ -1262,6 +1268,7 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string &
         if (rdi(dyn->d_tag) == DT_SONAME) {
             dynSoname = dyn;
             soname = strTab + rdi(dyn->d_un.d_val);
+            checkPointer(fileContents, strTab, rdi(dyn->d_un.d_val));
         }
     }
 

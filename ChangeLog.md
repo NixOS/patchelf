@@ -22,6 +22,17 @@ Changes from 0.15.3:
 (These notes are the remainder of 0.16.0 that was not backported to 0.15.3.
 Originally, 0.16.0 was branched from 0.15.0, and those changes were fresh in this release, having never been backported.)
 
+## 0.15.5 (August 12, 2025)
+
+Bugfix backports from 0.18.0:
+
+* Adjust `roundUp` for 0 as input by @cgzones in https://github.com/NixOS/patchelf/pull/466
+
+Bugfix backports from 0.17.{0, 1}:
+
+* Fix page size constants for Itanium and SPARC.
+* Fix Out-of-bounds read in the function `modifySoname` by @yairKoskas in https://github.com/NixOS/patchelf/pull/451
+
 ## 0.15.4 (August 12, 2025)
 
 * Update to a later glibc `elf.h`.

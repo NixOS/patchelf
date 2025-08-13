@@ -6,7 +6,7 @@ OBJCOPY=${OBJCOPY:-objcopy}
 
 if ! $OBJDUMP -p main | grep -q MIPS_RLD_MAP_REL; then
     echo "No MIPS_RLD_MAP_REL dynamic section entry, skipping"
-    exit 0
+    exit 77
 fi
 
 rm -rf "${SCRATCH}"
