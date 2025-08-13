@@ -1,4 +1,4 @@
-## Release History
+# Release History
 
 ## 0.16.1 (October 28, 2022)
 
@@ -13,7 +13,13 @@ Originally, 0.16.0 would have freshly contained all items from both releases.
 * Sync `.note.gnu.property` to `PT_GNU_PROPERTY` by @Bo98 in https://github.com/NixOS/patchelf/pull/414
 * Rework file shifting to avoid sections crossing multiple segments by @Bo98 in https://github.com/NixOS/patchelf/pull/415
 
-## 0.15.3 (yet to be released)
+## 0.15.4 (August 12, 2025)
+
+* Update to a later glibc `elf.h`.
+
+  This should not result in any behavioral changes, except for possibly better architecture-specific support.
+
+## 0.15.3 (August 12, 2025)
 
 This is a backport release made from the simplest fixes from 0.16.0.
 
