@@ -1005,10 +1005,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
         Elf_Shdr & shdr(shdrs.at(i));
         std::string sectionName = getSectionName(shdr);
         debug("looking at section '%s'\n", sectionName.c_str());
-        /* !!! Why do we stop after a .dynstr section? I can't
-           remember! */
-        if ((rdi(shdr.sh_type) == SHT_PROGBITS && sectionName != ".interp")
-            || prevSection == ".dynstr")
+        if (rdi(shdr.sh_type) == SHT_PROGBITS && sectionName != ".interp")
         {
             startOffset = rdi(shdr.sh_offset);
             startAddr = rdi(shdr.sh_addr);
@@ -1079,6 +1076,22 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
 
         firstPage -= neededPages * getPageSize();
         startOffset += neededPages * getPageSize();
+    } else {
+        // Calculate how many bytes are needed out of the additional pages.
+        Elf_Off curOff = sizeof(Elf_Ehdr) + phdrs.size() * sizeof(Elf_Phdr);
+        size_t extraSpace = neededSpace - curOff;
+
+        /* Find segment mapping the rewritten sections and increase its size
+           Also make it RW (not great) */
+        for (auto& segment : phdrs)
+            if (rdi(segment.p_type) == PT_LOAD &&
+                rdi(segment.p_offset) <= curOff &&
+                rdi(segment.p_offset) + rdi(segment.p_filesz) >= curOff)
+            {
+                wri(segment.p_filesz, rdi(segment.p_filesz) + extraSpace);
+                wri(segment.p_memsz, rdi(segment.p_memsz) + extraSpace);
+                wri(segment.p_flags, PF_R | PF_W);
+            }
     }
 
     Elf_Off curOff = sizeof(Elf_Ehdr) + phdrs.size() * sizeof(Elf_Phdr);
