@@ -14,7 +14,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - uses: cachix/install-nix-action@v31
-    - run: nix-build -A hydraJobs.release
+    - run: |
+        nix flake check --extra-experimental-features 'nix-command flakes' --all-systems --no-build
+        nix-build -A hydraJobs.release
   ubuntu:
     runs-on: ubuntu-latest
     steps:
