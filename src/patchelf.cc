@@ -724,6 +724,11 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
            must be sync'ed with it. */
         else if (sectionName == ".dynamic") {
             for (auto & phdr : phdrs) {
+                if (rdi(phdr.p_type) == PT_LOAD &&
+                        rdi(phdr.p_vaddr) <= shdr.sh_addr &&
+                        shdr.sh_addr < (rdi(phdr.p_vaddr) + rdi(phdr.p_memsz))) {
+                    phdr.p_flags |= PF_W;
+                }
                 if (rdi(phdr.p_type) == PT_DYNAMIC) {
                     phdr.p_offset = shdr.sh_offset;
                     phdr.p_vaddr = phdr.p_paddr = shdr.sh_addr;
