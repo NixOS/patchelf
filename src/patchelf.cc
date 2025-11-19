@@ -1531,8 +1531,13 @@ std::string ElfFile<ElfFileParamNames>::shrinkRPath(char* rpath, std::vector<std
     std::vector<bool> neededLibFound(neededLibs.size(), false);
 
     std::string newRPath = "";
+    std::set<std::string> componentsConsidered;
 
     for (auto & dirName : splitColonDelimitedString(rpath)) {
+        if (componentsConsidered.find(dirName) != componentsConsidered.end()) {
+            continue;
+        }
+        componentsConsidered.insert(dirName);
 
         /* Non-absolute entries are allowed (e.g., the special
            "$ORIGIN" hack). */
@@ -1671,6 +1676,14 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
             break;
         }
         case rpSet: { break; } /* new rpath was provied as input to this function */
+        case rpShrinkAndAdd: {
+            auto temp = std::string(rpath ? rpath : "");
+            appendRPath(temp, newRPath);
+            newRPath = temp;
+            char * newRPathCStr = const_cast<char *>(newRPath.c_str());
+            newRPath = shrinkRPath(newRPathCStr, neededLibs, allowedRpathPrefixes);
+            break;
+        }
     }
 
     if (!forceRPath && dynRPath && !dynRunPath) { /* convert DT_RPATH to DT_RUNPATH */
@@ -2473,7 +2486,9 @@ static void patchElf2(ElfFile && elfFile, const FileContents & fileContents, con
     else if (setExecstack)
         elfFile.modifyExecstack(ElfFile::ExecstackMode::set);
 
-    if (shrinkRPath)
+    if (shrinkRPath && addRPath)
+        elfFile.modifyRPath(elfFile.rpShrinkAndAdd, allowedRpathPrefixes, newRPath);
+    else if (shrinkRPath)
         elfFile.modifyRPath(elfFile.rpShrink, allowedRpathPrefixes, "");
     else if (removeRPath)
         elfFile.modifyRPath(elfFile.rpRemove, {}, "");
@@ -2620,6 +2635,12 @@ static int mainWrapped(int argc, char * * argv)
         else if (arg == "--allowed-rpath-prefixes") {
             if (++i == argc) error("missing argument");
             allowedRpathPrefixes = splitColonDelimitedString(argv[i]);
+        }
+        else if (arg == "--add-rpath-and-shrink") {
+            if (++i == argc) error("missing argument");
+            addRPath = true;
+            newRPath = resolveArgument(argv[i]);
+            shrinkRPath = true;
         }
         else if (arg == "--set-rpath") {
             if (++i == argc) error("missing argument");

@@ -150,7 +150,7 @@ public:
 
     void setInterpreter(const std::string & newInterpreter);
 
-    typedef enum { rpPrint, rpShrink, rpSet, rpAdd, rpRemove } RPathOp;
+    typedef enum { rpPrint, rpShrink, rpSet, rpAdd, rpRemove, rpShrinkAndAdd } RPathOp;
 
     void modifyRPath(RPathOp op, const std::vector<std::string> & allowedRpathPrefixes, std::string newRPath);
     std::string shrinkRPath(char* rpath, std::vector<std::string> &neededLibs, const std::vector<std::string> & allowedRpathPrefixes);
