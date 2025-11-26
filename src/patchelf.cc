@@ -1768,8 +1768,12 @@ void ElfFile<ElfFileParamNames>::removeNeeded(const std::set<std::string> & libs
     char * strTab = (char *) fileContents->data() + rdi(shdrDynStr.sh_offset);
 
     auto dyn = (Elf_Dyn *)(fileContents->data() + rdi(shdrDynamic.sh_offset));
+    Elf_Dyn * vnNumDyn = 0;
     Elf_Dyn * last = dyn;
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+        if (rdi(dyn->d_tag) == DT_VERNEEDNUM)
+            // Our stable location will be on last, not on dyn, in case of shifting.
+            vnNumDyn = last;
         if (rdi(dyn->d_tag) == DT_NEEDED) {
             char * name = strTab + rdi(dyn->d_un.d_val);
             if (libs.count(name)) {
@@ -1784,6 +1788,53 @@ void ElfFile<ElfFileParamNames>::removeNeeded(const std::set<std::string> & libs
     }
 
     memset(last, 0, sizeof(Elf_Dyn) * (dyn - last));
+
+    // If we've got a Verneed section AND it's advertised as having at least one entry.
+    unsigned int verNeedNum;
+    if (vnNumDyn && (verNeedNum = rdi(vnNumDyn->d_un.d_val)) > 0) {
+        Elf_Shdr & shdrVersionR = shdrs.at(getSectionIndex(".gnu.version_r"));
+        Elf_Shdr & shdrVersionRStrings = shdrs.at(rdi(shdrVersionR.sh_link));
+        char * verStrTab = (char *) fileContents->data() + rdi(shdrVersionRStrings.sh_offset);
+        debug("found .gnu.version_r with %i entries\n", verNeedNum);
+
+        auto need = (Elf_Verneed *)(fileContents->data() + rdi(shdrVersionR.sh_offset));
+        Elf64_Word * vnLastOffset = 0;
+        unsigned int vnRemovedCount = 0;
+        while (verNeedNum > 0) {
+            char * file = verStrTab + rdi(need->vn_file);
+            auto i = libs.find(file);
+            if (i != libs.end()) {
+                debug("skipping .gnu.version_r entry '%s'\n", file);
+                // If possible we'll just skip the entry by incrementing the previous' entry vn_next, letting our (now ghost) data in place.
+                // This will avoid breaking the binary in case of a strange, but technically possible, usage of the section where vn_next != sizeof(Elf_Verneed),
+                // where some arbitrary data has been interleaved between the Elf_Verneeds.
+                if (vnLastOffset)
+                    wri(*vnLastOffset, rdi(need->vn_next) ? rdi(*vnLastOffset) + rdi(need->vn_next) : 0);
+                else {
+                    // The only case where we trim is the first entry: its previous pointer is also the section's start (shdrVersionR.sh_offset).
+                    // @todo Not sure we let a working binary when removing the last entry (vn_next == 0).
+                    wri(shdrVersionR.sh_offset, rdi(shdrVersionR.sh_offset) + rdi(need->vn_next));
+                    wri(shdrVersionR.sh_size, rdi(shdrVersionR.sh_size) - rdi(need->vn_next));
+                }
+                ++vnRemovedCount;
+                changed = true;
+            } else {
+                debug("keeping .gnu.version_r entry '%s'\n", file);
+                vnLastOffset = &need->vn_next;
+            }
+            // vn_next == 0 officially ends the chained list (and would technically get us in an infinite loop).
+            if (rdi(need->vn_next) == 0)
+                break;
+            need = (Elf_Verneed *) (((char *) need) + rdi(need->vn_next));
+            --verNeedNum;
+        }
+        if (vnRemovedCount > 0) {
+            debug("shrinking count of versions from %d to %d\n", rdi(vnNumDyn->d_un.d_val), rdi(vnNumDyn->d_un.d_val) - vnRemovedCount);
+            wri(vnNumDyn->d_un.d_val, rdi(vnNumDyn->d_un.d_val) - vnRemovedCount);
+            wri(shdrVersionR.sh_info, rdi(shdrVersionR.sh_info) - vnRemovedCount);
+            replaceSection(".gnu.version_r", rdi(shdrVersionR.sh_size));
+        }
+    }
 
     this->rewriteSections();
 }
