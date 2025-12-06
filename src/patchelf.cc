@@ -1670,6 +1670,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
             newRPath = temp;
             break;
         }
+        case rpUpdate: { break; } /* just update the RPATH to RUNPATH or vice versa */
         case rpSet: { break; } /* new rpath was provied as input to this function */
     }
 
@@ -1683,6 +1684,10 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
         dynRPath = dynRunPath;
         dynRunPath = nullptr;
         changed = true;
+    }
+
+    if (op == rpUpdate) {
+        return;
     }
 
     if (rpath && rpath == newRPath) {
@@ -2426,6 +2431,7 @@ static std::vector<std::string> allowedRpathPrefixes;
 static bool removeRPath = false;
 static bool setRPath = false;
 static bool addRPath = false;
+static bool updateRPath = false;
 static bool addDebugTag = false;
 static bool renameDynamicSymbols = false;
 static bool printRPath = false;
@@ -2481,6 +2487,8 @@ static void patchElf2(ElfFile && elfFile, const FileContents & fileContents, con
         elfFile.modifyRPath(elfFile.rpSet, {}, newRPath);
     else if (addRPath)
         elfFile.modifyRPath(elfFile.rpAdd, {}, newRPath);
+    else if (updateRPath)
+        elfFile.modifyRPath(elfFile.rpUpdate, {}, "");
 
     if (printNeeded) elfFile.printNeededLibs();
 
@@ -2550,6 +2558,7 @@ static void showHelp(const std::string & progName)
   [--allowed-rpath-prefixes PREFIXES]\t\tWith '--shrink-rpath', reject rpath entries not starting with the allowed prefix\n\
   [--print-rpath]\n\
   [--force-rpath]\n\
+  [--update-rpath]\n\
   [--add-needed LIBRARY]\n\
   [--remove-needed LIBRARY]\n\
   [--replace-needed LIBRARY NEW_LIBRARY]\n\
@@ -2613,6 +2622,9 @@ static int mainWrapped(int argc, char * * argv)
         }
         else if (arg == "--remove-rpath") {
             removeRPath = true;
+        }
+        else if (arg == "--update-rpath") {
+            updateRPath = true;
         }
         else if (arg == "--shrink-rpath") {
             shrinkRPath = true;
