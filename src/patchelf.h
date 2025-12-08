@@ -45,6 +45,8 @@ private:
     std::vector<Elf_Phdr> phdrs;
     std::vector<Elf_Shdr> shdrs;
 
+    int trailingNullPhdrs;
+
     bool littleEndian;
 
     bool changed = false;
@@ -167,6 +169,8 @@ public:
     void noDefaultLib();
 
     void addDebugTag();
+
+    void appendNullPhdrs(int count);
 
     void renameDynamicSymbols(const std::unordered_map<std::string_view, std::string>&);
 

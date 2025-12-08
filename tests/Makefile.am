@@ -41,6 +41,7 @@ src_TESTS = \
   basic-flags.sh \
   set-empty-rpath.sh \
   phdr-corruption.sh \
+  append-null-phdr.sh \
   replace-needed.sh \
   replace-add-needed.sh \
   add-debug-tag.sh \
@@ -125,7 +126,7 @@ check_DATA = libbig-dynstr.debug
 # - with libtool, it is difficult to control options
 # - with libtool, it is not possible to compile convenience *dynamic* libraries :-(
 check_PROGRAMS += libfoo.so libfoo-scoped.so libbar.so libbar-scoped.so libsimple.so libsimple-execstack.so libbuildid.so libtoomanystrtab.so \
-                  phdr-corruption.so many-syms-main libmany-syms.so liboveralign.so libshared-rpath.so
+                  phdr-corruption.so append-null-phdr.so many-syms-main libmany-syms.so liboveralign.so libshared-rpath.so
 
 libbuildid_so_SOURCES = simple.c
 libbuildid_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,--build-id
@@ -182,6 +183,10 @@ contiguous_note_sections_CFLAGS = -pie
 phdr_corruption_so_SOURCES = void.c phdr-corruption.ld
 phdr_corruption_so_LDFLAGS = -nostdlib -shared -Wl,-T$(srcdir)/phdr-corruption.ld
 phdr_corruption_so_CFLAGS =
+
+append_null_phdr_so_SOURCES = void.c
+append_null_phdr_so_LDFLAGS = -nostdlib -shared
+append_null_phdr_so_CFLAGS =
 
 many-syms.c:
 	i=1; while [ $$i -le 2000 ]; do echo "void f$$i() {};"; i=$$(($$i + 1)); done > $@
