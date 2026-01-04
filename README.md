@@ -15,6 +15,16 @@ libraries.  In particular, it can do the following:
   $ patchelf --set-rpath /opt/my-libs/lib:/other-libs my-program
   ```
 
+* Add a directory to the `RPATH`:
+
+  ```console
+  $ patchelf --add-rpath /opt/my-libs/lib my-program
+  ```
+
+  This appends the specified directory to the existing `RPATH` of the
+  executable or library. Unlike `--set-rpath`, this preserves any
+  existing `RPATH` entries.
+
 * Shrink the `RPATH` of executables and libraries:
 
   ```console
