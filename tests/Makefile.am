@@ -25,6 +25,7 @@ src_TESTS = \
   set-rpath-library.sh soname.sh shrink-rpath-with-allowed-prefixes.sh \
   set-rpath-rel-map.sh \
   force-rpath.sh \
+  force.sh \
   plain-needed.sh \
   output-flag.sh \
   too-many-strtab.sh \

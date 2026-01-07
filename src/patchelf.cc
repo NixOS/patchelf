@@ -2564,6 +2564,7 @@ static void showHelp(const std::string & progName)
   [--rename-dynamic-symbols NAME_MAP_FILE]\tRenames dynamic symbols. The map file should contain two symbols (old_name new_name) per line\n\
   [--no-clobber-old-sections]\t\tDo not clobber old section values - only use when the binary expects to find section info at the old location.\n\
   [--output FILE]\n\
+  [--force]\t\tForce write-out even if no changes were made\n\
   [--debug]\n\
   [--version]\n\
   FILENAME...\n", progName.c_str());
@@ -2683,6 +2684,9 @@ static int mainWrapped(int argc, char * * argv)
         else if (arg == "--output") {
             if (++i == argc) error("missing argument");
             outputFileName = resolveArgument(argv[i]);
+            alwaysWrite = true;
+        }
+        else if (arg == "--force") {
             alwaysWrite = true;
         }
         else if (arg == "--debug") {

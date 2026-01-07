@@ -143,6 +143,11 @@ Use sparingly and with caution.
 .IP "--output FILE"
 Set the output file name.  If not specified, the input will be modified in place.
 
+.IP --force
+Force write-out of the ELF binary even when no changes were made.
+This is useful for fixing ELF binaries that have issues like
+"Program headers not in the first page".
+
 .IP --debug
 Prints details of the changes made to the input file.
 
