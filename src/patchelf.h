@@ -172,6 +172,8 @@ public:
 
     void clearSymbolVersions(const std::set<std::string> & syms);
 
+    void renameSymbolVersions(const std::map<std::string, std::string> & vers);
+
     enum class ExecstackMode { print, set, clear };
 
     void modifyExecstack(ExecstackMode op);

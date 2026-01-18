@@ -2299,6 +2299,99 @@ void ElfFile<ElfFileParamNames>::clearSymbolVersions(const std::set<std::string>
 }
 
 template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::renameSymbolVersions(const std::map<std::string, std::string> & vers)
+{
+    if (vers.empty()) return;
+
+    // convert to a strings table
+    std::string table;
+    std::map<std::string, int> offsets;
+    for (const auto& entry : vers) {
+        offsets[entry.second] = table.size();
+        table.append(entry.second.c_str(), entry.second.size() + 1);
+    }
+
+    // replace version definitions
+    bool updatedDefs = false;
+    int defLink = 0;
+    Elf_Shdr defStrTabHdr;
+    if (auto shdrVerdef = tryFindSectionHeader(".gnu.version_d")) {
+        defLink = shdrVerdef->get().sh_link;
+        defStrTabHdr = shdrs.at(defLink);
+        auto strTab = (char *)fileContents->data() + rdi(defStrTabHdr.sh_offset);
+        Elf_Verdef *curVerdef = NULL;
+        int verdauxIndex = 0;
+        forAll_ElfVer(getSectionSpan<Elf_Verdef>(*shdrVerdef),
+            [&](auto& vd) {
+                curVerdef = &vd;
+                verdauxIndex = 0;
+            },
+            [&](auto& vda) {
+                const char *name = &strTab[rdi(vda.vda_name)];
+                if (auto entry = vers.find(name); entry != vers.end()) {
+                    debug("replacing version definition %s with %s\n", name, entry->second.c_str());
+                    wri(vda.vda_name, defStrTabHdr.sh_size + offsets.at(entry->second));
+                    // Only update the hash for the first auxiliary entry (the actual version name, not the parent refs)
+                    if (verdauxIndex == 0) {
+                        wri(curVerdef->vd_hash, gnuHash(entry->second));
+                    }
+                    updatedDefs = true;
+                }
+                verdauxIndex++;
+            }
+        );
+        if (updatedDefs) {
+            debug("appending .gnu.version_d strings\n");
+            auto& newStrTab = replaceSection(getSectionName(defStrTabHdr), defStrTabHdr.sh_size + table.size());
+            newStrTab.replace(static_cast<size_t>(defStrTabHdr.sh_size), table.size(), table);
+        }
+    }
+
+    // rename version requirements
+    bool updatedNeeds = false;
+    if (auto shdrVerneed = tryFindSectionHeader(".gnu.version_r")) {
+        int needLink = rdi(shdrVerneed->get().sh_link);
+        auto needStrTabHdr = shdrs.at(needLink);
+        auto strTab = (char *)fileContents->data() + rdi(needStrTabHdr.sh_offset);
+
+        size_t baseOffset = needStrTabHdr.sh_size;
+        if (updatedDefs && needLink == defLink) {
+            baseOffset += table.size();
+            debug("version needs share string table with version defs; using offset %zu\n", baseOffset);
+        }
+
+        forAll_ElfVer(getSectionSpan<Elf_Verneed>(*shdrVerneed),
+            [] (auto&) { },
+            [&] (auto& vna) {
+                const char *name = strTab + rdi(vna.vna_name);
+                if (auto entry = vers.find(name); entry != vers.end()) {
+                    debug("replacing version requirement %s with %s\n", name, entry->second.c_str());
+                    // When sharing string table with defs, strings are already appended; use same offset
+                    if (updatedDefs && needLink == defLink) {
+                        wri(vna.vna_name, defStrTabHdr.sh_size + offsets.at(entry->second));
+                    } else {
+                        wri(vna.vna_name, needStrTabHdr.sh_size + offsets.at(entry->second));
+                    }
+                    wri(vna.vna_hash, gnuHash(entry->second));
+                    updatedNeeds = true;
+                }
+            }
+        );
+        if (updatedNeeds && !(updatedDefs && needLink == defLink)) {
+            debug("appending .gnu.version_r strings\n");
+            auto& newStrTab = replaceSection(getSectionName(needStrTabHdr), needStrTabHdr.sh_size + table.size());
+            newStrTab.replace(static_cast<size_t>(needStrTabHdr.sh_size), table.size(), table);
+        }
+    }
+
+    if (updatedDefs || updatedNeeds) {
+        changed = true;
+        debug("rewriting sections in response to new symbol versions\n");
+        this->rewriteSections();
+    }
+}
+
+template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::modifyExecstack(ExecstackMode op)
 {
     if (op == ExecstackMode::clear || op == ExecstackMode::set) {
@@ -2434,6 +2527,7 @@ static std::set<std::string> neededLibsToRemove;
 static std::map<std::string, std::string> neededLibsToReplace;
 static std::set<std::string> neededLibsToAdd;
 static std::set<std::string> symbolsToClearVersion;
+static std::map<std::string, std::string> symbolVersionsToRename;
 static std::unordered_map<std::string_view, std::string> symbolsToRename;
 static std::unordered_set<std::string> symbolsToRenameKeys;
 static bool printNeeded = false;
@@ -2488,6 +2582,7 @@ static void patchElf2(ElfFile && elfFile, const FileContents & fileContents, con
     elfFile.replaceNeeded(neededLibsToReplace);
     elfFile.addNeeded(neededLibsToAdd);
     elfFile.clearSymbolVersions(symbolsToClearVersion);
+    elfFile.renameSymbolVersions(symbolVersionsToRename);
 
     if (noDefaultLib)
         elfFile.noDefaultLib();
@@ -2557,6 +2652,7 @@ static void showHelp(const std::string & progName)
   [--no-default-lib]\n\
   [--no-sort]\t\tDo not sort program+section headers; useful for debugging patchelf.\n\
   [--clear-symbol-version SYMBOL]\n\
+  [--rename-symbol-version VERSION NEW_VERSION]\n\
   [--add-debug-tag]\n\
   [--print-execstack]\t\tPrints whether the object requests an executable stack\n\
   [--clear-execstack]\n\
@@ -2670,6 +2766,11 @@ static int mainWrapped(int argc, char * * argv)
         else if (arg == "--clear-symbol-version") {
             if (++i == argc) error("missing argument");
             symbolsToClearVersion.insert(resolveArgument(argv[i]));
+        }
+        else if (arg == "--rename-symbol-version") {
+            if (i+2 >= argc) error("missing argument(s)");
+            symbolVersionsToRename[ argv[i+1] ] = argv[i+2];
+            i += 2;
         }
         else if (arg == "--print-execstack") {
             printExecstack = true;
