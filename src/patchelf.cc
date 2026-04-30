@@ -1302,17 +1302,23 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                      *   DT_MIPS_RLD_MAP_REL + tag offset + executable base address == DT_MIPS_RLD_MAP
                      *   DT_MIPS_RLD_MAP_REL              + executable base address == DT_MIPS_RLD_MAP - tag_offset
                      *   DT_MIPS_RLD_MAP_REL                                        == DT_MIPS_RLD_MAP - tag_offset - executable base address
+                     *
+                     * Unlike the direct field copies elsewhere in this loop
+                     * (where target byte order round-trips untouched), this
+                     * *computes* a new value, so the operands must be read via
+                     * rdi() and the result written back via wri().
                      */
-                    auto rld_map_addr = findSectionHeader(".rld_map").sh_addr;
+                    auto rld_map_addr = rdi((*shdr).get().sh_addr);
                     auto dyn_offset = ((char*)dyn) - ((char*)dyn_table);
-                    dyn->d_un.d_ptr = rld_map_addr - dyn_offset - (*shdrDynamic).get().sh_addr;
+                    auto dynamic_addr = rdi((*shdrDynamic).get().sh_addr);
+                    wri(dyn->d_un.d_ptr, rld_map_addr - dyn_offset - dynamic_addr);
                 } else {
                     /* ELF file with DT_MIPS_RLD_MAP_REL but without .rld_map
                        is broken, and it's not our job to fix it; yet, we have
                        to find some location for dynamic loader to write the
                        debug pointer to; well, let's write it right here */
                     fprintf(stderr, "warning: DT_MIPS_RLD_MAP_REL entry is present, but .rld_map section is not\n");
-                    dyn->d_un.d_ptr = 0;
+                    wri(dyn->d_un.d_ptr, 0);
                 }
             }
     }
