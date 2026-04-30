@@ -64,7 +64,8 @@ src_TESTS = \
   empty-note.sh \
   set-interpreter-same.sh \
   property-rewrite.sh \
-  large-page-dynamic.sh
+  large-page-dynamic.sh \
+  no-vaddr-underrun.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)
@@ -108,11 +109,16 @@ main_DEPENDENCIES = libfoo.so
 main_LDFLAGS = $(LDFLAGS_local)
 
 # Non-PIE (ET_EXEC) variant of main, to exercise rewriteSectionsExecutable().
+# Carries a concrete DT_RPATH to the build directory so
+# build-resolution-cache-no-pie.sh can resolve the run path without first
+# rewriting sections with patchelf: after the vaddr-underrun fix, patching a
+# non-PIE binary moves the section header table off the end of the file, which
+# would make pad-to-page's "SHT ends on a page boundary" layout impossible.
 main_no_pie_SOURCES = main.c
 main_no_pie_CFLAGS = -fno-pie
 main_no_pie_LDADD = -lfoo $(AM_LDADD)
 main_no_pie_DEPENDENCIES = libfoo.so
-main_no_pie_LDFLAGS = $(LDFLAGS_local) -no-pie
+main_no_pie_LDFLAGS = $(LDFLAGS_local) -no-pie -Wl,-rpath,`pwd`
 
 # Non-PIE binary with a max-page-size larger than the runtime page size. On
 # 32-bit targets this makes patchelf relocate .dynamic into the read-only first
