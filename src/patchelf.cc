@@ -337,10 +337,12 @@ ElfFile<ElfFileParamNames>::ElfFile(FileContents fContents)
         error("string table index out of bounds");
 
     auto shstrtabSize = rdi(shdrs[shstrtabIndex].sh_size);
-    size_t shstrtabptr;
-    if (__builtin_add_overflow(reinterpret_cast<size_t>(fileContents->data()), rdi(shdrs[shstrtabIndex].sh_offset), &shstrtabptr))
-        error("string table overflow");
-    const char *shstrtab = reinterpret_cast<const char *>(shstrtabptr);
+    auto shstrtabOffset = rdi(shdrs[shstrtabIndex].sh_offset);
+
+    if (shstrtabOffset > fileContents->size())
+        error("string table offset out of bounds");
+
+    const char *shstrtab = reinterpret_cast<const char *>(fileContents->data() + shstrtabOffset);
     checkPointer(fileContents, shstrtab, shstrtabSize);
 
     if (shstrtabSize == 0)
