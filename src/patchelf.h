@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 #include "elf.h"
 
@@ -169,6 +170,8 @@ public:
     void addDebugTag();
 
     void renameDynamicSymbols(const std::unordered_map<std::string_view, std::string>&);
+
+    void removeNeededVersion(const std::map<std::string, std::set<std::string>> & verMap);
 
     void clearSymbolVersions(const std::set<std::string> & syms);
 

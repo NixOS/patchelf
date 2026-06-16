@@ -1,6 +1,7 @@
 LIBS =
 
-check_PROGRAMS = simple-pie simple simple-execstack main too-many-strtab main-scoped big-dynstr no-rpath contiguous-note-sections
+check_PROGRAMS = simple-pie simple simple-execstack main too-many-strtab main-scoped big-dynstr no-rpath contiguous-note-sections \
+				 symver
 
 no_rpath_arch_TESTS = \
   no-rpath-alpha.sh \
@@ -53,6 +54,7 @@ src_TESTS = \
   shared-rpath.sh \
   short-first-segment.sh \
   empty-note.sh \
+  remove-needed-version.sh \
   set-interpreter-same.sh
 
 build_TESTS = \
@@ -125,7 +127,8 @@ check_DATA = libbig-dynstr.debug
 # - with libtool, it is difficult to control options
 # - with libtool, it is not possible to compile convenience *dynamic* libraries :-(
 check_PROGRAMS += libfoo.so libfoo-scoped.so libbar.so libbar-scoped.so libsimple.so libsimple-execstack.so libbuildid.so libtoomanystrtab.so \
-                  phdr-corruption.so many-syms-main libmany-syms.so liboveralign.so libshared-rpath.so
+                  phdr-corruption.so many-syms-main libmany-syms.so liboveralign.so libshared-rpath.so \
+				  libsymver.so libsymver-old.so
 
 libbuildid_so_SOURCES = simple.c
 libbuildid_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,--build-id
@@ -182,6 +185,18 @@ contiguous_note_sections_CFLAGS = -pie
 phdr_corruption_so_SOURCES = void.c phdr-corruption.ld
 phdr_corruption_so_LDFLAGS = -nostdlib -shared -Wl,-T$(srcdir)/phdr-corruption.ld
 phdr_corruption_so_CFLAGS =
+
+libsymver_so_SOURCES = libsymver.c
+libsymver_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,--version-script=libsymver.map
+libsymver_so_CFLAGS = $(AM_CFLAGS)
+libsymver_old_so_SOURCES = libsymver-old.c
+libsymver_old_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,--version-script=libsymver-old.map
+libsymver_old_so_CFLAGS = $(AM_CFLAGS)
+symver_SOURCES = symver.c
+symver_LDFLAGS = $(LDFLAGS_local)
+symver_LDADD = -lsymver $(AM_LDADD)
+symver_DEPENDENCIES = libsymver.so libsymver-old.so
+symver_CFLAGS = $(AM_CFLAGS)
 
 many-syms.c:
 	i=1; while [ $$i -le 2000 ]; do echo "void f$$i() {};"; i=$$(($$i + 1)); done > $@
