@@ -870,7 +870,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
     /* Compute the total space needed for the replaced sections, pessimistically
        assuming we're going to need one more to account for new PT_LOAD covering
        relocated PHDR */
-    off_t phtSize = roundUp((phdrs.size() + num_notes + 1) * sizeof(Elf_Phdr) + sizeof(Elf_Ehdr), sectionAlignment);
+    off_t phtSize = roundUp((phdrs.size() + num_notes + 1) * sizeof(Elf_Phdr), sectionAlignment);
     off_t shtSize = roundUp(rdi(hdr()->e_shnum) * rdi(hdr()->e_shentsize), sectionAlignment);
 
     /* Check if we can keep PHT at the beginning of the file.
@@ -883,31 +883,33 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
          PHDRs not located at the beginning of the file; it was fixed over
          0da1d5002745cdc721bc018b582a8a9704d56c42 (2022-03-02) */
     bool relocatePht = false;
-    unsigned int i = 1;
+    off_t phtEnd = rdi(hdr()->e_phoff) + phtSize;
 
-    while (i < rdi(hdr()->e_shnum) && ((off_t) rdi(shdrs.at(i).sh_offset)) <= phtSize) {
+    for (unsigned int i = 1; i < rdi(hdr()->e_shnum); i++) {
+        off_t shOff = rdi(shdrs.at(i).sh_offset);
+        if (shOff <= (off_t) rdi(hdr()->e_phoff)) continue;
+        if (shOff >= phtEnd) break;
+
         const auto & sectionName = getSectionName(shdrs.at(i));
 
         if (!hasReplacedSection(sectionName) && !canReplaceSection(sectionName)) {
             relocatePht = true;
             break;
         }
-
-        i++;
     }
 
     if (!relocatePht) {
-        unsigned int i = 1;
+        for (unsigned int i = 1; i < rdi(hdr()->e_shnum); i++) {
+            off_t shOff = rdi(shdrs.at(i).sh_offset);
+            if (shOff <= (off_t) rdi(hdr()->e_phoff)) continue;
+            if (shOff >= phtEnd) break;
 
-        while (i < rdi(hdr()->e_shnum) && ((off_t) rdi(shdrs.at(i).sh_offset)) <= phtSize) {
             const auto & sectionName = getSectionName(shdrs.at(i));
             const auto sectionSize = rdi(shdrs.at(i).sh_size);
 
             if (!hasReplacedSection(sectionName)) {
                 replaceSection(sectionName, sectionSize);
             }
-
-            i++;
         }
     }
 
