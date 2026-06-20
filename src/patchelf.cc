@@ -1599,7 +1599,7 @@ void ElfFile<ElfFileParamNames>::removeRPath(Elf_Shdr & shdrDynamic) {
                *replace* sections we cannot rely on rewriteSections(). So
                we simply fix this one tag in place. */
             if (rdi(dyn->d_tag) == DT_MIPS_RLD_MAP_REL)
-                wri(dyn->d_un.d_val, rdi(dyn->d_un.d_val) + sizeof(Elf_Dyn) * (dyn - last));
+                wri(dyn->d_un.d_ptr, rdi(dyn->d_un.d_ptr) + sizeof(Elf_Dyn) * (dyn - last));
             *last++ = *dyn;
         }
     }
