@@ -10,8 +10,8 @@
 
 using FileContents = std::shared_ptr<std::vector<unsigned char>>;
 
-#define ElfFileParams class Elf_Ehdr, class Elf_Phdr, class Elf_Shdr, class Elf_Addr, class Elf_Off, class Elf_Dyn, class Elf_Sym, class Elf_Versym, class Elf_Verdef, class Elf_Verdaux, class Elf_Verneed, class Elf_Vernaux, class Elf_Rel, class Elf_Rela, unsigned ElfClass
-#define ElfFileParamNames Elf_Ehdr, Elf_Phdr, Elf_Shdr, Elf_Addr, Elf_Off, Elf_Dyn, Elf_Sym, Elf_Versym, Elf_Verdef, Elf_Verdaux, Elf_Verneed, Elf_Vernaux, Elf_Rel, Elf_Rela, ElfClass
+#define ElfFileParams class Elf_Ehdr, class Elf_Phdr, class Elf_Shdr, class Elf_Nhdr, class Elf_Addr, class Elf_Off, class Elf_Dyn, class Elf_Sym, class Elf_Versym, class Elf_Verdef, class Elf_Verdaux, class Elf_Verneed, class Elf_Vernaux, class Elf_Rel, class Elf_Rela, unsigned ElfClass
+#define ElfFileParamNames Elf_Ehdr, Elf_Phdr, Elf_Shdr, Elf_Nhdr, Elf_Addr, Elf_Off, Elf_Dyn, Elf_Sym, Elf_Versym, Elf_Verdef, Elf_Verdaux, Elf_Verneed, Elf_Vernaux, Elf_Rel, Elf_Rela, ElfClass
 
 template<class T>
 struct span
@@ -134,6 +134,8 @@ private:
 
     void normalizeNoteSegments();
 
+    void removeResolutionCache();
+
 public:
 
     void rewriteSections(bool force = false);
@@ -167,6 +169,8 @@ public:
     void noDefaultLib();
 
     void addDebugTag();
+
+    void buildResolutionCache();
 
     void renameDynamicSymbols(const std::unordered_map<std::string_view, std::string>&);
 

@@ -44,6 +44,7 @@ local options=(
   '--no-default-lib[Marks the object so that the search for dependencies of this object will ignore any default library search paths]'
   '--no-sort[Do not sort program headers or section headers]'
   '--add-debug-tag[Adds DT_DEBUG tag to the .dynamic section if not yet present in an ELF object]'
+  '--build-resolution-cache[Records resolved DT_NEEDED paths in a .note.nixos.ldcache note so a loader can skip the run-path search]'
   '(- : *)--print-execstack[Prints the state of the executable flag of the GNU_STACK program header, if present]'
   '--clear-execstack[Clears the executable flag of the GNU_STACK program header, or adds a new header]'
   '--set-execstack[Sets the executable flag of the GNU_STACK program header, or adds a new header]'
