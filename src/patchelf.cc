@@ -1383,7 +1383,10 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                     continue;
                 }
                 const std::string & section = sectionsByOldIndex.at(shndx);
-                assert(!section.empty());
+                if (section.empty()) {
+                    fprintf(stderr, "warning: symbol table entry refers to an unnamed section (index %d), skipping\n", shndx);
+                    continue;
+                }
                 auto newIndex = getSectionIndex(section); // inefficient
                 //debug("rewriting symbol %d: index = %d (%s) -> %d\n", entry, shndx, section.c_str(), newIndex);
                 wri(sym.st_shndx, newIndex);

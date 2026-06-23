@@ -60,6 +60,7 @@ fixture invalid-dynamic-unaligned "$(shdr_field $dynamic 24)"         '\001\0\0\
 fixture invalid-dynstr-idx        $((dynamic_off + 8))                '\377\377\377\377\377\377\377\177'
 fixture invalid-dynstr-noterm     $((dynstr_off + dynstr_size - 1))   'A'
 fixture invalid-verneed-file      $((verneed_off + 4))                '\377\377\377\177'
+fixture invalid-unnamed-section   "$(shdr_field 1 0)"                 '\0\0\0\0'
 # sh_addralign==0 is *valid* per the ELF spec; must be handled, not rejected.
 fixture valid-note-addralign-zero "$(shdr_field 2 48)"                '\0\0\0\0\0\0\0\0'
 
@@ -84,6 +85,7 @@ TEST_CASES="
     $SCRATCH:invalid-dynstr-noterm
     $SCRATCH:invalid-verneed-file
     $SCRATCH:invalid-dynamic-noterm
+    $SCRATCH:invalid-unnamed-section
     $TEST_DIR:invalid-phdr-offset
     $TEST_DIR:invalid-phdr-issue-64
 "
@@ -124,6 +126,10 @@ invalid_verneed_file_ARGS='--replace-needed libc.so.6 libx.so'
 invalid_dynamic_noterm_MSG='setSubstr: write extends past end of section'
 # shellcheck disable=SC2034
 invalid_dynamic_noterm_ARGS='--add-debug-tag'
+# shellcheck disable=SC2034
+invalid_unnamed_section_MSG='warning: .* refers to an unnamed section'
+# shellcheck disable=SC2034
+invalid_unnamed_section_ARGS='--set-rpath /x'
 # shellcheck disable=SC2034
 invalid_phdr_offset_MSG='program header table out of bounds'
 # shellcheck disable=SC2034
