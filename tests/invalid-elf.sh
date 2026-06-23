@@ -46,6 +46,9 @@ dynstr_off=$(read_le "$base" "$(shdr_field $dynstr 24)" 8)
 dynstr_size=$(read_le "$base" "$(shdr_field $dynstr 32)" 8)
 verneed_off=$(read_le "$base" "$(shdr_field $verneed 24)" 8)
 dynamic_size=$(read_le "$base" "$(shdr_field $dynamic 32)" 8)
+gnuhash=5
+gnuhash_off=$(read_le "$base" "$(shdr_field $gnuhash 24)" 8)
+printf 'puts puts2\n' > "$SCRATCH/sym-map"
 
 fixture() { cp "$base" "$SCRATCH/$1"; poke "$SCRATCH/$1" "$2" "$3"; }
 
@@ -61,6 +64,8 @@ fixture invalid-dynstr-idx        $((dynamic_off + 8))                '\377\377\
 fixture invalid-dynstr-noterm     $((dynstr_off + dynstr_size - 1))   'A'
 fixture invalid-verneed-file      $((verneed_off + 4))                '\377\377\377\177'
 fixture invalid-unnamed-section   "$(shdr_field 1 0)"                 '\0\0\0\0'
+fixture invalid-gnuhash-buckets   "$gnuhash_off"                      '\0\0\0\0'
+fixture invalid-gnuhash-maskwords $((gnuhash_off + 8))                '\377\377\377\177'
 # sh_addralign==0 is *valid* per the ELF spec; must be handled, not rejected.
 fixture valid-note-addralign-zero "$(shdr_field 2 48)"                '\0\0\0\0\0\0\0\0'
 
@@ -86,6 +91,8 @@ TEST_CASES="
     $SCRATCH:invalid-verneed-file
     $SCRATCH:invalid-dynamic-noterm
     $SCRATCH:invalid-unnamed-section
+    $SCRATCH:invalid-gnuhash-buckets
+    $SCRATCH:invalid-gnuhash-maskwords
     $TEST_DIR:invalid-phdr-offset
     $TEST_DIR:invalid-phdr-issue-64
 "
@@ -130,6 +137,14 @@ invalid_dynamic_noterm_ARGS='--add-debug-tag'
 invalid_unnamed_section_MSG='warning: .* refers to an unnamed section'
 # shellcheck disable=SC2034
 invalid_unnamed_section_ARGS='--set-rpath /x'
+# shellcheck disable=SC2034
+invalid_gnuhash_buckets_MSG='hash table header out of range'
+# shellcheck disable=SC2034
+invalid_gnuhash_buckets_ARGS="--rename-dynamic-symbols $SCRATCH/sym-map"
+# shellcheck disable=SC2034
+invalid_gnuhash_maskwords_MSG='hash table header out of range'
+# shellcheck disable=SC2034
+invalid_gnuhash_maskwords_ARGS="--rename-dynamic-symbols $SCRATCH/sym-map"
 # shellcheck disable=SC2034
 invalid_phdr_offset_MSG='program header table out of bounds'
 # shellcheck disable=SC2034

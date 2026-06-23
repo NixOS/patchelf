@@ -2437,7 +2437,16 @@ static uint32_t gnuHash(std::string_view name) {
 template<ElfFileParams>
 auto ElfFile<ElfFileParamNames>::parseGnuHashTable(span<char> sectionData) -> GnuHashTable
 {
+    if (sectionData.size() < sizeof(typename GnuHashTable::Header))
+        error(".gnu.hash section is too small");
     auto hdr = (typename GnuHashTable::Header*)sectionData.begin();
+    auto avail = sectionData.size() - sizeof(*hdr);
+    size_t bloomBytes, bucketBytes;
+    if (rdi(hdr->numBuckets) == 0 || rdi(hdr->maskwords) == 0
+        || __builtin_mul_overflow(rdi(hdr->maskwords), sizeof(typename GnuHashTable::BloomWord), &bloomBytes)
+        || __builtin_mul_overflow(rdi(hdr->numBuckets), sizeof(uint32_t), &bucketBytes)
+        || bloomBytes > avail || bucketBytes > avail - bloomBytes)
+        error(".gnu.hash table header out of range");
     auto bloomFilters = span((typename GnuHashTable::BloomWord*)(hdr+1), rdi(hdr->maskwords));
     auto buckets = span((uint32_t*)bloomFilters.end(), rdi(hdr->numBuckets));
     auto table = span(buckets.end(), ((uint32_t*)sectionData.end()) - buckets.end());
@@ -2570,7 +2579,15 @@ static uint32_t sysvHash(std::string_view name) {
 template<ElfFileParams>
 auto ElfFile<ElfFileParamNames>::parseHashTable(span<char> sectionData) -> HashTable
 {
+    if (sectionData.size() < sizeof(typename HashTable::Header))
+        error(".hash section is too small");
     auto hdr = (typename HashTable::Header*)sectionData.begin();
+    auto avail = sectionData.size() - sizeof(*hdr);
+    size_t bucketBytes;
+    if (rdi(hdr->numBuckets) == 0
+        || __builtin_mul_overflow(rdi(hdr->numBuckets), sizeof(uint32_t), &bucketBytes)
+        || bucketBytes > avail)
+        error(".hash table header out of range");
     auto buckets = span((uint32_t*)(hdr+1), rdi(hdr->numBuckets));
     auto table = span(buckets.end(), ((uint32_t*)sectionData.end()) - buckets.end());
     return HashTable{*hdr, buckets, table};
