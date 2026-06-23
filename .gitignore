@@ -27,6 +27,9 @@ CMakeLists.txt.user
 /tests/*.so
 /tests/scratch
 /tests/main
+/tests/main-no-pie
+/tests/main-emit-relocs
+/tests/pad-to-page
 /tests/simple
 /tests/too-many-strtab
 /tests/big-dynstr*

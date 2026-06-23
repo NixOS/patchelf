@@ -1351,6 +1351,15 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
             }
         }
     }
+
+    /* The symbol table now stores the section indices we just wrote, so the
+       old-index map must follow suit. Otherwise a second rewriteHeaders() in
+       the same run (e.g. removeResolutionCache() followed by a section-growing
+       edit) would remap the already-updated indices a second time through a
+       stale map and corrupt st_shndx. */
+    sectionsByOldIndex.resize(shdrs.size());
+    for (size_t i = 1; i < shdrs.size(); ++i)
+        sectionsByOldIndex.at(i) = getSectionName(shdrs.at(i));
 }
 
 
@@ -1613,7 +1622,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
 
     /* !!! We assume that the virtual address in the DT_STRTAB entry
        of the dynamic section corresponds to the .dynstr section. */
-    auto& shdrDynStr = findSectionHeader(".dynstr");
+    auto shdrDynStr = findSectionHeader(".dynstr");
     char * strTab = (char *) fileContents->data() + rdi(shdrDynStr.sh_offset);
 
 
@@ -1655,6 +1664,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
             return;
         }
         case rpRemove: {
+            removeResolutionCache();
             if (!rpath) {
                 debug("no RPATH to delete\n");
                 return;
@@ -1664,6 +1674,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
         }
         case rpShrink: {
             if (!rpath) {
+                removeResolutionCache();
                 debug("no RPATH to shrink\n");
                 return;
             }
@@ -1694,6 +1705,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
     if (rpath && rpath == newRPath) {
         return;
     }
+    removeResolutionCache();
     changed = true;
 
     bool rpathStrShared = false;
@@ -1775,12 +1787,14 @@ void ElfFile<ElfFileParamNames>::removeNeeded(const std::set<std::string> & libs
 
     auto dyn = (Elf_Dyn *)(fileContents->data() + rdi(shdrDynamic.sh_offset));
     Elf_Dyn * last = dyn;
+    bool removed = false;
     for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_NEEDED) {
             char * name = strTab + rdi(dyn->d_un.d_val);
             if (libs.count(name)) {
                 debug("removing DT_NEEDED entry '%s'\n", name);
                 changed = true;
+                removed = true;
             } else {
                 debug("keeping DT_NEEDED entry '%s'\n", name);
                 *last++ = *dyn;
@@ -1790,6 +1804,8 @@ void ElfFile<ElfFileParamNames>::removeNeeded(const std::set<std::string> & libs
     }
 
     memset(last, 0, sizeof(Elf_Dyn) * (dyn - last));
+
+    if (removed) removeResolutionCache();
 
     this->rewriteSections();
 }
@@ -1805,6 +1821,7 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
 
     auto dyn = (Elf_Dyn *)(fileContents->data() + rdi(shdrDynamic.sh_offset));
 
+    bool replaced = false;
     unsigned int verNeedNum = 0;
 
     unsigned int dynStrAddedBytes = 0;
@@ -1842,6 +1859,7 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
                 dynStrAddedBytes += replacement.size() + 1;
 
                 changed = true;
+                replaced = true;
             } else {
                 debug("keeping DT_NEEDED entry '%s'\n", name);
             }
@@ -1907,6 +1925,7 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
                 }
 
                 changed = true;
+                replaced = true;
             } else {
                 debug("keeping .gnu.version_r entry '%s'\n", file);
             }
@@ -1915,6 +1934,8 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
             --verNeedNum;
         }
     }
+
+    if (replaced) removeResolutionCache();
 
     this->rewriteSections();
 }
@@ -1965,6 +1986,8 @@ void ElfFile<ElfFileParamNames>::addNeeded(const std::set<std::string> & libs)
         setSubstr(newDynamic, i * sizeof(Elf_Dyn), std::string((char *) &newDyn, sizeof(Elf_Dyn)));
         i++;
     }
+
+    removeResolutionCache();
 
     changed = true;
 
@@ -2058,6 +2081,292 @@ void ElfFile<ElfFileParamNames>::addDebugTag()
     setSubstr(newDynamic, 0, std::string((char *) &newDyn, sizeof(Elf_Dyn)));
 
     this->rewriteSections();
+    changed = true;
+}
+
+/* The linker resolution cache note. Its name and type match the glibc loader
+   patch in Nixpkgs that reads it; keep them in sync. The descriptor is a
+   sequence of NUL-terminated (needed, path-list) string pairs, where each
+   path-list entry is "=<absolute-path>" for a directly resolved library or
+   "?<dir>" for a directory the loader must still search itself (used for
+   $ORIGIN-style and glibc-hwcaps directories). */
+static const char ldCacheNoteName[] = "NixOS";
+static const char ldCacheSectionName[] = ".note.nixos.ldcache";
+static constexpr uint32_t NT_NIXOS_LD_CACHE = 0x63a86cb6;
+
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::removeResolutionCache()
+{
+    const unsigned int noteIndex = getSectionIndex(ldCacheSectionName);
+    if (!noteIndex)
+        return;
+
+    const Elf_Shdr noteShdr = shdrs.at(noteIndex);
+    const Elf_Off noteOffset = rdi(noteShdr.sh_offset);
+    const Elf_Off noteSize = rdi(noteShdr.sh_size);
+
+    /* Dropping the section and program headers below does not remove the note's
+       bytes from the file. Its descriptor holds "=<store-path>" entries, so
+       zero them on disk; otherwise Nix's reference scanner would keep picking
+       up store paths that may already be stale after an rpath change (cf. the
+       'X' tainting of removed rpaths in modifyRPath). */
+    if (noteOffset <= fileContents->size() && noteSize <= fileContents->size() - noteOffset)
+        memset(fileContents->data() + noteOffset, 0, noteSize);
+
+    phdrs.erase(std::remove_if(phdrs.begin(), phdrs.end(), [&] (const Elf_Phdr & phdr) {
+        const auto type = rdi(phdr.p_type);
+        return (type == PT_LOAD || type == PT_NOTE)
+            && rdi(phdr.p_offset) == noteOffset
+            && rdi(phdr.p_filesz) == noteSize;
+    }), phdrs.end());
+    wri(hdr()->e_phnum, phdrs.size());
+
+    shdrs.erase(shdrs.begin() + noteIndex);
+    wri(hdr()->e_shnum, shdrs.size());
+
+    const unsigned int shstrndx = rdi(hdr()->e_shstrndx);
+    if (shstrndx == noteIndex)
+        error("cannot remove resolution cache note: section name table index points to it");
+    if (shstrndx > noteIndex)
+        wri(hdr()->e_shstrndx, shstrndx - 1);
+
+    for (auto & shdr : shdrs) {
+        const unsigned int link = rdi(shdr.sh_link);
+        if (link == noteIndex)
+            wri(shdr.sh_link, 0);
+        else if (link > noteIndex)
+            wri(shdr.sh_link, link - 1);
+
+        const auto type = rdi(shdr.sh_type);
+        if (type == SHT_REL || type == SHT_RELA) {
+            const unsigned int info = rdi(shdr.sh_info);
+            if (info == noteIndex)
+                wri(shdr.sh_info, 0);
+            else if (info > noteIndex)
+                wri(shdr.sh_info, info - 1);
+        }
+    }
+
+    Elf_Addr phdrAddress = 0;
+    for (const auto & phdr : phdrs)
+        if (rdi(phdr.p_type) == PT_PHDR) {
+            phdrAddress = rdi(phdr.p_vaddr);
+            break;
+        }
+    rewriteHeaders(phdrAddress);
+    changed = true;
+}
+
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::buildResolutionCache()
+{
+    const auto existingCacheNote = tryFindSectionHeader(ldCacheSectionName);
+
+    /* A cache is built once; rebuilding in place is not supported. Any bail-out
+       while a note is already present must fail loudly rather than leave a
+       stale note behind. Reset errno so error() doesn't append a misleading
+       strerror left over from the access() probes below. */
+    auto failIfStale = [&] {
+        if (existingCacheNote) {
+            errno = 0;
+            error("--build-resolution-cache: a resolution cache note is already present; rebuild from an unpatched binary");
+        }
+    };
+
+    auto shdrDynamic = tryFindSectionHeader(".dynamic");
+    auto shdrDynStr = tryFindSectionHeader(".dynstr");
+    if (!shdrDynamic || !shdrDynStr) {
+        failIfStale();
+        fprintf(stderr, "warning: --build-resolution-cache: no dynamic section (statically linked?); no cache written\n");
+        return;
+    }
+
+    const char * strTab = (const char *) fileContents->data() + rdi(shdrDynStr->get().sh_offset);
+    auto dyn = (const Elf_Dyn *) (fileContents->data() + rdi(shdrDynamic->get().sh_offset));
+    /* Bound the walk by the .dynamic section size so a missing DT_NULL
+       terminator can't run off the end of the mapping. */
+    const Elf_Dyn * dynEnd = dyn + rdi(shdrDynamic->get().sh_size) / sizeof(Elf_Dyn);
+
+    std::vector<std::string> needed;
+    const char * dtRunPath = nullptr;
+    const char * dtRPath = nullptr;
+    for ( ; dyn < dynEnd && rdi(dyn->d_tag) != DT_NULL; dyn++) {
+        if (rdi(dyn->d_tag) == DT_NEEDED)
+            needed.emplace_back(strTab + rdi(dyn->d_un.d_val));
+        else if (rdi(dyn->d_tag) == DT_RUNPATH)
+            dtRunPath = strTab + rdi(dyn->d_un.d_val);
+        else if (rdi(dyn->d_tag) == DT_RPATH)
+            dtRPath = strTab + rdi(dyn->d_un.d_val);
+    }
+    /* DT_RUNPATH takes precedence over DT_RPATH, as in the loader. */
+    const char * runPathStr = dtRunPath ? dtRunPath : dtRPath;
+    std::vector<std::string> runPath =
+        runPathStr ? splitColonDelimitedString(runPathStr) : std::vector<std::string>{};
+    if (needed.empty() || runPath.empty()) {
+        failIfStale();
+        fprintf(stderr, "warning: --build-resolution-cache: no DT_NEEDED entries or run path to resolve; no cache written\n");
+        return;
+    }
+
+    /* Resolve each soname against the run path, first match wins (as the
+       loader does). Directories containing dynamic-string tokens or a
+       glibc-hwcaps subdirectory can't be resolved at patch time, so record
+       them as a search hint for the loader instead of an exact path. */
+    std::map<std::string, std::string> cache;
+    auto addEntry = [&](const std::string & lib, const std::string & resolved) {
+        auto & entry = cache[lib];
+        if (!entry.empty())
+            entry += ':';
+        entry += resolved;
+    };
+    /* A DT_NEEDED entry containing a slash is a pathname the loader opens
+       directly without consulting the run path, so it has nothing to resolve
+       here. */
+    const auto isSearched = [](const std::string & lib) {
+        return lib.find('/') == std::string::npos;
+    };
+    for (const auto & dir : runPath) {
+        /* The loader reads an empty run-path component as the current working
+           directory, which is meaningless to bake in at patch time. */
+        if (dir.empty())
+            continue;
+        const bool hasToken = dir.find('$') != std::string::npos;
+        const bool hasHwcaps = access((dir + "/glibc-hwcaps").c_str(), F_OK) == 0;
+        if (hasToken || hasHwcaps) {
+            const std::string hint = "?" + dir;
+            for (const auto & lib : needed)
+                if (isSearched(lib))
+                    addEntry(lib, hint);
+        } else {
+            for (const auto & lib : needed) {
+                if (!isSearched(lib))
+                    continue;
+                const auto path = dir + "/" + lib;
+                if (access(path.c_str(), R_OK) == 0)
+                    addEntry(lib, "=" + path);
+            }
+        }
+    }
+    if (cache.empty()) {
+        failIfStale();
+        fprintf(stderr, "warning: --build-resolution-cache: no libraries resolved against the run path; no cache written\n");
+        return;
+    }
+
+    std::string desc;
+    for (const auto & [lib, path] : cache) {
+        debug("resolved %s to %s\n", lib.c_str(), path.c_str());
+        desc += lib;
+        desc += '\0';
+        desc += path;
+        desc += '\0';
+    }
+    desc += '\0';
+
+    errno = 0;
+
+    /* A note whose descriptor still matches is a harmless re-run; otherwise it
+       is stale and we fail rather than silently keep it. */
+    if (existingCacheNote) {
+        const Elf_Shdr & sh = existingCacheNote->get();
+        const Elf_Off noteOff = rdi(sh.sh_offset);
+        const uint64_t fileSize = fileContents->size();
+        std::string oldDesc;
+        /* Bounds-check against both the section and the file so a short or
+           foreign note isn't read past its end; an unparseable note leaves
+           oldDesc empty and falls through to failIfStale(). */
+        if (noteOff <= fileSize && fileSize - noteOff >= sizeof(Elf_Nhdr)
+            && rdi(sh.sh_size) >= sizeof(Elf_Nhdr)) {
+            Elf_Nhdr enh;
+            memcpy(&enh, fileContents->data() + noteOff, sizeof enh);
+            const uint64_t avail = std::min<uint64_t>(rdi(sh.sh_size), fileSize - noteOff);
+            const uint64_t nameSz = roundUp(rdi(enh.n_namesz), 4);
+            const uint64_t descSz = rdi(enh.n_descsz);
+            if (nameSz <= avail - sizeof(Elf_Nhdr)
+                && descSz <= avail - sizeof(Elf_Nhdr) - nameSz)
+                oldDesc.assign((const char *) fileContents->data()
+                    + noteOff + sizeof(Elf_Nhdr) + nameSz, descSz);
+        }
+        if (oldDesc == desc) {
+            debug("resolution cache already up to date\n");
+            return;
+        }
+        failIfStale();
+    }
+
+    const size_t descSize = desc.size();
+    const size_t nameSize = roundUp(sizeof(ldCacheNoteName), 4);
+    const size_t noteSize = sizeof(Elf_Nhdr) + nameSize + roundUp(descSize, 4);
+
+    /* Place the note in a fresh page-aligned PT_LOAD at the end of the file,
+       covered by a PT_NOTE so the loader can find it. */
+    const Elf_Addr pageSize = getPageSize();
+    /* For executables rewriteSections() rewrites the section header table in
+       place at e_shoff; it grows by the one section we add below. When the
+       table sits at the end of the file (the usual layout) its extra entry
+       would land on the note if the note started at the old end of file, so
+       keep the note past the grown table. */
+    const Elf_Off shdrTableEnd =
+        rdi(hdr()->e_shoff) + (rdi(hdr()->e_shnum) + 1) * rdi(hdr()->e_shentsize);
+    const Elf_Off noteOffset = roundUp(std::max<Elf_Off>(fileContents->size(), shdrTableEnd), pageSize);
+
+    Elf_Addr noteAddr = 0;
+    Elf_Addr minDiff = ~Elf_Addr(0);
+    for (const auto & phdr : phdrs)
+        if (rdi(phdr.p_type) == PT_LOAD) {
+            noteAddr = std::max<Elf_Addr>(noteAddr, rdi(phdr.p_vaddr) + rdi(phdr.p_memsz));
+            minDiff = std::min<Elf_Addr>(minDiff, rdi(phdr.p_vaddr) - rdi(phdr.p_offset));
+        }
+    noteAddr = roundUp(noteAddr, pageSize);
+
+    if (rdi(hdr()->e_type) == ET_EXEC)
+        /* qemu-user's loader mis-detects the load base of a non-PIE executable
+           when a new PT_LOAD has p_offset < p_vaddr while PT_PHDR's difference
+           is smaller still. Pad the address so that p_vaddr >= p_offset. */
+        noteAddr += roundUp(minDiff, pageSize);
+
+    fileContents->resize(noteOffset + noteSize, 0);
+    auto * note = fileContents->data() + noteOffset;
+    auto & nhdr = *(Elf_Nhdr *) note;
+    wri(nhdr.n_namesz, sizeof(ldCacheNoteName));
+    wri(nhdr.n_descsz, descSize);
+    wri(nhdr.n_type, NT_NIXOS_LD_CACHE);
+    memcpy(note + sizeof(Elf_Nhdr), ldCacheNoteName, sizeof(ldCacheNoteName));
+    memcpy(note + sizeof(Elf_Nhdr) + nameSize, desc.data(), desc.size());
+
+    auto addPhdr = [&](unsigned type, Elf_Addr align) {
+        Elf_Phdr phdr{};
+        wri(phdr.p_type, type);
+        wri(phdr.p_offset, noteOffset);
+        wri(phdr.p_vaddr, wri(phdr.p_paddr, noteAddr));
+        wri(phdr.p_filesz, wri(phdr.p_memsz, noteSize));
+        wri(phdr.p_flags, PF_R);
+        wri(phdr.p_align, align);
+        phdrs.push_back(phdr);
+    };
+    addPhdr(PT_LOAD, pageSize);
+    addPhdr(PT_NOTE, 4);
+    wri(hdr()->e_phnum, phdrs.size());
+
+    Elf_Shdr shdr{};
+    wri(shdr.sh_name, sectionNames.size());
+    wri(shdr.sh_type, SHT_NOTE);
+    wri(shdr.sh_flags, SHF_ALLOC);
+    wri(shdr.sh_addr, noteAddr);
+    wri(shdr.sh_offset, noteOffset);
+    wri(shdr.sh_size, noteSize);
+    wri(shdr.sh_addralign, 4);
+    shdrs.push_back(shdr);
+    wri(hdr()->e_shnum, shdrs.size());
+
+    /* Resolve the section-header string table via e_shstrndx, not a literal
+       ".shstrtab": some strip tools rename or merge it. */
+    const std::string shstrtabName = getSectionName(shdrs.at(rdi(hdr()->e_shstrndx)));
+    sectionNames += ldCacheSectionName;
+    sectionNames += '\0';
+    replaceSection(shstrtabName, sectionNames.size()) = sectionNames;
+
+    rewriteSections();
     changed = true;
 }
 
@@ -2433,6 +2742,7 @@ static bool removeRPath = false;
 static bool setRPath = false;
 static bool addRPath = false;
 static bool addDebugTag = false;
+static bool buildResolutionCache = false;
 static bool renameDynamicSymbols = false;
 static bool printRPath = false;
 static std::string newRPath;
@@ -2501,6 +2811,9 @@ static void patchElf2(ElfFile && elfFile, const FileContents & fileContents, con
     if (addDebugTag)
         elfFile.addDebugTag();
 
+    if (buildResolutionCache)
+        elfFile.buildResolutionCache();
+
     if (renameDynamicSymbols)
         elfFile.renameDynamicSymbols(symbolsToRename);
 
@@ -2523,9 +2836,9 @@ static void patchElf()
         const std::string & outputFileName2 = outputFileName.empty() ? fileName : outputFileName;
 
         if (getElfType(fileContents).is32Bit)
-            patchElf2(ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym, Elf32_Versym, Elf32_Verdef, Elf32_Verdaux, Elf32_Verneed, Elf32_Vernaux, Elf32_Rel, Elf32_Rela, 32>(fileContents), fileContents, outputFileName2);
+            patchElf2(ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Nhdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym, Elf32_Versym, Elf32_Verdef, Elf32_Verdaux, Elf32_Verneed, Elf32_Vernaux, Elf32_Rel, Elf32_Rela, 32>(fileContents), fileContents, outputFileName2);
         else
-            patchElf2(ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym, Elf64_Versym, Elf64_Verdef, Elf64_Verdaux, Elf64_Verneed, Elf64_Vernaux, Elf64_Rel, Elf64_Rela, 64>(fileContents), fileContents, outputFileName2);
+            patchElf2(ElfFile<Elf64_Ehdr, Elf64_Phdr, Elf64_Shdr, Elf64_Nhdr, Elf64_Addr, Elf64_Off, Elf64_Dyn, Elf64_Sym, Elf64_Versym, Elf64_Verdef, Elf64_Verdaux, Elf64_Verneed, Elf64_Vernaux, Elf64_Rel, Elf64_Rela, 64>(fileContents), fileContents, outputFileName2);
     }
 }
 
@@ -2564,6 +2877,7 @@ static void showHelp(const std::string & progName)
   [--no-sort]\t\tDo not sort program+section headers; useful for debugging patchelf.\n\
   [--clear-symbol-version SYMBOL]\n\
   [--add-debug-tag]\n\
+  [--build-resolution-cache]\n\
   [--print-execstack]\t\tPrints whether the object requests an executable stack\n\
   [--clear-execstack]\n\
   [--set-execstack]\n\
@@ -2700,6 +3014,9 @@ static int mainWrapped(int argc, char * * argv)
         else if (arg == "--add-debug-tag") {
             addDebugTag = true;
         }
+        else if (arg == "--build-resolution-cache") {
+            buildResolutionCache = true;
+        }
         else if (arg == "--rename-dynamic-symbols") {
             renameDynamicSymbols = true;
             if (++i == argc) error("missing argument");
@@ -2742,6 +3059,9 @@ static int mainWrapped(int argc, char * * argv)
     }
 
     if (fileNames.empty()) error("missing filename");
+
+    if (forceRPath && buildResolutionCache)
+        error("--build-resolution-cache cannot be combined with --force-rpath");
 
     if (!outputFileName.empty() && fileNames.size() != 1)
         error("--output option only allowed with single input file");
