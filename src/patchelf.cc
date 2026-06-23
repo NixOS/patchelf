@@ -932,15 +932,15 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
 
     fileContents->resize(startOffset + neededSpace + binutilsQuirkPadding, 0);
 
-    auto& lastSeg = phdrs.back();
     Elf_Addr lastSegAddr = 0;
 
     /* As an optimization, instead of allocating a new PT_LOAD segment, try
        expanding the last one */
     if (!phdrs.empty() &&
-        rdi(lastSeg.p_type) == PT_LOAD &&
-        rdi(lastSeg.p_flags) == (PF_R | PF_W) &&
-        rdi(lastSeg.p_align) == alignStartPage) {
+        rdi(phdrs.back().p_type) == PT_LOAD &&
+        rdi(phdrs.back().p_flags) == (PF_R | PF_W) &&
+        rdi(phdrs.back().p_align) == alignStartPage) {
+        auto & lastSeg = phdrs.back();
         auto segEnd = roundUp(rdi(lastSeg.p_offset) + rdi(lastSeg.p_memsz), alignStartPage);
 
         if (segEnd == startOffset) {
