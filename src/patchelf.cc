@@ -1183,9 +1183,11 @@ void ElfFile<ElfFileParamNames>::normalizeNoteSegments()
             size_t size = 0;
             for (const auto & shdr : shdrs) {
                 if (rdi(shdr.sh_type) != SHT_NOTE) continue;
-                if (rdi(shdr.sh_offset) != roundUp(curr_off, rdi(shdr.sh_addralign))) continue;
+                /* sh_addralign==0 means "no alignment constraint" per the spec. */
+                auto align = std::max<uint64_t>(1, rdi(shdr.sh_addralign));
+                if (rdi(shdr.sh_offset) != roundUp(curr_off, align)) continue;
                 size = rdi(shdr.sh_size);
-                curr_off = roundUp(curr_off, rdi(shdr.sh_addralign));
+                curr_off = roundUp(curr_off, align);
                 break;
             }
             if (size == 0)

@@ -60,6 +60,8 @@ fixture invalid-dynamic-unaligned "$(shdr_field $dynamic 24)"         '\001\0\0\
 fixture invalid-dynstr-idx        $((dynamic_off + 8))                '\377\377\377\377\377\377\377\177'
 fixture invalid-dynstr-noterm     $((dynstr_off + dynstr_size - 1))   'A'
 fixture invalid-verneed-file      $((verneed_off + 4))                '\377\377\377\177'
+# sh_addralign==0 is *valid* per the ELF spec; must be handled, not rejected.
+fixture valid-note-addralign-zero "$(shdr_field 2 48)"                '\0\0\0\0\0\0\0\0'
 
 # .dynamic with no DT_NULL terminator
 cp "$base" "$SCRATCH/invalid-dynamic-noterm"
@@ -153,6 +155,9 @@ for tcase in $TEST_CASES; do
     ../src/patchelf $args --output /dev/null "$file" 2>&1 |
         grep "$msg" >/dev/null 2>/dev/null
 done
+
+# This input is valid; it must be edited successfully, not rejected.
+../src/patchelf --set-rpath /x --output /dev/null "$SCRATCH/valid-note-addralign-zero"
 
 if [ -z "$FAILED_TESTS" ]; then
     exit 0
