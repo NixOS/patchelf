@@ -1,17 +1,7 @@
 #! /bin/sh -e
-# Regression test for the "?dir" search-hint path of --build-resolution-cache.
-#
-# patchelf normally resolves each DT_NEEDED soname to an absolute "=<path>" in
-# the note. But some run path directories cannot be resolved at patch time:
-#
-#   * a directory containing a dynamic-string token ($ORIGIN, $LIB, $PLATFORM)
-#     is only known once the loader expands it at runtime;
-#   * a directory holding a glibc-hwcaps/ subtree may carry a CPU-optimized
-#     variant of the library that the loader selects at runtime.
-#
-# For those, patchelf must record a "?<dir>" hint -- telling the loader to
-# search the directory itself -- instead of baking in a path it cannot know is
-# correct. This is why the "?dir" branch exists; the cases below exercise it.
+# Run-path entries that can't be resolved at patch time -- dynamic-string
+# tokens ($ORIGIN/$LIB/$PLATFORM) and glibc-hwcaps directories -- must be
+# recorded as "?<dir>" search hints, never as absolute "=<path>" entries.
 SCRATCH=scratch/$(basename "$0" .sh)
 READELF=${READELF:-readelf}
 PATCHELF=$(readlink -f "../src/patchelf")
@@ -25,7 +15,6 @@ descriptor() {
     ${READELF} -p .note.nixos.ldcache "$1"
 }
 
-# --- $ORIGIN token: unresolvable until the loader expands it ---
 cp main "${SCRATCH}/main-origin"
 # $ORIGIN is a literal loader token; it must reach patchelf unexpanded.
 # shellcheck disable=SC2016
@@ -45,10 +34,8 @@ if echo "$d" | grep -qF '=$ORIGIN/libs'; then
     exit 1
 fi
 
-# --- glibc-hwcaps directory: the loader picks a CPU-specific variant ---
-# libfoo.so is physically present in this directory, so without the glibc-hwcaps
-# guard patchelf would resolve it to an absolute "=path"; the guard must force a
-# "?" hint regardless.
+# libfoo.so is present here, so without the hwcaps guard it would resolve to an
+# absolute "=path"; the guard must force a "?" hint regardless.
 mkdir -p "${SCRATCH}/hw/glibc-hwcaps"
 cp libfoo.so "${SCRATCH}/hw/"
 cp main "${SCRATCH}/main-hwcaps"

@@ -13,10 +13,7 @@ cp libfoo.so "${SCRATCH}/libsA/"
 cp libbar.so "${SCRATCH}/libsB/"
 cp libfoo.so "${SCRATCH}/libsC/"
 
-# Give the executable a multi-directory DT_RUNPATH (--set-rpath emits RUNPATH).
 ${PATCHELF} --set-rpath "$(pwd)/${SCRATCH}/libsA:$(pwd)/${SCRATCH}/libsB" "${SCRATCH}/main"
-
-# Build the resolution cache note.
 ${PATCHELF} --build-resolution-cache "${SCRATCH}/main"
 
 # The note must be present and owned by "NixOS".
@@ -65,8 +62,7 @@ if [ "$count" != 1 ]; then
     exit 1
 fi
 
-# A binary whose search path lives in DT_RPATH (not DT_RUNPATH) must also get a
-# cache: the loader falls back to DT_RPATH when DT_RUNPATH is absent, so we do too.
+# DT_RPATH (no DT_RUNPATH) must also get a cache.
 cp main "${SCRATCH}/main-rpath"
 ${PATCHELF} --force-rpath --set-rpath "$(pwd)/${SCRATCH}/libsA" "${SCRATCH}/main-rpath"
 if ${READELF} -d "${SCRATCH}/main-rpath" | grep -q "RUNPATH"; then
@@ -95,8 +91,7 @@ if ! ${READELF} -p .note.nixos.ldcache "${SCRATCH}/main-stale" | grep -q "${SCRA
     exit 1
 fi
 
-# With no run path there is nothing to resolve: this must warn, and must not
-# pretend a cache was written.
+# No run path: warn, write nothing.
 cp main "${SCRATCH}/main-norpath"
 ${PATCHELF} --remove-rpath "${SCRATCH}/main-norpath"
 warn=$(${PATCHELF} --build-resolution-cache "${SCRATCH}/main-norpath" 2>&1 >/dev/null)
@@ -110,13 +105,11 @@ if ${READELF} -SW "${SCRATCH}/main-norpath" | grep -q "\.note\.nixos\.ldcache"; 
     exit 1
 fi
 
-# --build-resolution-cache is rejected together with --force-rpath.
 if ${PATCHELF} --force-rpath --build-resolution-cache "${SCRATCH}/main" 2>/dev/null; then
     echo "FAIL: --build-resolution-cache should be rejected with --force-rpath"
     exit 1
 fi
 
-# The patched binary must still load and run.
 exitCode=0
 LD_LIBRARY_PATH="$(pwd)/${SCRATCH}/libsA:$(pwd)/${SCRATCH}/libsB" "${SCRATCH}/main" || exitCode=$?
 if [ "$exitCode" != 46 ]; then

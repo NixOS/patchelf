@@ -1664,12 +1664,11 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
             return;
         }
         case rpRemove: {
+            removeResolutionCache();
             if (!rpath) {
-                removeResolutionCache();
                 debug("no RPATH to delete\n");
                 return;
             }
-            removeResolutionCache();
             removeRPath(shdrDynamic);
             return;
         }
@@ -1806,7 +1805,6 @@ void ElfFile<ElfFileParamNames>::removeNeeded(const std::set<std::string> & libs
 
     memset(last, 0, sizeof(Elf_Dyn) * (dyn - last));
 
-    /* The dependency set changed, so any resolution cache note is now stale. */
     if (removed) removeResolutionCache();
 
     this->rewriteSections();
@@ -1937,7 +1935,6 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
         }
     }
 
-    /* The dependency set changed, so any resolution cache note is now stale. */
     if (replaced) removeResolutionCache();
 
     this->rewriteSections();
@@ -1990,7 +1987,6 @@ void ElfFile<ElfFileParamNames>::addNeeded(const std::set<std::string> & libs)
         i++;
     }
 
-    /* The dependency set changed, so any resolution cache note is now stale. */
     removeResolutionCache();
 
     changed = true;
@@ -2166,11 +2162,10 @@ void ElfFile<ElfFileParamNames>::buildResolutionCache()
 {
     const auto existingCacheNote = tryFindSectionHeader(ldCacheSectionName);
 
-    /* A cache is built once; rebuilding in place is not supported. Any path
-       that bails out while a note is already present must fail loudly rather
-       than leave a stale note that would resolve dependencies to the wrong
-       paths. Reset errno first: the access() probes below leave it set, so
-       error() would otherwise append a misleading strerror to this message. */
+    /* A cache is built once; rebuilding in place is not supported. Any bail-out
+       while a note is already present must fail loudly rather than leave a
+       stale note behind. Reset errno so error() doesn't append a misleading
+       strerror left over from the access() probes below. */
     auto failIfStale = [&] {
         if (existingCacheNote) {
             errno = 0;
@@ -2258,8 +2253,6 @@ void ElfFile<ElfFileParamNames>::buildResolutionCache()
         return;
     }
 
-    /* Build the descriptor: NUL-terminated (lib, path-list) pairs followed by a
-       final empty entry terminating the list. */
     std::string desc;
     for (const auto & [lib, path] : cache) {
         debug("resolved %s to %s\n", lib.c_str(), path.c_str());
@@ -2270,26 +2263,18 @@ void ElfFile<ElfFileParamNames>::buildResolutionCache()
     }
     desc += '\0';
 
-    /* The access() probes above leave errno set; clear it so any error() below
-       reports its own message rather than a stale strerror. */
     errno = 0;
 
-    /* A cache is built once; rebuilding in place is not supported. A note whose
-       descriptor still matches means this is a harmless re-run, so skip it. A
-       differing note means the run path changed since it was built, and keeping
-       the stale note would resolve dependencies to the wrong paths, so fail
-       loudly instead of silently. */
+    /* A note whose descriptor still matches is a harmless re-run; otherwise it
+       is stale and we fail rather than silently keep it. */
     if (existingCacheNote) {
         const Elf_Shdr & sh = existingCacheNote->get();
         const Elf_Off noteOff = rdi(sh.sh_offset);
         const uint64_t fileSize = fileContents->size();
         std::string oldDesc;
-        /* Only parse a note that is at least a full Nhdr and whose name and
-           descriptor stay within both the section and the file; a short or
-           malformed note (e.g. one another tool injected) must not be read
-           past its end. Bound by the actual file bytes, and use subtraction
-           for the fit checks so they stay overflow-safe. A note that does not
-           parse leaves oldDesc empty and falls through to failIfStale(). */
+        /* Bounds-check against both the section and the file so a short or
+           foreign note isn't read past its end; an unparseable note leaves
+           oldDesc empty and falls through to failIfStale(). */
         if (noteOff <= fileSize && fileSize - noteOff >= sizeof(Elf_Nhdr)
             && rdi(sh.sh_size) >= sizeof(Elf_Nhdr)) {
             Elf_Nhdr enh;
@@ -2309,15 +2294,12 @@ void ElfFile<ElfFileParamNames>::buildResolutionCache()
         failIfStale();
     }
 
-    /* Lay out the note: Nhdr, name, then the descriptor. */
     const size_t descSize = desc.size();
     const size_t nameSize = roundUp(sizeof(ldCacheNoteName), 4);
     const size_t noteSize = sizeof(Elf_Nhdr) + nameSize + roundUp(descSize, 4);
 
-    /* Place the note in a fresh page-aligned PT_LOAD at the end of the file and
-       cover it with a PT_NOTE so the loader can find it. We add the segments
-       and a matching SHT_NOTE section, then let rewriteSections() relocate the
-       header tables to make room. */
+    /* Place the note in a fresh page-aligned PT_LOAD at the end of the file,
+       covered by a PT_NOTE so the loader can find it. */
     const Elf_Addr pageSize = getPageSize();
     /* For executables rewriteSections() rewrites the section header table in
        place at e_shoff; it grows by the one section we add below. When the
@@ -2377,11 +2359,8 @@ void ElfFile<ElfFileParamNames>::buildResolutionCache()
     shdrs.push_back(shdr);
     wri(hdr()->e_shnum, shdrs.size());
 
-    /* Register the new section name and rewrite so the relocated section and
-       program header tables include our additions. Resolve the section-header
-       string table by e_shstrndx rather than the literal ".shstrtab": some
-       strip tools rename or merge it, and getSectionName already reads it that
-       way, so a hardcoded name would error out or patch the wrong section. */
+    /* Resolve the section-header string table via e_shstrndx, not a literal
+       ".shstrtab": some strip tools rename or merge it. */
     const std::string shstrtabName = getSectionName(shdrs.at(rdi(hdr()->e_shstrndx)));
     sectionNames += ldCacheSectionName;
     sectionNames += '\0';
