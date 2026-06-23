@@ -60,6 +60,11 @@ static bool debugMode = false;
 static bool forceRPath = false;
 static bool clobberOldSections = true;
 
+/* Upper bound on PT_LOAD p_align honoured when placing the new segment in
+   rewriteSectionsLibrary(); anything larger is treated as corrupt input
+   rather than padding the file by gigabytes. */
+static constexpr unsigned maxSegmentAlignment = 0x1000000; /* 16 MiB */
+
 static std::vector<std::string> fileNames;
 static std::string outputFileName;
 static bool alwaysWrite = false;
@@ -830,6 +835,8 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
         unsigned thisAlign = rdi(phdr.p_align);
         alignStartPage = std::max(alignStartPage, thisAlign);
     }
+    if (alignStartPage > maxSegmentAlignment)
+        error("segment alignment is implausibly large; refusing to grow file");
 
     startPage = roundUp(startPage, alignStartPage);
 
