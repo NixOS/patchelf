@@ -313,20 +313,22 @@ ElfFile<ElfFileParamNames>::ElfFile(FileContents fContents)
     if (rdi(hdr()->e_phentsize) != sizeof(Elf_Phdr))
         error("program headers have wrong size");
 
-    /* Copy the program and section headers. */
-    for (int i = 0; i < rdi(hdr()->e_phnum); ++i) {
-        Elf_Phdr *phdr = (Elf_Phdr *) (fileContents->data() + rdi(hdr()->e_phoff)) + i;
+    if (rdi(hdr()->e_shentsize) != sizeof(Elf_Shdr))
+        error("section headers have wrong size");
 
-        checkPointer(fileContents, phdr, sizeof(*phdr));
-        phdrs.push_back(*phdr);
+    /* Copy the program and section headers. e_{ph,sh}off come from the file
+       and need not be naturally aligned, so memcpy instead of dereferencing. */
+    for (int i = 0; i < rdi(hdr()->e_phnum); ++i) {
+        Elf_Phdr phdr;
+        memcpy(&phdr, fileContents->data() + rdi(hdr()->e_phoff) + i * sizeof(Elf_Phdr), sizeof phdr);
+        phdrs.push_back(phdr);
         if (rdi(phdrs[i].p_type) == PT_INTERP) isExecutable = true;
     }
 
     for (int i = 0; i < rdi(hdr()->e_shnum); ++i) {
-        Elf_Shdr *shdr = (Elf_Shdr *) (fileContents->data() + rdi(hdr()->e_shoff)) + i;
-
-        checkPointer(fileContents, shdr, sizeof(*shdr));
-        shdrs.push_back(*shdr);
+        Elf_Shdr shdr;
+        memcpy(&shdr, fileContents->data() + rdi(hdr()->e_shoff) + i * sizeof(Elf_Shdr), sizeof shdr);
+        shdrs.push_back(shdr);
     }
 
     /* Get the section header string table section (".shstrtab").  Its
