@@ -1940,7 +1940,7 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
         // which one.
         Elf_Shdr & shdrVersionRStrings = shdrs.at(rdi(shdrVersionR.sh_link));
         // this is where we find the actual filename strings
-        char * verStrTab = (char *) fileContents->data() + rdi(shdrVersionRStrings.sh_offset);
+        auto verStrTab = getStrTab(shdrVersionRStrings);
         // and we also need the name of the section containing the strings, so
         // that we can pass it to replaceSection
         std::string versionRStringsSName = getSectionName(shdrVersionRStrings);
@@ -1956,9 +1956,11 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
             // otherwise the already added strings can't be reused
             addedStrings.clear();
 
-        auto need = (Elf_Verneed *)(fileContents->data() + rdi(shdrVersionR.sh_offset));
-        while (verNeedNum > 0) {
-            char * file = verStrTab + rdi(need->vn_file);
+        auto needBytes = getSectionSpan<char>(shdrVersionR);
+        for (auto need = verHead<Elf_Verneed>(needBytes);
+             need && verNeedNum > 0;
+             need = follow<Elf_Verneed>(needBytes, need, rdi(need->vn_next)), --verNeedNum) {
+            char * file = strTabEntry(verStrTab, rdi(need->vn_file));
             auto i = libs.find(file);
             if (i != libs.end() && file != i->second) {
                 auto replacement = i->second;
@@ -1988,9 +1990,6 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
             } else {
                 debug("keeping .gnu.version_r entry '%s'\n", file);
             }
-            // the Elf_Verneed structures form a linked list, so jump to next entry
-            need = (Elf_Verneed *) (((char *) need) + rdi(need->vn_next));
-            --verNeedNum;
         }
     }
 
@@ -2764,7 +2763,7 @@ void ElfFile<ElfFileParamNames>::forAllStringReferences(const Elf_Shdr& strTabHd
     if (auto verdHdr = tryFindSectionHeader(".gnu.version_d"))
     {
         if (&shdrs.at(rdi(verdHdr->get().sh_link)) == &strTabHdr)
-            forAll_ElfVer(getSectionSpan<Elf_Verdef>(*verdHdr),
+            forAll_ElfVer(getSectionSpan<char>(*verdHdr), (Elf_Verdef*)nullptr,
                 [] (auto& /*vd*/) {},
                 [&] (auto& vda) { fn(vda.vda_name); }
             );
@@ -2773,7 +2772,7 @@ void ElfFile<ElfFileParamNames>::forAllStringReferences(const Elf_Shdr& strTabHd
     if (auto vernHdr = tryFindSectionHeader(".gnu.version_r"))
     {
         if (&shdrs.at(rdi(vernHdr->get().sh_link)) == &strTabHdr)
-            forAll_ElfVer(getSectionSpan<Elf_Verneed>(*vernHdr),
+            forAll_ElfVer(getSectionSpan<char>(*vernHdr), (Elf_Verneed*)nullptr,
                 [&] (auto& vn) { fn(vn.vn_file); },
                 [&] (auto& vna) { fn(vna.vna_name); }
             );
