@@ -114,6 +114,7 @@ private:
     template<class T> span<T> getSectionSpan(const Elf_Shdr & shdr) const;
     template<class T> span<T> getSectionSpan(const SectionName & sectionName);
     template<class T> span<T> tryGetSectionSpan(const SectionName & sectionName);
+    span<char> getStrTab(const Elf_Shdr & shdr) const;
 
     [[nodiscard]] unsigned int getSectionIndex(const SectionName & sectionName) const;
 

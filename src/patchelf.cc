@@ -263,6 +263,16 @@ static void checkOffset(const FileContents & contents, size_t offset, size_t siz
 }
 
 
+/* String-table lookup by offset. The span comes from getStrTab() and is
+   NUL-terminated, so an in-range offset is always a safe C string. */
+static char * strTabEntry(span<char> strTab, uint64_t idx)
+{
+    if (idx >= strTab.size())
+        error("string table index out of bounds");
+    return &strTab[idx];
+}
+
+
 static std::string extractString(const FileContents & contents, size_t offset, size_t size)
 {
     checkOffset(contents, offset, size);
@@ -622,6 +632,15 @@ span<T> ElfFile<ElfFileParamNames>::getSectionSpan(const Elf_Shdr & shdr) const
     if (off % alignof(T) != 0)
         error("section content is not naturally aligned");
     return span((T*)(fileContents->data() + off), size / sizeof(T));
+}
+
+template<ElfFileParams>
+span<char> ElfFile<ElfFileParamNames>::getStrTab(const Elf_Shdr & shdr) const
+{
+    auto s = getSectionSpan<char>(shdr);
+    if (s.size() == 0 || s[s.size() - 1] != '\0')
+        error("string table is not NUL-terminated");
+    return s;
 }
 
 template<ElfFileParams>
@@ -1496,7 +1515,7 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string &
 
     auto shdrDynamic = findSectionHeader(".dynamic");
     auto shdrDynStr = findSectionHeader(".dynstr");
-    char * strTab = (char *) fileContents->data() + rdi(shdrDynStr.sh_offset);
+    auto strTab = getStrTab(shdrDynStr);
 
     /* Walk through the dynamic section, look for the DT_SONAME entry. */
     auto dynSpan = getSectionSpan<Elf_Dyn>(shdrDynamic);
@@ -1505,8 +1524,7 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string &
     for (auto * dyn = dynSpan.begin(); dyn < dynSpan.end() && rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_SONAME) {
             dynSoname = dyn;
-            soname = strTab + rdi(dyn->d_un.d_val);
-            checkPointer(fileContents, strTab, rdi(dyn->d_un.d_val));
+            soname = strTabEntry(strTab, rdi(dyn->d_un.d_val));
         }
     }
 
@@ -1665,7 +1683,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
     /* !!! We assume that the virtual address in the DT_STRTAB entry
        of the dynamic section corresponds to the .dynstr section. */
     auto shdrDynStr = findSectionHeader(".dynstr");
-    char * strTab = (char *) fileContents->data() + rdi(shdrDynStr.sh_offset);
+    auto strTab = getStrTab(shdrDynStr);
 
 
     /* Walk through the dynamic section, look for the RPATH/RUNPATH
@@ -1689,14 +1707,14 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
             dynRPath = dyn;
             /* Only use DT_RPATH if there is no DT_RUNPATH. */
             if (!dynRunPath)
-                rpath = strTab + rdi(dyn->d_un.d_val);
+                rpath = strTabEntry(strTab, rdi(dyn->d_un.d_val));
         }
         else if (rdi(dyn->d_tag) == DT_RUNPATH) {
             dynRunPath = dyn;
-            rpath = strTab + rdi(dyn->d_un.d_val);
+            rpath = strTabEntry(strTab, rdi(dyn->d_un.d_val));
         }
         else if (rdi(dyn->d_tag) == DT_NEEDED)
-            neededLibs.push_back(std::string(strTab + rdi(dyn->d_un.d_val)));
+            neededLibs.push_back(std::string(strTabEntry(strTab, rdi(dyn->d_un.d_val))));
     }
 
     switch (op) {
@@ -1757,7 +1775,8 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
 
         size_t rpathStrReferences = 0;
         forAllStringReferences(shdrDynStr, [&] (auto refIdx) {
-            if (rpathView.end() == std::string_view(strTab + rdi(refIdx)).end())
+            if (rdi(refIdx) < strTab.size()
+                && rpathView.end() == std::string_view(&strTab[rdi(refIdx)]).end())
                 rpathStrReferences++;
         });
         assert(rpathStrReferences >= 1);
@@ -1822,7 +1841,7 @@ void ElfFile<ElfFileParamNames>::removeNeeded(const std::set<std::string> & libs
 
     auto shdrDynamic = findSectionHeader(".dynamic");
     auto shdrDynStr = findSectionHeader(".dynstr");
-    char * strTab = (char *) fileContents->data() + rdi(shdrDynStr.sh_offset);
+    auto strTab = getStrTab(shdrDynStr);
 
     auto dynSpan = getSectionSpan<Elf_Dyn>(shdrDynamic);
     Elf_Dyn * dyn = dynSpan.begin();
@@ -1830,7 +1849,7 @@ void ElfFile<ElfFileParamNames>::removeNeeded(const std::set<std::string> & libs
     bool removed = false;
     for ( ; dyn < dynSpan.end() && rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_NEEDED) {
-            char * name = strTab + rdi(dyn->d_un.d_val);
+            char * name = strTabEntry(strTab, rdi(dyn->d_un.d_val));
             if (libs.count(name)) {
                 debug("removing DT_NEEDED entry '%s'\n", name);
                 changed = true;
@@ -1857,7 +1876,7 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
 
     auto shdrDynamic = findSectionHeader(".dynamic");
     auto shdrDynStr = findSectionHeader(".dynstr");
-    char * strTab = (char *) fileContents->data() + rdi(shdrDynStr.sh_offset);
+    auto strTab = getStrTab(shdrDynStr);
 
     auto dynSpan = getSectionSpan<Elf_Dyn>(shdrDynamic);
 
@@ -1869,7 +1888,7 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
 
     for (auto * dyn = dynSpan.begin(); dyn < dynSpan.end() && rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_NEEDED) {
-            char * name = strTab + rdi(dyn->d_un.d_val);
+            char * name = strTabEntry(strTab, rdi(dyn->d_un.d_val));
             auto i = libs.find(name);
             if (i != libs.end() && name != i->second) {
                 auto replacement = i->second;
@@ -2037,13 +2056,13 @@ void ElfFile<ElfFileParamNames>::printNeededLibs() const
 {
     const auto shdrDynamic = findSectionHeader(".dynamic");
     const auto shdrDynStr = findSectionHeader(".dynstr");
-    const char *strTab = (const char *)fileContents->data() + rdi(shdrDynStr.sh_offset);
+    auto strTab = getStrTab(shdrDynStr);
 
     auto dynSpan = getSectionSpan<Elf_Dyn>(shdrDynamic);
 
     for (const auto * dyn = dynSpan.begin(); dyn < dynSpan.end() && rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_NEEDED) {
-            const char *name = strTab + rdi(dyn->d_un.d_val);
+            const char *name = strTabEntry(strTab, rdi(dyn->d_un.d_val));
             printf("%s\n", name);
         }
     }
@@ -2627,17 +2646,16 @@ void ElfFile<ElfFileParamNames>::clearSymbolVersions(const std::set<std::string>
     auto shdrDynsym = findSectionHeader(".dynsym");
     auto shdrVersym = findSectionHeader(".gnu.version");
 
-    auto strTab = (char *)fileContents->data() + rdi(shdrDynStr.sh_offset);
-    auto dynsyms = (Elf_Sym *)(fileContents->data() + rdi(shdrDynsym.sh_offset));
-    auto versyms = (Elf_Versym *)(fileContents->data() + rdi(shdrVersym.sh_offset));
-    size_t count = rdi(shdrDynsym.sh_size) / sizeof(Elf_Sym);
+    auto strTab = getStrTab(shdrDynStr);
+    auto dynsyms = getSectionSpan<Elf_Sym>(shdrDynsym);
+    auto versyms = getSectionSpan<Elf_Versym>(shdrVersym);
 
-    if (count != rdi(shdrVersym.sh_size) / sizeof(Elf_Versym))
+    if (dynsyms.size() != versyms.size())
         error("versym size mismatch");
 
-    for (size_t i = 0; i < count; i++) {
+    for (size_t i = 0; i < dynsyms.size(); i++) {
         auto dynsym = dynsyms[i];
-        auto name = strTab + rdi(dynsym.st_name);
+        auto name = strTabEntry(strTab, rdi(dynsym.st_name));
         if (syms.count(name)) {
             debug("clearing symbol version for %s\n", name);
             wri(versyms[i], 1);
