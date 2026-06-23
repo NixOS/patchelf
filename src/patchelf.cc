@@ -1245,9 +1245,10 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
        (e.g., those produced by klibc's klcc). */
     auto shdrDynamic = tryFindSectionHeader(".dynamic");
     if (shdrDynamic) {
-        auto dyn_table = (Elf_Dyn *) (fileContents->data() + rdi((*shdrDynamic).get().sh_offset));
+        auto dynSpan = getSectionSpan<Elf_Dyn>(*shdrDynamic);
+        auto dyn_table = dynSpan.begin();
         unsigned int d_tag;
-        for (auto dyn = dyn_table; (d_tag = rdi(dyn->d_tag)) != DT_NULL; dyn++)
+        for (auto dyn = dyn_table; dyn < dynSpan.end() && (d_tag = rdi(dyn->d_tag)) != DT_NULL; dyn++)
             if (d_tag == DT_STRTAB)
                 dyn->d_un.d_ptr = findSectionHeader(".dynstr").sh_addr;
             else if (d_tag == DT_STRSZ)
@@ -1369,6 +1370,26 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
 
 
 
+/* Index of the DT_NULL terminator in a replaceSection()'d copy of .dynamic.
+   Read via memcpy (std::string storage isn't Elf_Dyn-aligned) and bounded by
+   the buffer; reject an input .dynamic that has no terminator. */
+template<ElfFileParams>
+unsigned int ElfFile<ElfFileParamNames>::dynNullIndex(const std::string & newDynamic) const
+{
+    unsigned int idx = 0;
+    const unsigned int n = newDynamic.size() / sizeof(Elf_Dyn);
+    for ( ; idx < n; idx++) {
+        Elf_Dyn d;
+        memcpy(&d, newDynamic.data() + idx * sizeof(Elf_Dyn), sizeof d);
+        if (rdi(d.d_tag) == DT_NULL) break;
+    }
+    if (idx == n)
+        error(".dynamic section has no DT_NULL terminator");
+    debug("DT_NULL index is %d\n", idx);
+    return idx;
+}
+
+
 static void setSubstr(std::string & s, unsigned int pos, const std::string & t)
 {
     if (pos > s.size() || t.size() > s.size() - pos)
@@ -1462,10 +1483,10 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string &
     char * strTab = (char *) fileContents->data() + rdi(shdrDynStr.sh_offset);
 
     /* Walk through the dynamic section, look for the DT_SONAME entry. */
-    auto dyn = (Elf_Dyn *)(fileContents->data() + rdi(shdrDynamic.sh_offset));
+    auto dynSpan = getSectionSpan<Elf_Dyn>(shdrDynamic);
     Elf_Dyn * dynSoname = nullptr;
     char * soname = nullptr;
-    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+    for (auto * dyn = dynSpan.begin(); dyn < dynSpan.end() && rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_SONAME) {
             dynSoname = dyn;
             soname = strTab + rdi(dyn->d_un.d_val);
@@ -1506,9 +1527,7 @@ void ElfFile<ElfFileParamNames>::modifySoname(sonameMode op, const std::string &
            have to grow the .dynamic section. */
         std::string & newDynamic = replaceSection(".dynamic", rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn));
 
-        unsigned int idx = 0;
-        for (; rdi(reinterpret_cast<const Elf_Dyn *>(newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++);
-        debug("DT_NULL index is %d\n", idx);
+        unsigned int idx = dynNullIndex(newDynamic);
 
         /* Shift all entries down by one. */
         setSubstr(newDynamic, sizeof(Elf_Dyn), std::string(newDynamic, 0, sizeof(Elf_Dyn) * (idx + 1)));
@@ -1598,9 +1617,10 @@ std::string ElfFile<ElfFileParamNames>::shrinkRPath(char* rpath, std::vector<std
 
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::removeRPath(Elf_Shdr & shdrDynamic) {
-    auto dyn = (Elf_Dyn *)(fileContents->data() + rdi(shdrDynamic.sh_offset));
+    auto dynSpan = getSectionSpan<Elf_Dyn>(shdrDynamic);
+    Elf_Dyn * dyn = dynSpan.begin();
     Elf_Dyn * last = dyn;
-    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+    for ( ; dyn < dynSpan.end() && rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_RPATH) {
             debug("removing DT_RPATH entry\n");
             changed = true;
@@ -1645,11 +1665,10 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
        generates a DT_RPATH and DT_RUNPATH pointing at the same
        string. */
     std::vector<std::string> neededLibs;
-    auto dyn = (Elf_Dyn *)(fileContents->data() + rdi(shdrDynamic.sh_offset));
-    checkPointer(fileContents, dyn, sizeof(*dyn));
+    auto dynSpan = getSectionSpan<Elf_Dyn>(shdrDynamic);
     Elf_Dyn *dynRPath = nullptr, *dynRunPath = nullptr;
     char * rpath = nullptr;
-    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+    for (auto * dyn = dynSpan.begin(); dyn < dynSpan.end() && rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_RPATH) {
             dynRPath = dyn;
             /* Only use DT_RPATH if there is no DT_RUNPATH. */
@@ -1764,9 +1783,7 @@ void ElfFile<ElfFileParamNames>::modifyRPath(RPathOp op,
         std::string & newDynamic = replaceSection(".dynamic",
             rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn));
 
-        unsigned int idx = 0;
-        for ( ; rdi(reinterpret_cast<const Elf_Dyn *>(newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
-        debug("DT_NULL index is %d\n", idx);
+        unsigned int idx = dynNullIndex(newDynamic);
 
         /* Shift all entries down by one. */
         setSubstr(newDynamic, sizeof(Elf_Dyn),
@@ -1791,10 +1808,11 @@ void ElfFile<ElfFileParamNames>::removeNeeded(const std::set<std::string> & libs
     auto shdrDynStr = findSectionHeader(".dynstr");
     char * strTab = (char *) fileContents->data() + rdi(shdrDynStr.sh_offset);
 
-    auto dyn = (Elf_Dyn *)(fileContents->data() + rdi(shdrDynamic.sh_offset));
+    auto dynSpan = getSectionSpan<Elf_Dyn>(shdrDynamic);
+    Elf_Dyn * dyn = dynSpan.begin();
     Elf_Dyn * last = dyn;
     bool removed = false;
-    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+    for ( ; dyn < dynSpan.end() && rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_NEEDED) {
             char * name = strTab + rdi(dyn->d_un.d_val);
             if (libs.count(name)) {
@@ -1825,7 +1843,7 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
     auto shdrDynStr = findSectionHeader(".dynstr");
     char * strTab = (char *) fileContents->data() + rdi(shdrDynStr.sh_offset);
 
-    auto dyn = (Elf_Dyn *)(fileContents->data() + rdi(shdrDynamic.sh_offset));
+    auto dynSpan = getSectionSpan<Elf_Dyn>(shdrDynamic);
 
     bool replaced = false;
     unsigned int verNeedNum = 0;
@@ -1833,7 +1851,7 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
     unsigned int dynStrAddedBytes = 0;
     std::unordered_map<std::string, Elf_Off> addedStrings;
 
-    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+    for (auto * dyn = dynSpan.begin(); dyn < dynSpan.end() && rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_NEEDED) {
             char * name = strTab + rdi(dyn->d_un.d_val);
             auto i = libs.find(name);
@@ -1975,9 +1993,7 @@ void ElfFile<ElfFileParamNames>::addNeeded(const std::set<std::string> & libs)
     std::string & newDynamic = replaceSection(".dynamic",
         rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn) * libs.size());
 
-    unsigned int idx = 0;
-    for ( ; rdi(reinterpret_cast<const Elf_Dyn *>(newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
-    debug("DT_NULL index is %d\n", idx);
+    unsigned int idx = dynNullIndex(newDynamic);
 
     /* Shift all entries down by the number of new entries. */
     setSubstr(newDynamic, sizeof(Elf_Dyn) * libs.size(),
@@ -2007,9 +2023,9 @@ void ElfFile<ElfFileParamNames>::printNeededLibs() const
     const auto shdrDynStr = findSectionHeader(".dynstr");
     const char *strTab = (const char *)fileContents->data() + rdi(shdrDynStr.sh_offset);
 
-    const Elf_Dyn *dyn = (const Elf_Dyn *) (fileContents->data() + rdi(shdrDynamic.sh_offset));
+    auto dynSpan = getSectionSpan<Elf_Dyn>(shdrDynamic);
 
-    for (; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+    for (const auto * dyn = dynSpan.begin(); dyn < dynSpan.end() && rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_NEEDED) {
             const char *name = strTab + rdi(dyn->d_un.d_val);
             printf("%s\n", name);
@@ -2023,9 +2039,9 @@ void ElfFile<ElfFileParamNames>::noDefaultLib()
 {
     auto shdrDynamic = findSectionHeader(".dynamic");
 
-    auto dyn = (Elf_Dyn *)(fileContents->data() + rdi(shdrDynamic.sh_offset));
+    auto dynSpan = getSectionSpan<Elf_Dyn>(shdrDynamic);
     auto dynFlags1 = (Elf_Dyn *)nullptr;
-    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+    for (auto * dyn = dynSpan.begin(); dyn < dynSpan.end() && rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_FLAGS_1) {
             dynFlags1 = dyn;
             break;
@@ -2039,9 +2055,7 @@ void ElfFile<ElfFileParamNames>::noDefaultLib()
         std::string & newDynamic = replaceSection(".dynamic",
                 rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn));
 
-        unsigned int idx = 0;
-        for ( ; rdi(reinterpret_cast<const Elf_Dyn *>(newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
-        debug("DT_NULL index is %d\n", idx);
+        unsigned int idx = dynNullIndex(newDynamic);
 
         /* Shift all entries down by one. */
         setSubstr(newDynamic, sizeof(Elf_Dyn),
@@ -2063,8 +2077,8 @@ void ElfFile<ElfFileParamNames>::addDebugTag()
 {
     auto shdrDynamic = findSectionHeader(".dynamic");
 
-    auto dyn = (Elf_Dyn *)(fileContents->data() + rdi(shdrDynamic.sh_offset));
-    for ( ; rdi(dyn->d_tag) != DT_NULL; dyn++) {
+    auto dynSpan = getSectionSpan<Elf_Dyn>(shdrDynamic);
+    for (auto * dyn = dynSpan.begin(); dyn < dynSpan.end() && rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_DEBUG) {
             return;
         }
@@ -2072,9 +2086,7 @@ void ElfFile<ElfFileParamNames>::addDebugTag()
     std::string & newDynamic = replaceSection(".dynamic",
             rdi(shdrDynamic.sh_size) + sizeof(Elf_Dyn));
 
-    unsigned int idx = 0;
-    for ( ; rdi(reinterpret_cast<const Elf_Dyn *>(newDynamic.c_str())[idx].d_tag) != DT_NULL; idx++) ;
-    debug("DT_NULL index is %d\n", idx);
+    unsigned int idx = dynNullIndex(newDynamic);
 
     /* Shift all entries down by one. */
     setSubstr(newDynamic, sizeof(Elf_Dyn),
