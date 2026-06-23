@@ -610,7 +610,9 @@ template<ElfFileParams>
 template<class T>
 span<T> ElfFile<ElfFileParamNames>::getSectionSpan(const Elf_Shdr & shdr) const
 {
-    return span((T*)(fileContents->data() + rdi(shdr.sh_offset)), rdi(shdr.sh_size)/sizeof(T));
+    auto off = rdi(shdr.sh_offset), size = rdi(shdr.sh_size);
+    checkOffset(fileContents, off, size);
+    return span((T*)(fileContents->data() + off), size / sizeof(T));
 }
 
 template<ElfFileParams>
@@ -1333,9 +1335,8 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
         auto &shdr = shdrs.at(i);
         if (rdi(shdr.sh_type) != SHT_SYMTAB && rdi(shdr.sh_type) != SHT_DYNSYM) continue;
         debug("rewriting symbol table section %d\n", i);
-        for (size_t entry = 0; (entry + 1) * sizeof(Elf_Sym) <= rdi(shdr.sh_size); entry++) {
-            auto sym = (Elf_Sym *)(fileContents->data() + rdi(shdr.sh_offset) + entry * sizeof(Elf_Sym));
-            unsigned int shndx = rdi(sym->st_shndx);
+        for (auto & sym : getSectionSpan<Elf_Sym>(shdr)) {
+            unsigned int shndx = rdi(sym.st_shndx);
             if (shndx != SHN_UNDEF && shndx < SHN_LORESERVE) {
                 if (shndx >= sectionsByOldIndex.size()) {
                     fprintf(stderr, "warning: entry %d in symbol table refers to a non-existent section, skipping\n", shndx);
@@ -1345,11 +1346,11 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                 assert(!section.empty());
                 auto newIndex = getSectionIndex(section); // inefficient
                 //debug("rewriting symbol %d: index = %d (%s) -> %d\n", entry, shndx, section.c_str(), newIndex);
-                wri(sym->st_shndx, newIndex);
+                wri(sym.st_shndx, newIndex);
                 /* Rewrite st_value.  FIXME: we should do this for all
                    types, but most don't actually change. */
-                if (ELF32_ST_TYPE(rdi(sym->st_info)) == STT_SECTION)
-                    wri(sym->st_value, rdi(shdrs.at(newIndex).sh_addr));
+                if (ELF32_ST_TYPE(rdi(sym.st_info)) == STT_SECTION)
+                    wri(sym.st_value, rdi(shdrs.at(newIndex).sh_addr));
             }
         }
     }
