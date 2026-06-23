@@ -1,19 +1,10 @@
-/* Test helper: page-align an ELF's section header table.
+/* Test helper: insert zero padding before the section header table so it ends
+ * on a 0x10000 boundary (covers every page size patchelf uses). This is the
+ * layout that triggers the ET_EXEC note corruption in --build-resolution-cache,
+ * where the in-place SHT rewrite would overwrite the note's Elf_Nhdr.
  *
- * Inserts zero padding immediately before the section header table (SHT) so
- * that the SHT (which the test toolchain places at the end of the file) ends on
- * a 0x10000 boundary. Only e_shoff needs adjusting, since every section's data
- * lives before the SHT.
- *
- * This reproduces, deterministically, the file layout that triggers the
- * ET_EXEC note corruption in `patchelf --build-resolution-cache`: the note is
- * placed at roundUp(fileSize, pageSize), which then coincides with where the
- * grown section header table is rewritten in place, so the note's own section
- * header overwrites its Elf_Nhdr. Aligning to 0x10000 covers every page size
- * patchelf uses (0x1000 / 0x2000 / 0x10000).
- *
- * The binary under test is built by the same toolchain that builds this helper,
- * so it is native-endian; fields are read and written directly.
+ * The binary under test is native-endian (built by the same toolchain), so
+ * fields are read and written directly.
  */
 #include <elf.h>
 #include <stdint.h>
@@ -54,7 +45,6 @@ int main(int argc, char ** argv)
     if (memcmp(buf, ELFMAG, SELFMAG) != 0)
         die("not an ELF file");
 
-    /* Read e_shoff / e_shentsize / e_shnum for the file's ELF class. */
     uint64_t shoff;
     uint64_t shentsize;
     uint64_t shnum;
@@ -71,17 +61,15 @@ int main(int argc, char ** argv)
         shnum = eh->e_shnum;
     }
 
-    /* The trigger requires the SHT to sit at the end of the file. */
     if (shoff + shnum * shentsize != (uint64_t) sz)
         die("section header table is not at end of file");
 
     long pad = (long) ((ALIGN - (sz % ALIGN)) % ALIGN);
     if (pad == 0) {
         free(buf);
-        return 0; /* already page-aligned: trigger already holds */
+        return 0;
     }
 
-    /* Bump e_shoff by the padding we insert before the SHT. */
     if (is64)
         ((Elf64_Ehdr *) buf)->e_shoff = shoff + pad;
     else
@@ -91,7 +79,6 @@ int main(int argc, char ** argv)
     if (!out)
         die("cannot reopen file for writing");
 
-    /* pad is in [0, ALIGN), so a single ALIGN-sized buffer covers it. */
     static const unsigned char zero[ALIGN] = {0};
     if (fwrite(buf, 1, shoff, out) != shoff)
         die("write failed");

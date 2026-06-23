@@ -45,13 +45,11 @@ src_TESTS = \
   replace-add-needed.sh \
   add-debug-tag.sh \
   build-resolution-cache.sh \
-  build-resolution-cache-stale-no-cache.sh \
-  build-resolution-cache-rpath-edits.sh \
+  build-resolution-cache-stale.sh \
+  build-resolution-cache-edits.sh \
   build-resolution-cache-no-pie.sh \
   build-resolution-cache-symtab.sh \
   build-resolution-cache-search-hint.sh \
-  build-resolution-cache-needed-edits.sh \
-  build-resolution-cache-malformed-note.sh \
   repeated-updates.sh \
   empty-note.sh \
   print-execstack.sh \
