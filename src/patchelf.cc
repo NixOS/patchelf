@@ -614,6 +614,8 @@ span<T> ElfFile<ElfFileParamNames>::getSectionSpan(const Elf_Shdr & shdr) const
 {
     auto off = rdi(shdr.sh_offset), size = rdi(shdr.sh_size);
     checkOffset(fileContents, off, size);
+    if (off % alignof(T) != 0)
+        error("section content is not naturally aligned");
     return span((T*)(fileContents->data() + off), size / sizeof(T));
 }
 
