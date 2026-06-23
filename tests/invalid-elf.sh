@@ -35,27 +35,36 @@ poke() { # file decoffset hexbytes
 
 shoff=$(read_le "$base" 40 8)
 shstrndx=$(read_le "$base" 62 2)
-shdr=$((shoff + shstrndx * 64))
-shstrtab_off=$(read_le "$base" $((shdr + 24)) 8)
-shstrtab_size=$(read_le "$base" $((shdr + 32)) 8)
+# byte offset of field $2 in section header $1
+shdr_field() { echo $((shoff + $1 * 64 + $2)); }
+shstrtab_off=$(read_le "$base" "$(shdr_field "$shstrndx" 24)" 8)
+shstrtab_size=$(read_le "$base" "$(shdr_field "$shstrndx" 32)" 8)
+# section indices in $base (committed binary, stable)
+dynstr=7 verneed=9 dynamic=22
+dynamic_off=$(read_le "$base" "$(shdr_field $dynamic 24)" 8)
+dynstr_off=$(read_le "$base" "$(shdr_field $dynstr 24)" 8)
+dynstr_size=$(read_le "$base" "$(shdr_field $dynstr 32)" 8)
+verneed_off=$(read_le "$base" "$(shdr_field $verneed 24)" 8)
+dynamic_size=$(read_le "$base" "$(shdr_field $dynamic 32)" 8)
 
-cp "$base" "$SCRATCH/invalid-shrstrtab-idx"
-poke "$SCRATCH/invalid-shrstrtab-idx" 62 '\377\377'
+fixture() { cp "$base" "$SCRATCH/$1"; poke "$SCRATCH/$1" "$2" "$3"; }
 
-cp "$base" "$SCRATCH/invalid-shrstrtab-size"
-poke "$SCRATCH/invalid-shrstrtab-size" $((shdr + 32)) '\377\377\377\377\377\377\377\177'
+fixture invalid-shrstrtab-idx     62                                  '\377\377'
+fixture invalid-shrstrtab-size    "$(shdr_field "$shstrndx" 32)"      '\377\377\377\377\377\377\377\177'
+fixture invalid-shrstrtab-zero    "$(shdr_field "$shstrndx" 32)"      '\0\0\0\0\0\0\0\0'
+fixture invalid-shrstrtab-nonterm $((shstrtab_off + shstrtab_size - 1)) 'A'
+fixture invalid-shdr-name         "$(shdr_field 1 0)"                 '\377\377\377\177'
+fixture invalid-shentsize         58                                  '\060\000'
+fixture invalid-dynamic-offset    "$(shdr_field $dynamic 24)"         '\377\377\377\377\377\377\377\177'
+fixture invalid-dynamic-unaligned "$(shdr_field $dynamic 24)"         '\001\0\0\0\0\0\0\0'
+fixture invalid-dynstr-idx        $((dynamic_off + 8))                '\377\377\377\377\377\377\377\177'
+fixture invalid-dynstr-noterm     $((dynstr_off + dynstr_size - 1))   'A'
+fixture invalid-verneed-file      $((verneed_off + 4))                '\377\377\377\177'
 
-cp "$base" "$SCRATCH/invalid-shrstrtab-zero"
-poke "$SCRATCH/invalid-shrstrtab-zero" $((shdr + 32)) '\0\0\0\0\0\0\0\0'
-
-cp "$base" "$SCRATCH/invalid-shrstrtab-nonterm"
-poke "$SCRATCH/invalid-shrstrtab-nonterm" $((shstrtab_off + shstrtab_size - 1)) 'A'
-
-cp "$base" "$SCRATCH/invalid-shdr-name"
-poke "$SCRATCH/invalid-shdr-name" $((shoff + 64)) '\377\377\377\177'
-
-cp "$base" "$SCRATCH/invalid-shentsize"
-poke "$SCRATCH/invalid-shentsize" 58 '\060\000'
+# .dynamic with no DT_NULL terminator
+cp "$base" "$SCRATCH/invalid-dynamic-noterm"
+dd if=/dev/zero bs=1 count="$dynamic_size" 2>/dev/null | tr '\0' '\377' \
+    | dd of="$SCRATCH/invalid-dynamic-noterm" bs=1 seek="$dynamic_off" conv=notrunc status=none
 
 # --- Test cases ---
 # Each test case is listed here as <directory>:<filename>. The names should
@@ -67,6 +76,12 @@ TEST_CASES="
     $SCRATCH:invalid-shrstrtab-nonterm
     $SCRATCH:invalid-shdr-name
     $SCRATCH:invalid-shentsize
+    $SCRATCH:invalid-dynamic-offset
+    $SCRATCH:invalid-dynamic-unaligned
+    $SCRATCH:invalid-dynstr-idx
+    $SCRATCH:invalid-dynstr-noterm
+    $SCRATCH:invalid-verneed-file
+    $SCRATCH:invalid-dynamic-noterm
     $TEST_DIR:invalid-phdr-offset
     $TEST_DIR:invalid-phdr-issue-64
 "
@@ -84,6 +99,30 @@ invalid_shdr_name_MSG='section name offset out of bounds'
 # shellcheck disable=SC2034
 invalid_shentsize_MSG='section headers have wrong size'
 # shellcheck disable=SC2034
+invalid_dynamic_offset_MSG='data offset extends past file end'
+# shellcheck disable=SC2034
+invalid_dynamic_offset_ARGS='--print-needed'
+# shellcheck disable=SC2034
+invalid_dynamic_unaligned_MSG='section content is not naturally aligned'
+# shellcheck disable=SC2034
+invalid_dynamic_unaligned_ARGS='--print-needed'
+# shellcheck disable=SC2034
+invalid_dynstr_idx_MSG='string table index out of bounds'
+# shellcheck disable=SC2034
+invalid_dynstr_idx_ARGS='--print-needed'
+# shellcheck disable=SC2034
+invalid_dynstr_noterm_MSG='string table is not NUL-terminated'
+# shellcheck disable=SC2034
+invalid_dynstr_noterm_ARGS='--print-needed'
+# shellcheck disable=SC2034
+invalid_verneed_file_MSG='string table index out of bounds'
+# shellcheck disable=SC2034
+invalid_verneed_file_ARGS='--replace-needed libc.so.6 libx.so'
+# shellcheck disable=SC2034
+invalid_dynamic_noterm_MSG='setSubstr: write extends past end of section'
+# shellcheck disable=SC2034
+invalid_dynamic_noterm_ARGS='--add-debug-tag'
+# shellcheck disable=SC2034
 invalid_phdr_offset_MSG='program header table out of bounds'
 # shellcheck disable=SC2034
 invalid_phdr_issue_64_MSG='program header table out of bounds'
@@ -99,15 +138,19 @@ for tcase in $TEST_CASES; do
 	exit 1
     fi
 
-    ../src/patchelf --output /dev/null "$file" && res=$? || res=$?
+    var=$(echo "$name" | tr '-' '_')
+    msg=; args=
+    eval "msg=\${${var}_MSG}"
+    eval "args=\${${var}_ARGS:-}"
+
+    # shellcheck disable=SC2086 # args is a deliberate word list
+    ../src/patchelf $args --output /dev/null "$file" && res=$? || res=$?
     if killed_by_signal "$res"; then
 	FAILED_TESTS="$FAILED_TESTS $name"
     fi
 
-    var=$(echo "$name-MSG" | tr '-' '_')
-    msg=
-    eval "msg=\${$var}"
-    ../src/patchelf --output /dev/null "$file" 2>&1 |
+    # shellcheck disable=SC2086
+    ../src/patchelf $args --output /dev/null "$file" 2>&1 |
         grep "$msg" >/dev/null 2>/dev/null
 done
 
