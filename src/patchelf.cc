@@ -688,8 +688,10 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
         for (auto & i : replacedSections) {
             const std::string & sectionName = i.first;
             const Elf_Shdr & shdr = findSectionHeader(sectionName);
-            if (rdi(shdr.sh_type) != SHT_NOBITS)
+            if (rdi(shdr.sh_type) != SHT_NOBITS) {
+                checkOffset(fileContents, rdi(shdr.sh_offset), rdi(shdr.sh_size));
                 memset(fileContents->data() + rdi(shdr.sh_offset), 'Z', rdi(shdr.sh_size));
+            }
         }
     }
 
@@ -707,6 +709,7 @@ void ElfFile<ElfFileParamNames>::writeReplacedSections(Elf_Off & curOff,
         debug("rewriting section '%s' from offset 0x%x (size %d) to offset 0x%x (size %d)\n",
             sectionName.c_str(), rdi(shdr.sh_offset), rdi(shdr.sh_size), curOff, i->second.size());
 
+        checkOffset(fileContents, curOff, i->second.size());
         memcpy(fileContents->data() + curOff, i->second.c_str(),
             i->second.size());
 
@@ -1228,8 +1231,10 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
         sortPhdrs();
     }
 
+    auto phoff = rdi(hdr()->e_phoff);
+    checkOffset(fileContents, phoff, phdrs.size() * sizeof(Elf_Phdr));
     for (unsigned int i = 0; i < phdrs.size(); ++i)
-        * ((Elf_Phdr *) (fileContents->data() + rdi(hdr()->e_phoff)) + i) = phdrs.at(i);
+        memcpy(fileContents->data() + phoff + i * sizeof(Elf_Phdr), &phdrs.at(i), sizeof(Elf_Phdr));
 
 
     /* Rewrite the section header table.  For neatness, keep the
@@ -1238,8 +1243,10 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
     if (!noSort) {
         sortShdrs();
     }
-    for (unsigned int i = 1; i < rdi(hdr()->e_shnum); ++i)
-        * ((Elf_Shdr *) (fileContents->data() + rdi(hdr()->e_shoff)) + i) = shdrs.at(i);
+    auto shoff = rdi(hdr()->e_shoff);
+    checkOffset(fileContents, shoff, shdrs.size() * sizeof(Elf_Shdr));
+    for (unsigned int i = 1; i < shdrs.size(); ++i)
+        memcpy(fileContents->data() + shoff + i * sizeof(Elf_Shdr), &shdrs.at(i), sizeof(Elf_Shdr));
 
 
     /* Update all those nasty virtual addresses in the .dynamic
