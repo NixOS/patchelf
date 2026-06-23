@@ -1368,7 +1368,8 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
 
 static void setSubstr(std::string & s, unsigned int pos, const std::string & t)
 {
-    assert(pos + t.size() <= s.size());
+    if (pos > s.size() || t.size() > s.size() - pos)
+        error("setSubstr: write extends past end of section");
     copy(t.begin(), t.end(), s.begin() + pos);
 }
 
