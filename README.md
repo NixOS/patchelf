@@ -69,6 +69,14 @@ libraries.  In particular, it can do the following:
   $ patchelf --set-soname libnewname.so.3.4.5 path/to/libmylibrary.so.1.2.3
   ```
 
+* Pre-resolve each `DT_NEEDED` dependency against the run path and record the
+  result in a `.note.nixos.ldcache` note, so a loader that understands the note
+  can skip the run-path search at startup:
+
+  ```console
+  $ patchelf --build-resolution-cache my-program
+  ```
+
 
 ## Compiling and Testing
 

@@ -1,6 +1,6 @@
 LIBS =
 
-check_PROGRAMS = simple-pie simple simple-execstack main too-many-strtab main-scoped big-dynstr no-rpath contiguous-note-sections
+check_PROGRAMS = simple-pie simple simple-execstack main main-no-pie main-emit-relocs pad-to-page too-many-strtab main-scoped big-dynstr no-rpath contiguous-note-sections
 
 no_rpath_arch_TESTS = \
   no-rpath-alpha.sh \
@@ -44,6 +44,12 @@ src_TESTS = \
   replace-needed.sh \
   replace-add-needed.sh \
   add-debug-tag.sh \
+  build-resolution-cache.sh \
+  build-resolution-cache-stale.sh \
+  build-resolution-cache-edits.sh \
+  build-resolution-cache-no-pie.sh \
+  build-resolution-cache-symtab.sh \
+  build-resolution-cache-search-hint.sh \
   repeated-updates.sh \
   empty-note.sh \
   print-execstack.sh \
@@ -95,6 +101,25 @@ main_SOURCES = main.c
 main_LDADD = -lfoo $(AM_LDADD)
 main_DEPENDENCIES = libfoo.so
 main_LDFLAGS = $(LDFLAGS_local)
+
+# Non-PIE (ET_EXEC) variant of main, to exercise rewriteSectionsExecutable().
+main_no_pie_SOURCES = main.c
+main_no_pie_CFLAGS = -fno-pie
+main_no_pie_LDADD = -lfoo $(AM_LDADD)
+main_no_pie_DEPENDENCIES = libfoo.so
+main_no_pie_LDFLAGS = $(LDFLAGS_local) -no-pie
+
+# Variant of main that retains named SECTION symbols in .symtab (via
+# --emit-relocs), so the symbol-table rewrite can be checked for corruption.
+main_emit_relocs_SOURCES = main.c
+main_emit_relocs_CFLAGS =
+main_emit_relocs_LDADD = -lfoo $(AM_LDADD)
+main_emit_relocs_DEPENDENCIES = libfoo.so
+main_emit_relocs_LDFLAGS = $(LDFLAGS_local) -Wl,--emit-relocs
+
+# Test helper: page-aligns an ELF's section header table.
+pad_to_page_SOURCES = pad-to-page.c
+pad_to_page_CFLAGS =
 
 main_scoped_SOURCES = main.c
 main_scoped_LDADD = -lfoo-scoped $(AM_LDADD)
