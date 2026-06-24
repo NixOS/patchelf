@@ -1,11 +1,6 @@
 #! /bin/sh -e
 SCRATCH=scratch/$(basename "$0" .sh)
 
-if test "$(uname)" = FreeBSD; then
-    echo "skipping on FreeBSD"
-    exit 77
-fi
-
 rm -rf "${SCRATCH}"
 mkdir -p "${SCRATCH}"
 mkdir -p "${SCRATCH}/libsA"
