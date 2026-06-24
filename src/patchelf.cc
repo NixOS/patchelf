@@ -3038,6 +3038,8 @@ static int mainWrapped(int argc, char * * argv)
                     error(fmt(fname, ":", lineCount, ": Name '", from, "' appears twice in the map file"));
                 if (from.find('@') != std::string_view::npos || to.find('@') != std::string_view::npos)
                     error(fmt(fname, ":", lineCount, ": Name pair contains version tag: ", from, " ", to));
+                if (from.size() > 65535 || to.size() > 65535)
+                    error(fmt(fname, ":", lineCount, ": Symbol name exceeds maximum allowed length"));
                 lineCount++;
                 symbolsToRename[*symbolsToRenameKeys.insert(from).first] = to;
             }
