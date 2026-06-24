@@ -1136,7 +1136,10 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
             break;
         }
 
-    /* Clear out the free space. */
+    /* Clear out the free space. startOffset is taken from an sh_offset in
+       the input, so must be bounded before being used as a write extent. */
+    if (startOffset < curOff || startOffset > fileContents->size())
+        error("section offsets are inconsistent with file size");
     debug("clearing first %d bytes\n", startOffset - curOff);
     memset(fileContents->data() + curOff, 0, startOffset - curOff);
 
