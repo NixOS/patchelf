@@ -1899,6 +1899,7 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
             char * name = strTabEntry(strTab, rdi(dyn->d_un.d_val));
             auto i = libs.find(name);
             if (i != libs.end() && name != i->second) {
+                auto orig = i->first;
                 auto replacement = i->second;
 
                 debug("replacing DT_NEEDED entry '%s' with '%s'\n", name, replacement.c_str());
@@ -1906,7 +1907,21 @@ void ElfFile<ElfFileParamNames>::replaceNeeded(const std::map<std::string, std::
                 auto a = addedStrings.find(replacement);
                 // the same replacement string has already been added, reuse it
                 if (a != addedStrings.end()) {
+                    debug("reusing previous replacement\n");
                     wri(dyn->d_un.d_val, a->second);
+                    continue;
+                }
+
+                // if the replacement a suffix of the original, e.g. when replacing full
+                // paths with the basename or stripping a sysroot-like prefix, then
+                // update the reference to that suffix while keeping the original
+                // intact (thus we can potentially avoid relocating the whole section)
+                auto pos = orig.rfind(replacement);
+                if (pos != std::string::npos && orig.size() == pos + replacement.size()) {
+                    debug("reusing suffix\n");
+                    wri(dyn->d_un.d_val, rdi(dyn->d_un.d_val) + pos);
+                    /* ensure write-out in case all replaces use this technique */
+                    changed = true;
                     continue;
                 }
 
