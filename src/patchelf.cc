@@ -2241,22 +2241,19 @@ void ElfFile<ElfFileParamNames>::buildResolutionCache()
         return;
     }
 
-    const char * strTab = (const char *) fileContents->data() + rdi(shdrDynStr->get().sh_offset);
-    auto dyn = (const Elf_Dyn *) (fileContents->data() + rdi(shdrDynamic->get().sh_offset));
-    /* Bound the walk by the .dynamic section size so a missing DT_NULL
-       terminator can't run off the end of the mapping. */
-    const Elf_Dyn * dynEnd = dyn + rdi(shdrDynamic->get().sh_size) / sizeof(Elf_Dyn);
+    auto strTab = getStrTab(shdrDynStr->get());
+    auto dynSpan = getSectionSpan<Elf_Dyn>(shdrDynamic->get());
 
     std::vector<std::string> needed;
     const char * dtRunPath = nullptr;
     const char * dtRPath = nullptr;
-    for ( ; dyn < dynEnd && rdi(dyn->d_tag) != DT_NULL; dyn++) {
+    for (auto * dyn = dynSpan.begin(); dyn < dynSpan.end() && rdi(dyn->d_tag) != DT_NULL; dyn++) {
         if (rdi(dyn->d_tag) == DT_NEEDED)
-            needed.emplace_back(strTab + rdi(dyn->d_un.d_val));
+            needed.emplace_back(strTabEntry(strTab, rdi(dyn->d_un.d_val)));
         else if (rdi(dyn->d_tag) == DT_RUNPATH)
-            dtRunPath = strTab + rdi(dyn->d_un.d_val);
+            dtRunPath = strTabEntry(strTab, rdi(dyn->d_un.d_val));
         else if (rdi(dyn->d_tag) == DT_RPATH)
-            dtRPath = strTab + rdi(dyn->d_un.d_val);
+            dtRPath = strTabEntry(strTab, rdi(dyn->d_un.d_val));
     }
     /* DT_RUNPATH takes precedence over DT_RPATH, as in the loader. */
     const char * runPathStr = dtRunPath ? dtRunPath : dtRPath;
