@@ -22,7 +22,6 @@
 
       supportedSystems = [
         "x86_64-linux"
-        "i686-linux"
         "aarch64-linux"
       ];
       forAllSystems = lib.genAttrs supportedSystems;
@@ -174,14 +173,12 @@
           constituents = [
             self.hydraJobs.tarball
             self.hydraJobs.build.x86_64-linux
-            self.hydraJobs.build.i686-linux
             self.hydraJobs.build-cmake.x86_64-linux
             self.hydraJobs.build-meson.x86_64-linux
             # FIXME: add aarch64 emulation to our github action...
             #self.hydraJobs.build.aarch64-linux
             self.hydraJobs.build-sanitized.x86_64-linux
             #self.hydraJobs.build-sanitized.aarch64-linux
-            self.hydraJobs.build-sanitized.i686-linux
             self.hydraJobs.build-sanitized-clang.x86_64-linux
           ];
           meta.description = "Release-critical builds";
@@ -227,9 +224,6 @@
         {
           glibc = mkShell self.packages.${system}.patchelf;
           default = self.devShells.${system}.glibc;
-        }
-        // lib.optionalAttrs (system != "i686-linux") {
-          musl = mkShell self.packages.${system}.patchelf-musl;
         }
       );
 
@@ -286,9 +280,6 @@
           patchelf-netbsd-cross = patchelfFor pkgs.pkgsCross.x86_64-netbsd;
           patchelf-win32 = patchelfForWindowsStatic pkgs.pkgsCross.mingw32;
           patchelf-win64 = patchelfForWindowsStatic pkgs.pkgsCross.mingwW64;
-        }
-        // lib.optionalAttrs (system != "i686-linux") {
-          patchelf-musl = patchelfFor nixpkgs.legacyPackages.${system}.pkgsMusl;
         }
       );
 
