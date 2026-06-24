@@ -102,6 +102,15 @@ Prints all DT_NEEDED entries of the executable.
 Marks the object so that the search for dependencies of this object will ignore any
 default library search paths.
 
+.IP "--build-resolution-cache"
+Resolves each DT_NEEDED dependency against the object's run path at patch time
+and records the result in a \fB.note.nixos.ldcache\fR note, so that a loader
+which understands the note can skip the run-path search at startup. Directories
+that cannot be resolved ahead of time (those containing dynamic-string tokens
+such as \fB$ORIGIN\fR, or a \fBglibc-hwcaps\fR subdirectory) are stored as a
+search hint instead of an exact path. The cache is built once from an unpatched
+binary; this option cannot be combined with \fB--force-rpath\fR.
+
 .IP "--no-sort"
 Do not sort program headers or section headers.  This is useful when
 debugging patchelf, because it makes it easier to read diffs of the
