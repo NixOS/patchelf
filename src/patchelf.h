@@ -114,6 +114,7 @@ private:
     template<class T> span<T> getSectionSpan(const Elf_Shdr & shdr) const;
     template<class T> span<T> getSectionSpan(const SectionName & sectionName);
     template<class T> span<T> tryGetSectionSpan(const SectionName & sectionName);
+    span<char> getStrTab(const Elf_Shdr & shdr) const;
 
     [[nodiscard]] unsigned int getSectionIndex(const SectionName & sectionName) const;
 
@@ -157,6 +158,8 @@ public:
     void modifyRPath(RPathOp op, const std::vector<std::string> & allowedRpathPrefixes, std::string newRPath);
     std::string shrinkRPath(char* rpath, std::vector<std::string> &neededLibs, const std::vector<std::string> & allowedRpathPrefixes);
     void removeRPath(Elf_Shdr & shdrDynamic);
+
+    unsigned int dynNullIndex(const std::string & newDynamic) const;
 
     void addNeeded(const std::set<std::string> & libs);
 
@@ -245,33 +248,44 @@ private:
     template<class StrIdxCallback>
     void forAllStringReferences(const Elf_Shdr& strTabHdr, StrIdxCallback&& fn);
 
+    /* Follow a vd_next/vn_next/vd_aux-style link, bounded by the section:
+       a zero, misaligned or out-of-range link ends the walk. */
     template<class T, class U>
-    auto follow(U* ptr, size_t offset) -> T* {
-        return offset ? (T*)(((char*)ptr)+offset) : nullptr;
-    };
+    T * follow(span<char> bytes, U * from, size_t offset) {
+        if (!offset || offset >= bytes.size()) return nullptr;
+        size_t pos = ((char*)from - bytes.begin()) + offset;
+        if (pos % alignof(T) || sizeof(T) > bytes.size() || pos > bytes.size() - sizeof(T))
+            return nullptr;
+        return (T*)(bytes.begin() + pos);
+    }
+
+    template<class T>
+    T * verHead(span<char> bytes) {
+        if (sizeof(T) > bytes.size() || (uintptr_t)bytes.begin() % alignof(T))
+            return nullptr;
+        return (T*)bytes.begin();
+    }
 
     template<class VdFn, class VaFn>
-    void forAll_ElfVer(span<Elf_Verdef> vdspan, VdFn&& vdfn, VaFn&& vafn)
+    void forAll_ElfVer(span<char> bytes, Elf_Verdef *, VdFn&& vdfn, VaFn&& vafn)
     {
-        auto* vd = vdspan.begin();
-        for (; vd; vd = follow<Elf_Verdef>(vd, rdi(vd->vd_next)))
+        for (auto vd = verHead<Elf_Verdef>(bytes); vd; vd = follow<Elf_Verdef>(bytes, vd, rdi(vd->vd_next)))
         {
             vdfn(*vd);
-            auto va = follow<Elf_Verdaux>(vd, rdi(vd->vd_aux));
-            for (; va; va = follow<Elf_Verdaux>(va, rdi(va->vda_next)))
+            for (auto va = follow<Elf_Verdaux>(bytes, vd, rdi(vd->vd_aux)); va;
+                 va = follow<Elf_Verdaux>(bytes, va, rdi(va->vda_next)))
                 vafn(*va);
         }
     }
 
     template<class VnFn, class VaFn>
-    void forAll_ElfVer(span<Elf_Verneed> vnspan, VnFn&& vnfn, VaFn&& vafn)
+    void forAll_ElfVer(span<char> bytes, Elf_Verneed *, VnFn&& vnfn, VaFn&& vafn)
     {
-        auto* vn = vnspan.begin();
-        for (; vn; vn = follow<Elf_Verneed>(vn, rdi(vn->vn_next)))
+        for (auto vn = verHead<Elf_Verneed>(bytes); vn; vn = follow<Elf_Verneed>(bytes, vn, rdi(vn->vn_next)))
         {
             vnfn(*vn);
-            auto va = follow<Elf_Vernaux>(vn, rdi(vn->vn_aux));
-            for (; va; va = follow<Elf_Vernaux>(va, rdi(va->vna_next)))
+            for (auto va = follow<Elf_Vernaux>(bytes, vn, rdi(vn->vn_aux)); va;
+                 va = follow<Elf_Vernaux>(bytes, va, rdi(va->vna_next)))
                 vafn(*va);
         }
     }
