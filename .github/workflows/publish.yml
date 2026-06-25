@@ -16,6 +16,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
       - uses: cachix/install-nix-action@v31
+      - uses: Mic92/hestia@v1
       - name: Build tarballs
         run: |
           nix build -L .#hydraJobs.tarball
@@ -33,6 +34,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
       - uses: cachix/install-nix-action@v31
+      - uses: Mic92/hestia@v1
       - name: Build windows executable
         run: |
           nix build -L .#patchelf-win32 .#patchelf-win64
@@ -125,6 +127,40 @@ jobs:
         with:
           name: patchelf-${{ matrix.platform }}
           path: dist/*
+
+  # Architectures without an official musl/Alpine image: build with glibc on
+  # Debian under QEMU and just run the test suite (no release artifact).
+  test_qemu_glibc:
+    name: Test under QEMU (glibc)
+    needs: [build_tarballs]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ["mips64le"]
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - uses: actions/download-artifact@v6
+        with:
+          name: patchelf-tarball
+          path: dist
+      - name: Build and test
+        run: |
+          cat <<'EOF' > check.sh
+          set -ex
+          apt-get update
+          apt-get install -y --no-install-recommends build-essential file
+          tar -xf dist/*.tar.bz2
+          cd patchelf-*
+          ./configure
+          # qemu emulation is slow, so keep the randomized property test short.
+          export ITERS=10
+          make check || (cat tests/test-suite.log; exit 1)
+          EOF
+          # bookworm still carries mips64el in the main archive; unstable does not.
+          docker run --platform "linux/${{ matrix.platform }}" -v "$(pwd):/gha" \
+            "${{ matrix.platform }}/debian:bookworm-slim" sh -ec "cd /gha && sh ./check.sh"
 
   publish:
     name: Publish tarballs & binaries

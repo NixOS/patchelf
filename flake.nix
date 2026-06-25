@@ -218,6 +218,8 @@
                   #pkgs.buildPackages.cmake
                   #pkgs.buildPackages.meson
                   #pkgs.buildPackages.ninja
+                  pkgs.buildPackages.lld
+                  pkgs.buildPackages.mold
                   modular.pre-commit.settings.package
                   (pkgs.buildPackages.writeScriptBin "pre-commit-hooks-install" modular.pre-commit.settings.installationScript)
                 ];

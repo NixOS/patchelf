@@ -1095,16 +1095,44 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
 
     debug("needed space is %d\n", neededSpace);
 
+    /* A writable section (commonly .dynamic, which the loader writes DT_DEBUG
+       into) may be relocated into the reserved area, so the segment covering
+       that area must end up writable. */
+    bool needWritable = std::any_of(replacedSections.begin(), replacedSections.end(),
+        [this](const std::pair<const std::string, std::string> & i) {
+            return (rdi(findSectionHeader(i.first).sh_flags) & SHF_WRITE) != 0;
+        });
+
+    /* If that area sits in an executable LOAD segment, marking it writable
+       would create a W+X segment. Prefer to grow the file instead, so shiftFile
+       splits the reserved area into its own R/W segment and leaves the
+       executable one untouched. Growing adds one program header and one page;
+       only take this path when both fit (otherwise the underrun check below
+       would abort), else fall back to marking the segment writable (W+X). */
+    bool growForWritable = false;
+    if (needWritable && neededSpace + sizeof(Elf_Phdr) <= startOffset
+        && firstPage >= getPageSize()) {
+        Elf_Off hdrOff = sizeof(Elf_Ehdr) + phdrs.size() * sizeof(Elf_Phdr);
+        for (const auto & phdr : phdrs)
+            if (rdi(phdr.p_type) == PT_LOAD &&
+                rdi(phdr.p_offset) <= hdrOff &&
+                rdi(phdr.p_offset) + rdi(phdr.p_filesz) > hdrOff)
+            {
+                growForWritable = (rdi(phdr.p_flags) & PF_X) != 0;
+                break;
+            }
+    }
+
     /* If we need more space at the start of the file, then grow the
        file by the minimum number of pages and adjust internal
        offsets. */
-    if (neededSpace > startOffset) {
+    if (neededSpace > startOffset || growForWritable) {
         /* We also need an additional program header, so adjust for that. */
         neededSpace += sizeof(Elf_Phdr);
         debug("needed space is %d\n", neededSpace);
 
         /* Calculate how many bytes are needed out of the additional pages. */
-        size_t extraSpace = neededSpace - startOffset;
+        size_t extraSpace = neededSpace > startOffset ? neededSpace - startOffset : 0;
         // Always give one extra page to avoid colliding with segments that start at
         // unaligned addresses and will be rounded down when loaded
         unsigned int neededPages = 1 + roundUp(extraSpace, getPageSize()) / getPageSize();
@@ -1128,11 +1156,20 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
     for (auto& phdr : phdrs)
         if (rdi(phdr.p_type) == PT_LOAD &&
             rdi(phdr.p_offset) <= curOff &&
-            rdi(phdr.p_offset) + rdi(phdr.p_filesz) > curOff &&
-            rdi(phdr.p_filesz) < neededSpace)
+            rdi(phdr.p_offset) + rdi(phdr.p_filesz) > curOff)
         {
-            wri(phdr.p_filesz, neededSpace);
-            wri(phdr.p_memsz, neededSpace);
+            if (rdi(phdr.p_filesz) < neededSpace) {
+                wri(phdr.p_filesz, neededSpace);
+                wri(phdr.p_memsz, neededSpace);
+            }
+            /* The segment may already be large enough (e.g. with a large page
+               size), so set this regardless of whether it was extended. If a
+               grow happened above this is the new R/W segment shiftFile created
+               and the flag is already set; otherwise we set it here, which for
+               an executable segment is the W+X fallback when growing was not
+               possible. */
+            if (needWritable)
+                wri(phdr.p_flags, rdi(phdr.p_flags) | PF_W);
             break;
         }
 
@@ -1657,30 +1694,38 @@ std::string ElfFile<ElfFileParamNames>::shrinkRPath(char* rpath, std::vector<std
     return newRPath;
 }
 
+/* Remove every entry matched by drop() from .dynamic in place, shifting later
+   entries down and zeroing the tail. DT_MIPS_RLD_MAP_REL is relative to its
+   own slot's address, so a kept entry that moved gets its value adjusted by
+   the distance shifted; rewriteHeaders() would recompute it from the section
+   address, but that only runs when .dynamic is replaced, and this compacts in
+   place. Returns whether anything was dropped. */
+template<ElfFileParams>
+template<class Drop>
+bool ElfFile<ElfFileParamNames>::compactDynamic(Elf_Shdr & shdrDynamic, Drop && drop)
+{
+    auto dynSpan = getSectionSpan<Elf_Dyn>(shdrDynamic);
+    Elf_Dyn * out = dynSpan.begin();
+    Elf_Dyn * dyn = out;
+    for ( ; dyn < dynSpan.end() && rdi(dyn->d_tag) != DT_NULL; dyn++) {
+        if (drop(*dyn)) continue;
+        *out = *dyn;
+        if (out != dyn && rdi(out->d_tag) == DT_MIPS_RLD_MAP_REL)
+            wri(out->d_un.d_ptr, rdi(out->d_un.d_ptr) + (dyn - out) * sizeof(Elf_Dyn));
+        out++;
+    }
+    memset(out, 0, sizeof(Elf_Dyn) * (dyn - out));
+    return out != dyn;
+}
+
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::removeRPath(Elf_Shdr & shdrDynamic) {
-    auto dynSpan = getSectionSpan<Elf_Dyn>(shdrDynamic);
-    Elf_Dyn * dyn = dynSpan.begin();
-    Elf_Dyn * last = dyn;
-    for ( ; dyn < dynSpan.end() && rdi(dyn->d_tag) != DT_NULL; dyn++) {
-        if (rdi(dyn->d_tag) == DT_RPATH) {
-            debug("removing DT_RPATH entry\n");
-            changed = true;
-        } else if (rdi(dyn->d_tag) == DT_RUNPATH) {
-            debug("removing DT_RUNPATH entry\n");
-            changed = true;
-        } else {
-            /* the MIPS_RLD_MAP_REL tag stores the offset to the debug
-               pointer, relative to the address of the tag. Therefore we must
-               update the value if the tag is moved down. And since we do not
-               *replace* sections we cannot rely on rewriteSections(). So
-               we simply fix this one tag in place. */
-            if (rdi(dyn->d_tag) == DT_MIPS_RLD_MAP_REL)
-                wri(dyn->d_un.d_ptr, rdi(dyn->d_un.d_ptr) + sizeof(Elf_Dyn) * (dyn - last));
-            *last++ = *dyn;
-        }
-    }
-    memset(last, 0, sizeof(Elf_Dyn) * (dyn - last));
+    changed |= compactDynamic(shdrDynamic, [this](const Elf_Dyn & d) {
+        auto tag = rdi(d.d_tag);
+        if (tag != DT_RPATH && tag != DT_RUNPATH) return false;
+        debug("removing %s entry\n", tag == DT_RPATH ? "DT_RPATH" : "DT_RUNPATH");
+        return true;
+    });
     this->rewriteSections();
 }
 
@@ -1858,28 +1903,19 @@ void ElfFile<ElfFileParamNames>::removeNeeded(const std::set<std::string> & libs
     auto shdrDynStr = findSectionHeader(".dynstr");
     auto strTab = getStrTab(shdrDynStr);
 
-    auto dynSpan = getSectionSpan<Elf_Dyn>(shdrDynamic);
-    Elf_Dyn * dyn = dynSpan.begin();
-    Elf_Dyn * last = dyn;
-    bool removed = false;
-    for ( ; dyn < dynSpan.end() && rdi(dyn->d_tag) != DT_NULL; dyn++) {
-        if (rdi(dyn->d_tag) == DT_NEEDED) {
-            char * name = strTabEntry(strTab, rdi(dyn->d_un.d_val));
-            if (libs.count(name)) {
-                debug("removing DT_NEEDED entry '%s'\n", name);
-                changed = true;
-                removed = true;
-            } else {
-                debug("keeping DT_NEEDED entry '%s'\n", name);
-                *last++ = *dyn;
-            }
-        } else
-            *last++ = *dyn;
+    if (compactDynamic(shdrDynamic, [&](const Elf_Dyn & d) {
+        if (rdi(d.d_tag) != DT_NEEDED) return false;
+        char * name = strTabEntry(strTab, rdi(d.d_un.d_val));
+        if (!libs.count(name)) {
+            debug("keeping DT_NEEDED entry '%s'\n", name);
+            return false;
+        }
+        debug("removing DT_NEEDED entry '%s'\n", name);
+        return true;
+    })) {
+        changed = true;
+        removeResolutionCache();
     }
-
-    memset(last, 0, sizeof(Elf_Dyn) * (dyn - last));
-
-    if (removed) removeResolutionCache();
 
     this->rewriteSections();
 }

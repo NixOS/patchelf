@@ -1,0 +1,31 @@
+name: Hestia cache GC
+
+# PR-scoped caches die with their branch; the default-branch scope grows
+# forever without this.
+on:
+  schedule:
+    - cron: "23 3 * * *"
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Plan only; delete nothing.
+        type: boolean
+        default: false
+
+# Two GCs racing corrupts the repack; queue, don't overlap.
+concurrency:
+  group: hestia-gc
+  cancel-in-progress: false
+
+jobs:
+  gc:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write   # REST cache deletes
+      contents: read
+    steps:
+      - uses: Mic92/hestia@v1
+      - run: |
+          "$HESTIA_BIN" gc ${{ inputs.dry-run && '--dry-run' || '' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
