@@ -1374,6 +1374,32 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                 dyn->d_un.d_ptr = findSectionHeader(".gnu.version_r").sh_addr;
             else if (d_tag == DT_VERSYM)
                 dyn->d_un.d_ptr = findSectionHeader(".gnu.version").sh_addr;
+            /* The init/fini pointers reference the address of the
+               corresponding section, so they must be updated when those
+               sections are relocated (e.g. when growing the PHT pushes .init
+               to the end of the file); otherwise the dynamic loader jumps to a
+               stale address and the process crashes, typically at dlopen time.
+               See https://github.com/NixOS/patchelf/issues/639. */
+            else if (d_tag == DT_INIT) {
+                auto shdr = tryFindSectionHeader(".init");
+                if (shdr) dyn->d_un.d_ptr = (*shdr).get().sh_addr;
+            }
+            else if (d_tag == DT_FINI) {
+                auto shdr = tryFindSectionHeader(".fini");
+                if (shdr) dyn->d_un.d_ptr = (*shdr).get().sh_addr;
+            }
+            else if (d_tag == DT_INIT_ARRAY) {
+                auto shdr = tryFindSectionHeader(".init_array");
+                if (shdr) dyn->d_un.d_ptr = (*shdr).get().sh_addr;
+            }
+            else if (d_tag == DT_FINI_ARRAY) {
+                auto shdr = tryFindSectionHeader(".fini_array");
+                if (shdr) dyn->d_un.d_ptr = (*shdr).get().sh_addr;
+            }
+            else if (d_tag == DT_PREINIT_ARRAY) {
+                auto shdr = tryFindSectionHeader(".preinit_array");
+                if (shdr) dyn->d_un.d_ptr = (*shdr).get().sh_addr;
+            }
             else if (d_tag == DT_MIPS_RLD_MAP_REL) {
                 /* the MIPS_RLD_MAP_REL tag stores the offset to the debug
                    pointer, relative to the address of the tag */
