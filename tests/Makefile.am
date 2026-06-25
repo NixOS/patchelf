@@ -61,6 +61,7 @@ src_TESTS = \
   short-first-segment.sh \
   empty-note.sh \
   set-interpreter-same.sh \
+  property-rewrite.sh \
   large-page-dynamic.sh
 
 build_TESTS = \
