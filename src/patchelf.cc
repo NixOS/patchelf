@@ -1657,30 +1657,38 @@ std::string ElfFile<ElfFileParamNames>::shrinkRPath(char* rpath, std::vector<std
     return newRPath;
 }
 
+/* Remove every entry matched by drop() from .dynamic in place, shifting later
+   entries down and zeroing the tail. DT_MIPS_RLD_MAP_REL is relative to its
+   own slot's address, so a kept entry that moved gets its value adjusted by
+   the distance shifted; rewriteHeaders() would recompute it from the section
+   address, but that only runs when .dynamic is replaced, and this compacts in
+   place. Returns whether anything was dropped. */
+template<ElfFileParams>
+template<class Drop>
+bool ElfFile<ElfFileParamNames>::compactDynamic(Elf_Shdr & shdrDynamic, Drop && drop)
+{
+    auto dynSpan = getSectionSpan<Elf_Dyn>(shdrDynamic);
+    Elf_Dyn * out = dynSpan.begin();
+    Elf_Dyn * dyn = out;
+    for ( ; dyn < dynSpan.end() && rdi(dyn->d_tag) != DT_NULL; dyn++) {
+        if (drop(*dyn)) continue;
+        *out = *dyn;
+        if (out != dyn && rdi(out->d_tag) == DT_MIPS_RLD_MAP_REL)
+            wri(out->d_un.d_ptr, rdi(out->d_un.d_ptr) + (dyn - out) * sizeof(Elf_Dyn));
+        out++;
+    }
+    memset(out, 0, sizeof(Elf_Dyn) * (dyn - out));
+    return out != dyn;
+}
+
 template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::removeRPath(Elf_Shdr & shdrDynamic) {
-    auto dynSpan = getSectionSpan<Elf_Dyn>(shdrDynamic);
-    Elf_Dyn * dyn = dynSpan.begin();
-    Elf_Dyn * last = dyn;
-    for ( ; dyn < dynSpan.end() && rdi(dyn->d_tag) != DT_NULL; dyn++) {
-        if (rdi(dyn->d_tag) == DT_RPATH) {
-            debug("removing DT_RPATH entry\n");
-            changed = true;
-        } else if (rdi(dyn->d_tag) == DT_RUNPATH) {
-            debug("removing DT_RUNPATH entry\n");
-            changed = true;
-        } else {
-            /* the MIPS_RLD_MAP_REL tag stores the offset to the debug
-               pointer, relative to the address of the tag. Therefore we must
-               update the value if the tag is moved down. And since we do not
-               *replace* sections we cannot rely on rewriteSections(). So
-               we simply fix this one tag in place. */
-            if (rdi(dyn->d_tag) == DT_MIPS_RLD_MAP_REL)
-                wri(dyn->d_un.d_ptr, rdi(dyn->d_un.d_ptr) + sizeof(Elf_Dyn) * (dyn - last));
-            *last++ = *dyn;
-        }
-    }
-    memset(last, 0, sizeof(Elf_Dyn) * (dyn - last));
+    changed |= compactDynamic(shdrDynamic, [this](const Elf_Dyn & d) {
+        auto tag = rdi(d.d_tag);
+        if (tag != DT_RPATH && tag != DT_RUNPATH) return false;
+        debug("removing %s entry\n", tag == DT_RPATH ? "DT_RPATH" : "DT_RUNPATH");
+        return true;
+    });
     this->rewriteSections();
 }
 
@@ -1858,28 +1866,19 @@ void ElfFile<ElfFileParamNames>::removeNeeded(const std::set<std::string> & libs
     auto shdrDynStr = findSectionHeader(".dynstr");
     auto strTab = getStrTab(shdrDynStr);
 
-    auto dynSpan = getSectionSpan<Elf_Dyn>(shdrDynamic);
-    Elf_Dyn * dyn = dynSpan.begin();
-    Elf_Dyn * last = dyn;
-    bool removed = false;
-    for ( ; dyn < dynSpan.end() && rdi(dyn->d_tag) != DT_NULL; dyn++) {
-        if (rdi(dyn->d_tag) == DT_NEEDED) {
-            char * name = strTabEntry(strTab, rdi(dyn->d_un.d_val));
-            if (libs.count(name)) {
-                debug("removing DT_NEEDED entry '%s'\n", name);
-                changed = true;
-                removed = true;
-            } else {
-                debug("keeping DT_NEEDED entry '%s'\n", name);
-                *last++ = *dyn;
-            }
-        } else
-            *last++ = *dyn;
+    if (compactDynamic(shdrDynamic, [&](const Elf_Dyn & d) {
+        if (rdi(d.d_tag) != DT_NEEDED) return false;
+        char * name = strTabEntry(strTab, rdi(d.d_un.d_val));
+        if (!libs.count(name)) {
+            debug("keeping DT_NEEDED entry '%s'\n", name);
+            return false;
+        }
+        debug("removing DT_NEEDED entry '%s'\n", name);
+        return true;
+    })) {
+        changed = true;
+        removeResolutionCache();
     }
-
-    memset(last, 0, sizeof(Elf_Dyn) * (dyn - last));
-
-    if (removed) removeResolutionCache();
 
     this->rewriteSections();
 }
