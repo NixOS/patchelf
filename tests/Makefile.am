@@ -1,6 +1,6 @@
 LIBS =
 
-check_PROGRAMS = simple-pie simple simple-execstack main main-no-pie main-emit-relocs pad-to-page too-many-strtab main-scoped big-dynstr no-rpath contiguous-note-sections
+check_PROGRAMS = simple-pie simple simple-execstack main main-no-pie main-emit-relocs pad-to-page too-many-strtab main-scoped big-dynstr no-rpath contiguous-note-sections large-page
 
 no_rpath_arch_TESTS = \
   no-rpath-alpha.sh \
@@ -60,7 +60,8 @@ src_TESTS = \
   shared-rpath.sh \
   short-first-segment.sh \
   empty-note.sh \
-  set-interpreter-same.sh
+  set-interpreter-same.sh \
+  large-page-dynamic.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)
@@ -109,6 +110,13 @@ main_no_pie_CFLAGS = -fno-pie
 main_no_pie_LDADD = -lfoo $(AM_LDADD)
 main_no_pie_DEPENDENCIES = libfoo.so
 main_no_pie_LDFLAGS = $(LDFLAGS_local) -no-pie
+
+# Non-PIE binary with a max-page-size larger than the runtime page size. On
+# 32-bit targets this makes patchelf relocate .dynamic into the read-only first
+# segment; see large-page-dynamic.sh.
+large_page_SOURCES = simple.c
+large_page_CFLAGS = -fno-pie
+large_page_LDFLAGS = $(LDFLAGS_local) -no-pie -Wl,-z,max-page-size=0x200000
 
 # Variant of main that retains named SECTION symbols in .symtab (via
 # --emit-relocs), so the symbol-table rewrite can be checked for corruption.

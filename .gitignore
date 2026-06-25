@@ -38,6 +38,7 @@ CMakeLists.txt.user
 /tests/contiguous-note-sections
 /tests/simple-pie
 /tests/simple-execstack
+/tests/large-page
 
 .direnv/
 .vscode/

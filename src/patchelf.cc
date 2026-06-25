@@ -1095,16 +1095,44 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
 
     debug("needed space is %d\n", neededSpace);
 
+    /* A writable section (commonly .dynamic, which the loader writes DT_DEBUG
+       into) may be relocated into the reserved area, so the segment covering
+       that area must end up writable. */
+    bool needWritable = std::any_of(replacedSections.begin(), replacedSections.end(),
+        [this](const std::pair<const std::string, std::string> & i) {
+            return (rdi(findSectionHeader(i.first).sh_flags) & SHF_WRITE) != 0;
+        });
+
+    /* If that area sits in an executable LOAD segment, marking it writable
+       would create a W+X segment. Prefer to grow the file instead, so shiftFile
+       splits the reserved area into its own R/W segment and leaves the
+       executable one untouched. Growing adds one program header and one page;
+       only take this path when both fit (otherwise the underrun check below
+       would abort), else fall back to marking the segment writable (W+X). */
+    bool growForWritable = false;
+    if (needWritable && neededSpace + sizeof(Elf_Phdr) <= startOffset
+        && firstPage >= getPageSize()) {
+        Elf_Off hdrOff = sizeof(Elf_Ehdr) + phdrs.size() * sizeof(Elf_Phdr);
+        for (const auto & phdr : phdrs)
+            if (rdi(phdr.p_type) == PT_LOAD &&
+                rdi(phdr.p_offset) <= hdrOff &&
+                rdi(phdr.p_offset) + rdi(phdr.p_filesz) > hdrOff)
+            {
+                growForWritable = (rdi(phdr.p_flags) & PF_X) != 0;
+                break;
+            }
+    }
+
     /* If we need more space at the start of the file, then grow the
        file by the minimum number of pages and adjust internal
        offsets. */
-    if (neededSpace > startOffset) {
+    if (neededSpace > startOffset || growForWritable) {
         /* We also need an additional program header, so adjust for that. */
         neededSpace += sizeof(Elf_Phdr);
         debug("needed space is %d\n", neededSpace);
 
         /* Calculate how many bytes are needed out of the additional pages. */
-        size_t extraSpace = neededSpace - startOffset;
+        size_t extraSpace = neededSpace > startOffset ? neededSpace - startOffset : 0;
         // Always give one extra page to avoid colliding with segments that start at
         // unaligned addresses and will be rounded down when loaded
         unsigned int neededPages = 1 + roundUp(extraSpace, getPageSize()) / getPageSize();
@@ -1128,11 +1156,20 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
     for (auto& phdr : phdrs)
         if (rdi(phdr.p_type) == PT_LOAD &&
             rdi(phdr.p_offset) <= curOff &&
-            rdi(phdr.p_offset) + rdi(phdr.p_filesz) > curOff &&
-            rdi(phdr.p_filesz) < neededSpace)
+            rdi(phdr.p_offset) + rdi(phdr.p_filesz) > curOff)
         {
-            wri(phdr.p_filesz, neededSpace);
-            wri(phdr.p_memsz, neededSpace);
+            if (rdi(phdr.p_filesz) < neededSpace) {
+                wri(phdr.p_filesz, neededSpace);
+                wri(phdr.p_memsz, neededSpace);
+            }
+            /* The segment may already be large enough (e.g. with a large page
+               size), so set this regardless of whether it was extended. If a
+               grow happened above this is the new R/W segment shiftFile created
+               and the flag is already set; otherwise we set it here, which for
+               an executable segment is the W+X fallback when growing was not
+               possible. */
+            if (needWritable)
+                wri(phdr.p_flags, rdi(phdr.p_flags) | PF_W);
             break;
         }
 
