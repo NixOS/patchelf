@@ -79,6 +79,10 @@ the "/foo/lib" reference instead of the "/tmp" entry.
 .IP --print-rpath
 Prints the DT_RUNPATH or DT_RPATH for an executable or library.
 
+.IP --update-rpath
+Updates the DR_RPATH to a DT_RUNTPATH or vice versa if "--force-rpath" is given
+too.
+
 .IP --force-rpath
 Forces the use of the obsolete DT_RPATH in the file instead of
 DT_RUNPATH. By default DT_RPATH is converted to DT_RUNPATH.
