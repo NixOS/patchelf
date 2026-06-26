@@ -1,11 +1,53 @@
 # Release History
 
-## 0.16.2 (Yet to be released)
+## 0.19.0 (June 26, 2026)
 
-The release combines the 0.15.1 through 0.15.4 backports with 0.16.1.
+This is the first feature release since 0.18.0 (April 2023) and collects three
+years of fixes and hardening.
 
-* Code quality and infra changes just like 0.15.{1,2}
-* Update to a later glibc `elf.h`, just like 0.15.4
+### New features
+
+* Add `--build-resolution-cache` to write a per-DSO library resolution note (#647).
+* Add `--no-clobber-old-sections` switch to keep the original section contents in place.
+
+### Bug fixes
+
+* Fix support for files larger than 4GB.
+* Fix alignment problem when rewriting sections.
+* Allocate the program and section header tables at the end of the file.
+* Set the interpreter only when necessary.
+* Fix `#639`: update `DT_INIT`/`DT_FINI` dynamic tags when their sections move, and stop
+  rewriting them to the `.init`/`.fini` `sh_addr`.
+* Fix `DT_MIPS_RLD_MAP_REL` on cross-endian patches and after `--remove-rpath`,
+  `--remove-needed` and friends.
+* Allow removing an RPATH on MIPS (#645).
+* Fix the page size on Alpha, Itanium and SPARC.
+* `roundUp`: reject a zero alignment instead of dividing by it.
+* Preserve pointer provenance during string table offset arithmetic, fixing a
+  `SIGSEGV` on capability-based architectures such as CHERI RISC-V (#641).
+* Restrict system operations on OpenBSD.
+* Optimize prefix stripping in `replaceNeeded` (#650).
+* Fix compilation with GCC 7.
+
+### Hardening
+
+A round of fuzzing-driven robustness fixes so malformed inputs are rejected with
+errors instead of crashing (#648):
+
+* `setSubstr` errors out instead of asserting on an out-of-bounds write.
+* Bound every `.dynamic` walk, `.dynstr` lookup and `.gnu.version_{d,r}` link walk by
+  the owning section.
+* Validate `e_shentsize`, hash table header counts and `getSectionSpan` offsets/sizes
+  against the file before deriving spans.
+* Treat `sh_addralign == 0` as 1 in `normalizeNoteSegments`.
+
+### Build system and infra
+
+* Add a Meson build system (#604) and improve the CMake build (#610).
+* Add `package.nix` definitions for the autotools, CMake and Meson builds.
+* Add property-based testing of binary-preserving rewrites (#651).
+* CI: build static musl binaries for more architectures, test mips64le and FreeBSD,
+  and add developer tooling and formatting.
 
 ## 0.16.1 (October 28, 2022)
 
