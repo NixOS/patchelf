@@ -870,7 +870,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
     /* Compute the total space needed for the replaced sections, pessimistically
        assuming we're going to need one more to account for new PT_LOAD covering
        relocated PHDR */
-    off_t phtSize = roundUp((phdrs.size() + num_notes + 1) * sizeof(Elf_Phdr) + sizeof(Elf_Ehdr), sectionAlignment);
+    off_t phtSize = roundUp((phdrs.size() + num_notes + 1) * sizeof(Elf_Phdr), sectionAlignment);
     off_t shtSize = roundUp(rdi(hdr()->e_shnum) * rdi(hdr()->e_shentsize), sectionAlignment);
 
     /* Check if we can keep PHT at the beginning of the file.
@@ -883,31 +883,33 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
          PHDRs not located at the beginning of the file; it was fixed over
          0da1d5002745cdc721bc018b582a8a9704d56c42 (2022-03-02) */
     bool relocatePht = false;
-    unsigned int i = 1;
+    off_t phtEnd = rdi(hdr()->e_phoff) + phtSize;
 
-    while (i < rdi(hdr()->e_shnum) && ((off_t) rdi(shdrs.at(i).sh_offset)) <= phtSize) {
+    for (unsigned int i = 1; i < rdi(hdr()->e_shnum); i++) {
+        off_t shOff = rdi(shdrs.at(i).sh_offset);
+        if (shOff <= (off_t) rdi(hdr()->e_phoff)) continue;
+        if (shOff >= phtEnd) continue; /* shdrs not sorted by sh_offset */
+
         const auto & sectionName = getSectionName(shdrs.at(i));
 
         if (!hasReplacedSection(sectionName) && !canReplaceSection(sectionName)) {
             relocatePht = true;
             break;
         }
-
-        i++;
     }
 
     if (!relocatePht) {
-        unsigned int i = 1;
+        for (unsigned int i = 1; i < rdi(hdr()->e_shnum); i++) {
+            off_t shOff = rdi(shdrs.at(i).sh_offset);
+            if (shOff <= (off_t) rdi(hdr()->e_phoff)) continue;
+            if (shOff >= phtEnd) continue;
 
-        while (i < rdi(hdr()->e_shnum) && ((off_t) rdi(shdrs.at(i).sh_offset)) <= phtSize) {
             const auto & sectionName = getSectionName(shdrs.at(i));
             const auto sectionSize = rdi(shdrs.at(i).sh_size);
 
             if (!hasReplacedSection(sectionName)) {
                 replaceSection(sectionName, sectionSize);
             }
-
-            i++;
         }
     }
 
@@ -1372,6 +1374,23 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
                 dyn->d_un.d_ptr = findSectionHeader(".gnu.version_r").sh_addr;
             else if (d_tag == DT_VERSYM)
                 dyn->d_un.d_ptr = findSectionHeader(".gnu.version").sh_addr;
+            /* DT_{PREINIT,INIT,FINI}_ARRAY point at the corresponding
+               section's sh_addr and must follow it if relocated
+               (https://github.com/NixOS/patchelf/issues/639).
+               DT_INIT/DT_FINI are function addresses (-Wl,-init/-fini), not
+               section addresses, so leave them alone. */
+            else if (d_tag == DT_INIT_ARRAY) {
+                auto shdr = tryFindSectionHeader(".init_array");
+                if (shdr) dyn->d_un.d_ptr = (*shdr).get().sh_addr;
+            }
+            else if (d_tag == DT_FINI_ARRAY) {
+                auto shdr = tryFindSectionHeader(".fini_array");
+                if (shdr) dyn->d_un.d_ptr = (*shdr).get().sh_addr;
+            }
+            else if (d_tag == DT_PREINIT_ARRAY) {
+                auto shdr = tryFindSectionHeader(".preinit_array");
+                if (shdr) dyn->d_un.d_ptr = (*shdr).get().sh_addr;
+            }
             else if (d_tag == DT_MIPS_RLD_MAP_REL) {
                 /* the MIPS_RLD_MAP_REL tag stores the offset to the debug
                    pointer, relative to the address of the tag */

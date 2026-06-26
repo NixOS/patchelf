@@ -42,6 +42,8 @@ src_TESTS = \
   basic-flags.sh \
   set-empty-rpath.sh \
   phdr-corruption.sh \
+  pht-collision.sh \
+  preserve-init.sh \
   replace-needed.sh \
   replace-add-needed.sh \
   add-debug-tag.sh \
@@ -160,7 +162,7 @@ check_DATA = libbig-dynstr.debug
 # - with libtool, it is difficult to control options
 # - with libtool, it is not possible to compile convenience *dynamic* libraries :-(
 check_PROGRAMS += libfoo.so libfoo-scoped.so libbar.so libbar-scoped.so libsimple.so libsimple-execstack.so libbuildid.so libtoomanystrtab.so \
-                  phdr-corruption.so many-syms-main libmany-syms.so liboveralign.so libshared-rpath.so
+                  phdr-corruption.so pht-collision.so libcustom-init.so many-syms-main libmany-syms.so liboveralign.so libshared-rpath.so
 
 libbuildid_so_SOURCES = simple.c
 libbuildid_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,--build-id
@@ -183,6 +185,9 @@ libbar_scoped_so_LDFLAGS = $(LDFLAGS_sharedlib)
 
 libsimple_so_SOURCES = simple.c
 libsimple_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-z,noexecstack
+
+libcustom_init_so_SOURCES = custom-init.c
+libcustom_init_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-init,my_init
 
 liboveralign_so_SOURCES = simple.c
 liboveralign_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-z,max-page-size=0x10000
@@ -217,6 +222,10 @@ contiguous_note_sections_CFLAGS = -pie
 phdr_corruption_so_SOURCES = void.c phdr-corruption.ld
 phdr_corruption_so_LDFLAGS = -nostdlib -shared -Wl,-T$(srcdir)/phdr-corruption.ld
 phdr_corruption_so_CFLAGS =
+
+pht_collision_so_SOURCES = pht-collision.c pht-collision.ld
+pht_collision_so_LDFLAGS = -nostdlib -shared -Wl,-T$(srcdir)/pht-collision.ld
+pht_collision_so_CFLAGS =
 
 many-syms.c:
 	i=1; while [ $$i -le 2000 ]; do echo "void f$$i() {};"; i=$$(($$i + 1)); done > $@
