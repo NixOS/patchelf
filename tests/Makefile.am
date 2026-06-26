@@ -43,6 +43,7 @@ src_TESTS = \
   set-empty-rpath.sh \
   phdr-corruption.sh \
   pht-collision.sh \
+  preserve-init.sh \
   replace-needed.sh \
   replace-add-needed.sh \
   add-debug-tag.sh \
@@ -161,7 +162,7 @@ check_DATA = libbig-dynstr.debug
 # - with libtool, it is difficult to control options
 # - with libtool, it is not possible to compile convenience *dynamic* libraries :-(
 check_PROGRAMS += libfoo.so libfoo-scoped.so libbar.so libbar-scoped.so libsimple.so libsimple-execstack.so libbuildid.so libtoomanystrtab.so \
-                  phdr-corruption.so pht-collision.so many-syms-main libmany-syms.so liboveralign.so libshared-rpath.so
+                  phdr-corruption.so pht-collision.so libcustom-init.so many-syms-main libmany-syms.so liboveralign.so libshared-rpath.so
 
 libbuildid_so_SOURCES = simple.c
 libbuildid_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,--build-id
@@ -184,6 +185,9 @@ libbar_scoped_so_LDFLAGS = $(LDFLAGS_sharedlib)
 
 libsimple_so_SOURCES = simple.c
 libsimple_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-z,noexecstack
+
+libcustom_init_so_SOURCES = custom-init.c
+libcustom_init_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-init,my_init
 
 liboveralign_so_SOURCES = simple.c
 liboveralign_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-z,max-page-size=0x10000
