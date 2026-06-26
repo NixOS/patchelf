@@ -26,6 +26,7 @@ src_TESTS = \
   set-rpath-rel-map.sh \
   remove-rld-map-rel.sh \
   force-rpath.sh \
+  force.sh \
   plain-needed.sh \
   output-flag.sh \
   too-many-strtab.sh \
