@@ -888,7 +888,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
     for (unsigned int i = 1; i < rdi(hdr()->e_shnum); i++) {
         off_t shOff = rdi(shdrs.at(i).sh_offset);
         if (shOff <= (off_t) rdi(hdr()->e_phoff)) continue;
-        if (shOff >= phtEnd) break;
+        if (shOff >= phtEnd) continue; /* shdrs not sorted by sh_offset */
 
         const auto & sectionName = getSectionName(shdrs.at(i));
 
@@ -902,7 +902,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
         for (unsigned int i = 1; i < rdi(hdr()->e_shnum); i++) {
             off_t shOff = rdi(shdrs.at(i).sh_offset);
             if (shOff <= (off_t) rdi(hdr()->e_phoff)) continue;
-            if (shOff >= phtEnd) break;
+            if (shOff >= phtEnd) continue;
 
             const auto & sectionName = getSectionName(shdrs.at(i));
             const auto sectionSize = rdi(shdrs.at(i).sh_size);
