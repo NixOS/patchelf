@@ -63,6 +63,7 @@ jobs:
               ("ubuntu:20.04", ("x86_64", "aarch64", "armv7l", "ppc64le", "s390x", "riscv64")),
               ("ubuntu:22.04", ("x86_64", "aarch64", "armv7l", "ppc64le", "s390x", "riscv64")),
               ("ubuntu:24.04", ("x86_64", "aarch64", "armv7l", "ppc64le", "s390x", "riscv64")),
+              ("ubuntu:26.04", ("x86_64", "aarch64", "armv7l", "ppc64le", "s390x", "riscv64")),
           ]
           expanded = [{"distro": distro, "platform": platform, "runner": runner[platform]} for distro, platforms in reduced for platform in platforms]
           print(json.dumps(expanded, indent=2))
