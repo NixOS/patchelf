@@ -7,19 +7,19 @@ jobs:
   shellcheck:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - run: shellcheck tests/*.sh
   nix:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - uses: cachix/install-nix-action@v31
     - uses: Mic92/hestia@v1
     - run: nix-build -A hydraJobs.release
   ubuntu:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: get toolchain version
       run: |
         c++ --version
