@@ -74,7 +74,7 @@ jobs:
     steps:
       - name: Set up QEMU
         if: matrix.platform != 'amd64'
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       - name: Set docker arch
         run: |
@@ -140,7 +140,7 @@ jobs:
         platform: ["mips64le"]
     steps:
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
       - uses: actions/download-artifact@v6
         with:
           name: patchelf-tarball
