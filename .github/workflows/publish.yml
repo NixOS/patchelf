@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - uses: cachix/install-nix-action@v31
       - uses: Mic92/hestia@v1
       - name: Build tarballs
@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - uses: cachix/install-nix-action@v31
       - uses: Mic92/hestia@v1
       - name: Build windows executable
@@ -50,7 +50,7 @@ jobs:
     needs: [build_windows]
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v6
         with:
           name: patchelf-windows
