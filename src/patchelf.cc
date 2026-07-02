@@ -2345,9 +2345,8 @@ void ElfFile<ElfFileParamNames>::buildResolutionCache()
     }
 
     /* Resolve each soname against the run path, first match wins (as the
-       loader does). Directories containing dynamic-string tokens or a
-       glibc-hwcaps subdirectory can't be resolved at patch time, so record
-       them as a search hint for the loader instead of an exact path. */
+       loader does). Components that only resolve at run time are recorded as a
+       search hint for the loader instead of an exact path (see loop below). */
     std::map<std::string, std::string> cache;
     auto addEntry = [&](const std::string & lib, const std::string & resolved) {
         auto & entry = cache[lib];
@@ -2362,13 +2361,17 @@ void ElfFile<ElfFileParamNames>::buildResolutionCache()
         return lib.find('/') == std::string::npos;
     };
     for (const auto & dir : runPath) {
-        /* The loader reads an empty run-path component as the current working
-           directory, which is meaningless to bake in at patch time. */
-        if (dir.empty())
-            continue;
-        const bool hasToken = dir.find('$') != std::string::npos;
-        const bool hasHwcaps = access((dir + "/glibc-hwcaps").c_str(), F_OK) == 0;
-        if (hasToken || hasHwcaps) {
+        /* An empty or relative component resolves against the process's
+           current directory at run time, so it can't be baked into an exact
+           path here. Dynamic-string tokens and glibc-hwcaps directories
+           likewise must be probed by the loader. All are recorded as a search
+           hint in run-path order, so a later exact entry can't bypass this
+           earlier search position. */
+        const bool runtimeOnly = dir.empty() || dir[0] != '/';
+        const bool hasToken = !runtimeOnly && dir.find('$') != std::string::npos;
+        const bool hasHwcaps = !runtimeOnly && !hasToken
+            && access((dir + "/glibc-hwcaps").c_str(), F_OK) == 0;
+        if (runtimeOnly || hasToken || hasHwcaps) {
             const std::string hint = "?" + dir;
             for (const auto & lib : needed)
                 if (isSearched(lib))
