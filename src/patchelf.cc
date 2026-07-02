@@ -1012,188 +1012,6 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
 static bool noSort = false;
 
 template<ElfFileParams>
-void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
-{
-    if (!noSort) {
-        /* Sort the sections by offset, otherwise we won't correctly find
-           all the sections before the last replaced section. */
-        sortShdrs();
-    }
-
-    /* What is the index of the last replaced section? */
-    unsigned int lastReplaced = 0;
-    for (unsigned int i = 1; i < rdi(hdr()->e_shnum); ++i) {
-        std::string sectionName = getSectionName(shdrs.at(i));
-        if (replacedSections.count(sectionName)) {
-            debug("using replaced section '%s'\n", sectionName.c_str());
-            lastReplaced = i;
-        }
-    }
-
-    assert(lastReplaced != 0);
-
-    debug("last replaced is %d\n", lastReplaced);
-
-    /* Try to replace all sections before that, as far as possible.
-       Stop when we reach an irreplacable section (such as one of type
-       SHT_PROGBITS).  These cannot be moved in virtual address space
-       since that would invalidate absolute references to them. */
-    assert(lastReplaced + 1 < shdrs.size()); /* !!! I'm lazy. */
-    size_t startOffset = rdi(shdrs.at(lastReplaced + 1).sh_offset);
-    Elf_Addr startAddr = rdi(shdrs.at(lastReplaced + 1).sh_addr);
-    std::string prevSection;
-    for (unsigned int i = 1; i <= lastReplaced; ++i) {
-        Elf_Shdr & shdr(shdrs.at(i));
-        std::string sectionName = getSectionName(shdr);
-        debug("looking at section '%s'\n", sectionName.c_str());
-        /* !!! Why do we stop after a .dynstr section? I can't
-           remember! */
-        if ((rdi(shdr.sh_type) == SHT_PROGBITS && sectionName != ".interp")
-            || prevSection == ".dynstr")
-        {
-            startOffset = rdi(shdr.sh_offset);
-            startAddr = rdi(shdr.sh_addr);
-            lastReplaced = i - 1;
-            break;
-        }
-        if (!replacedSections.count(sectionName)) {
-            debug("replacing section '%s' which is in the way\n", sectionName.c_str());
-            replaceSection(sectionName, rdi(shdr.sh_size));
-        }
-        prevSection = std::move(sectionName);
-    }
-
-    debug("first reserved offset/addr is 0x%x/0x%llx\n",
-        startOffset, (unsigned long long) startAddr);
-
-    assert(startAddr % getPageSize() == startOffset % getPageSize());
-    Elf_Addr firstPage = startAddr - startOffset;
-    debug("first page is 0x%llx\n", (unsigned long long) firstPage);
-
-    if (rdi(hdr()->e_shoff) < startOffset) {
-        /* The section headers occur too early in the file and would be
-           overwritten by the replaced sections. Move them to the end of the file
-           before proceeding. */
-        off_t shoffNew = fileContents->size();
-        off_t shSize = rdi(hdr()->e_shoff) + rdi(hdr()->e_shnum) * rdi(hdr()->e_shentsize);
-        fileContents->resize(fileContents->size() + shSize, 0);
-        wri(hdr()->e_shoff, shoffNew);
-
-        /* Rewrite the section header table.  For neatness, keep the
-           sections sorted. */
-        assert(rdi(hdr()->e_shnum) == shdrs.size());
-        sortShdrs();
-        for (unsigned int i = 1; i < rdi(hdr()->e_shnum); ++i)
-            * ((Elf_Shdr *) (fileContents->data() + rdi(hdr()->e_shoff)) + i) = shdrs.at(i);
-    }
-
-
-    normalizeNoteSegments();
-
-
-    /* Compute the total space needed for the replaced sections, the
-       ELF header, and the program headers. */
-    size_t neededSpace = sizeof(Elf_Ehdr) + phdrs.size() * sizeof(Elf_Phdr);
-    for (auto & i : replacedSections)
-        neededSpace += roundUp(i.second.size(), sectionAlignment);
-
-    debug("needed space is %d\n", neededSpace);
-
-    /* A writable section (commonly .dynamic, which the loader writes DT_DEBUG
-       into) may be relocated into the reserved area, so the segment covering
-       that area must end up writable. */
-    bool needWritable = std::any_of(replacedSections.begin(), replacedSections.end(),
-        [this](const std::pair<const std::string, std::string> & i) {
-            return (rdi(findSectionHeader(i.first).sh_flags) & SHF_WRITE) != 0;
-        });
-
-    /* If that area sits in an executable LOAD segment, marking it writable
-       would create a W+X segment. Prefer to grow the file instead, so shiftFile
-       splits the reserved area into its own R/W segment and leaves the
-       executable one untouched. Growing adds one program header and one page;
-       only take this path when both fit (otherwise the underrun check below
-       would abort), else fall back to marking the segment writable (W+X). */
-    bool growForWritable = false;
-    if (needWritable && neededSpace + sizeof(Elf_Phdr) <= startOffset
-        && firstPage >= getPageSize()) {
-        Elf_Off hdrOff = sizeof(Elf_Ehdr) + phdrs.size() * sizeof(Elf_Phdr);
-        for (const auto & phdr : phdrs)
-            if (rdi(phdr.p_type) == PT_LOAD &&
-                rdi(phdr.p_offset) <= hdrOff &&
-                rdi(phdr.p_offset) + rdi(phdr.p_filesz) > hdrOff)
-            {
-                growForWritable = (rdi(phdr.p_flags) & PF_X) != 0;
-                break;
-            }
-    }
-
-    /* If we need more space at the start of the file, then grow the
-       file by the minimum number of pages and adjust internal
-       offsets. */
-    if (neededSpace > startOffset || growForWritable) {
-        /* We also need an additional program header, so adjust for that. */
-        neededSpace += sizeof(Elf_Phdr);
-        debug("needed space is %d\n", neededSpace);
-
-        /* Calculate how many bytes are needed out of the additional pages. */
-        size_t extraSpace = neededSpace > startOffset ? neededSpace - startOffset : 0;
-        // Always give one extra page to avoid colliding with segments that start at
-        // unaligned addresses and will be rounded down when loaded
-        unsigned int neededPages = 1 + roundUp(extraSpace, getPageSize()) / getPageSize();
-        debug("needed pages is %d\n", neededPages);
-        if (neededPages * getPageSize() > firstPage)
-            error("virtual address space underrun!");
-
-        shiftFile(neededPages, startOffset, extraSpace);
-
-        firstPage -= neededPages * getPageSize();
-        startOffset += neededPages * getPageSize();
-    }
-
-    Elf_Off curOff = sizeof(Elf_Ehdr) + phdrs.size() * sizeof(Elf_Phdr);
-
-    /* Ensure PHDR is covered by a LOAD segment.
-
-       Because PHDR is supposed to have been covered by such section before, in
-       here we assume that we don't have to create any new section, but rather
-       extend the existing one. */
-    for (auto& phdr : phdrs)
-        if (rdi(phdr.p_type) == PT_LOAD &&
-            rdi(phdr.p_offset) <= curOff &&
-            rdi(phdr.p_offset) + rdi(phdr.p_filesz) > curOff)
-        {
-            if (rdi(phdr.p_filesz) < neededSpace) {
-                wri(phdr.p_filesz, neededSpace);
-                wri(phdr.p_memsz, neededSpace);
-            }
-            /* The segment may already be large enough (e.g. with a large page
-               size), so set this regardless of whether it was extended. If a
-               grow happened above this is the new R/W segment shiftFile created
-               and the flag is already set; otherwise we set it here, which for
-               an executable segment is the W+X fallback when growing was not
-               possible. */
-            if (needWritable)
-                wri(phdr.p_flags, rdi(phdr.p_flags) | PF_W);
-            break;
-        }
-
-    /* Clear out the free space. startOffset is taken from an sh_offset in
-       the input, so must be bounded before being used as a write extent. */
-    if (startOffset < curOff || startOffset > fileContents->size())
-        error("section offsets are inconsistent with file size");
-    debug("clearing first %d bytes\n", startOffset - curOff);
-    memset(fileContents->data() + curOff, 0, startOffset - curOff);
-
-    /* Write out the replaced sections. */
-    writeReplacedSections(curOff, firstPage, 0);
-    assert(curOff == neededSpace);
-
-    /* Write out the updated program and section headers */
-    rewriteHeaders(firstPage + rdi(hdr()->e_phoff));
-}
-
-
-template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::normalizeNoteSegments()
 {
     /* Break up PT_NOTE segments containing multiple SHT_NOTE sections. This
@@ -1278,7 +1096,7 @@ void ElfFile<ElfFileParamNames>::rewriteSections(bool force)
         rewriteSectionsLibrary();
     } else if (rdi(hdr()->e_type) == ET_EXEC) {
         debug("this is an executable\n");
-        rewriteSectionsExecutable();
+        rewriteSectionsLibrary();
     } else error("unknown ELF type");
 }
 
@@ -2320,8 +2138,19 @@ void ElfFile<ElfFileParamNames>::buildResolutionCache()
         return;
     }
 
-    auto strTab = getStrTab(shdrDynStr->get());
-    auto dynSpan = getSectionSpan<Elf_Dyn>(shdrDynamic->get());
+    /* A cache note that is already present means we will refuse to rebuild (or,
+       at most, confirm it is up to date). Don't let a malformed .dynamic or
+       .dynstr abort with a raw section error first: a note that is already
+       present must fail loudly as "already present", which callers rely on. */
+    span<char> strTab;
+    span<Elf_Dyn> dynSpan;
+    try {
+        strTab = getStrTab(shdrDynStr->get());
+        dynSpan = getSectionSpan<Elf_Dyn>(shdrDynamic->get());
+    } catch (...) {
+        failIfStale();
+        throw;
+    }
 
     std::vector<std::string> needed;
     const char * dtRunPath = nullptr;
