@@ -53,4 +53,35 @@ if echo "$d" | grep -qF "=$(pwd)/${SCRATCH}/hw/libfoo.so"; then
     exit 1
 fi
 
+# An empty run-path component (the caller's current directory at run time)
+# only resolves at run time; it must become a bare "?" hint, kept in run-path
+# order, so the later exact libs entry cannot bypass that search position.
+cp main "${SCRATCH}/main-cwd"
+${PATCHELF} --set-rpath ":$(pwd)/${SCRATCH}/libs" "${SCRATCH}/main-cwd"
+${PATCHELF} --build-resolution-cache "${SCRATCH}/main-cwd"
+
+d=$(descriptor "${SCRATCH}/main-cwd")
+echo "$d"
+if ! echo "$d" | grep -qF "?:=$(pwd)/${SCRATCH}/libs/libfoo.so"; then
+    echo "FAIL: empty run-path component was not recorded as a '?' hint before the exact entry"
+    exit 1
+fi
+
+# A relative component would otherwise be probed against patchelf's own
+# working directory and could be baked in as a bogus relative "=" path.
+cp main "${SCRATCH}/main-rel"
+${PATCHELF} --set-rpath "relative/dir:$(pwd)/${SCRATCH}/libs" "${SCRATCH}/main-rel"
+${PATCHELF} --build-resolution-cache "${SCRATCH}/main-rel"
+
+d=$(descriptor "${SCRATCH}/main-rel")
+echo "$d"
+if ! echo "$d" | grep -qF "?relative/dir:=$(pwd)/${SCRATCH}/libs/libfoo.so"; then
+    echo "FAIL: relative run-path component was not recorded as a '?' search hint"
+    exit 1
+fi
+if echo "$d" | grep -qF "=relative/dir/libfoo.so"; then
+    echo "FAIL: relative run-path component was wrongly baked into an '=' path"
+    exit 1
+fi
+
 echo "PASS"
