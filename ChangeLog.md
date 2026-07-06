@@ -1,5 +1,16 @@
 # Release History
 
+## Unreleased
+
+### Bug fixes
+
+* Fix patching of non-PIE (`ET_EXEC`) binaries placing new `PT_LOAD`
+  segments below the input's lowest load address, which broke loading on
+  systems that enforce `vm.mmap_min_addr` at that floor (e.g.
+  riscv64-linux at `0x10000`). Executables are now rewritten with the
+  same tail-append strategy as shared objects instead of shifting load
+  addresses down. See [#622](https://github.com/NixOS/patchelf/issues/622).
+
 ## 0.19.0 (June 26, 2026)
 
 This is the first feature release since 0.18.0 (April 2023) and collects three

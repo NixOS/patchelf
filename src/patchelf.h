@@ -131,8 +131,6 @@ private:
 
     void rewriteSectionsLibrary();
 
-    void rewriteSectionsExecutable();
-
     void normalizeNoteSegments();
 
     void removeResolutionCache();
