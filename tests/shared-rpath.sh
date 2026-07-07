@@ -23,7 +23,12 @@ echo "#### Number of a_symbol_name strings in the library: $previous_cnt"
 echo "#### Rename the rpath to something larger than the original"
 # Pathelf should detect that the rpath string is shared with the symbol name string and avoid
 # tainting the string with Xs
-"${PATCHELF}" --set-rpath a_very_big_rpath_that_is_larger_than_original  --output liblarge-rpath.so "${LIB_NAME}"
+output=$("${PATCHELF}" --set-rpath a_very_big_rpath_that_is_larger_than_original  --output liblarge-rpath.so "${LIB_NAME}" 2>&1)
+
+# The number of rpath references depends on linker's ability to perform
+# strings deduplication optimization. Not all linkers do that, so skip the
+# test if there is only 1 reference
+(echo $output | grep 'Number of rpath references: 1') && exit 77
 
 echo "#### Checking symbol is still there"
 ${NM} -D liblarge-rpath.so | grep a_symbol_name
