@@ -34,6 +34,7 @@
 #include <cassert>
 #include <cerrno>
 #include <cstdarg>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -196,7 +197,7 @@ static FileContents readFile(const std::string & fileName,
 
     size_t size = std::min(cutOff, static_cast<size_t>(st.st_size));
 
-    FileContents contents = std::make_shared<std::vector<unsigned char>>(size);
+    FileContents contents = std::make_shared<FileContentsBuffer>(FileContentsBuffer::inHeapMemory(std::vector<unsigned char>(size)));
 
     int fd = open(fileName.c_str(), O_RDONLY | O_BINARY);
     if (fd == -1) throw SysError(fmt("opening '", fileName, "'"));
@@ -212,6 +213,161 @@ static FileContents readFile(const std::string & fileName,
         throw SysError(fmt("reading '", fileName, "'"));
 
     return contents;
+}
+
+
+#ifdef PATCHELF_HAVE_MREMAP
+static bool tryCopyFileRange(int srcFd, int dstFd, off_t & off, size_t & remaining)
+{
+    while (remaining > 0) {
+        ssize_t n = copy_file_range(srcFd, &off, dstFd, nullptr, remaining, 0);
+        if (n > 0) {
+            remaining -= static_cast<size_t>(n);
+            continue;
+        }
+        if (n == 0)
+            throw SysError("unexpected end of file while copying");
+        if (errno == EINTR)
+            continue;
+        if (errno != EXDEV && errno != ENOSYS && errno != EINVAL)
+            throw SysError("copy_file_range");
+        return false;
+    }
+    return true;
+}
+
+static size_t readChunk(int srcFd, std::vector<unsigned char> & buf, size_t chunk)
+{
+    while (true) {
+        ssize_t r = read(srcFd, buf.data(), chunk);
+        if (r < 0) {
+            if (errno == EINTR) continue;
+            throw SysError("reading source file while copying");
+        }
+        if (r == 0)
+            throw SysError("unexpected end of file while copying");
+        return static_cast<size_t>(r);
+    }
+}
+
+static void writeChunk(int dstFd, const unsigned char * data, size_t size)
+{
+    size_t written = 0;
+    while (written < size) {
+        ssize_t w = write(dstFd, data + written, size - written);
+        if (w < 0) {
+            if (errno == EINTR) continue;
+            throw SysError("writing destination file while copying");
+        }
+        written += static_cast<size_t>(w);
+    }
+}
+
+static void copyFileContentsFallback(int srcFd, int dstFd, off_t off, size_t remaining)
+{
+    if (lseek(srcFd, off, SEEK_SET) == (off_t) -1)
+        throw SysError("seeking source file while copying");
+    if (lseek(dstFd, off, SEEK_SET) == (off_t) -1)
+        throw SysError("seeking destination file while copying");
+
+    std::vector<unsigned char> buf(std::min<size_t>(remaining, size_t{8} << 20));
+    while (remaining > 0) {
+        size_t chunk = std::min(remaining, buf.size());
+        size_t r = readChunk(srcFd, buf, chunk);
+        writeChunk(dstFd, buf.data(), r);
+        remaining -= r;
+    }
+}
+
+static void copyFileContents(int srcFd, int dstFd, size_t size)
+{
+    off_t off = 0;
+    size_t remaining = size;
+
+    if (!tryCopyFileRange(srcFd, dstFd, off, remaining))
+        copyFileContentsFallback(srcFd, dstFd, off, remaining);
+}
+
+static bool statRegularFileSize(const std::string & fileName, size_t & size)
+{
+    struct stat st;
+    if (stat(fileName.c_str(), &st) != 0)
+        return false;
+    if (st.st_size <= 0)
+        return false;
+    if (static_cast<uint64_t>(st.st_size) > static_cast<uint64_t>(std::numeric_limits<size_t>::max()))
+        return false;
+    size = static_cast<size_t>(st.st_size);
+    return true;
+}
+
+static int openForInPlaceEditing(const std::string & fileName)
+{
+    int fd = open(fileName.c_str(), O_RDWR | O_BINARY);
+    if (fd == -1)
+        throw SysError(fmt("opening '", fileName, "'"));
+    return fd;
+}
+
+static int openForCopyEditing(const std::string & inputFileName, const std::string & outputFileName, size_t size)
+{
+    int srcFd = open(inputFileName.c_str(), O_RDONLY | O_BINARY);
+    if (srcFd == -1)
+        throw SysError(fmt("opening '", inputFileName, "'"));
+
+    int dstFd = open(outputFileName.c_str(), O_CREAT | O_TRUNC | O_RDWR | O_BINARY, 0777);
+    if (dstFd == -1) {
+        close(srcFd);
+        throw SysError(fmt("opening '", outputFileName, "'"));
+    }
+
+    try {
+        if (ftruncate(dstFd, static_cast<off_t>(size)) != 0)
+            throw SysError(fmt("truncating '", outputFileName, "'"));
+        copyFileContents(srcFd, dstFd, size);
+    } catch (...) {
+        close(srcFd);
+        close(dstFd);
+        throw;
+    }
+    close(srcFd);
+    return dstFd;
+}
+
+static int openFileToMap(const std::string & inputFileName, const std::string & outputFileName, size_t size)
+{
+    bool inPlace = outputFileName == inputFileName;
+    return inPlace
+        ? openForInPlaceEditing(inputFileName)
+        : openForCopyEditing(inputFileName, outputFileName, size);
+}
+
+static FileContents tryPrepareFileByMMap(const std::string & inputFileName, const std::string & outputFileName)
+{
+    size_t size;
+    if (!statRegularFileSize(inputFileName, size))
+        return nullptr;
+
+    try {
+        int fd = openFileToMap(inputFileName, outputFileName, size);
+        debug("mmap'ing '%s' read-write for editing (%zu bytes)\n", outputFileName.c_str(), size);
+        return std::make_shared<FileContentsBuffer>(FileContentsBuffer::mappedFromFile(fd, size));
+    } catch (std::exception & e) {
+        debug("mmap-based editing of '%s' -> '%s' failed (%s), falling back to reading into memory\n",
+            inputFileName.c_str(), outputFileName.c_str(), e.what());
+        return nullptr;
+    }
+}
+
+#endif
+
+static FileContents prepareFileForEditing(const std::string & inputFileName, const std::string & outputFileName)
+{
+#ifdef PATCHELF_HAVE_MREMAP
+    if (FileContents mapped = tryPrepareFileByMMap(inputFileName, outputFileName))
+        return mapped;
+#endif
+    return readFile(inputFileName);
 }
 
 
@@ -467,6 +623,12 @@ void ElfFile<ElfFileParamNames>::sortShdrs()
 
 static void writeFile(const std::string & fileName, const FileContents & contents)
 {
+    if (contents->isMMapBacked()) {
+        debug("flushing mmap'ed '%s'\n", fileName.c_str());
+        contents->flush();
+        return;
+    }
+
     debug("writing %s\n", fileName.c_str());
 
     int fd = open(fileName.c_str(), O_CREAT | O_TRUNC | O_WRONLY | O_BINARY, 0777);
@@ -2999,8 +3161,9 @@ static void patchElf()
         if (!printInterpreter && !printRPath && !printSoname && !printNeeded)
             debug("patching ELF file '%s'\n", fileName.c_str());
 
-        auto fileContents = readFile(fileName);
         const std::string & outputFileName2 = outputFileName.empty() ? fileName : outputFileName;
+
+        auto fileContents = prepareFileForEditing(fileName, outputFileName2);
 
         if (getElfType(fileContents).is32Bit)
             patchElf2(ElfFile<Elf32_Ehdr, Elf32_Phdr, Elf32_Shdr, Elf32_Nhdr, Elf32_Addr, Elf32_Off, Elf32_Dyn, Elf32_Sym, Elf32_Versym, Elf32_Verdef, Elf32_Verdaux, Elf32_Verneed, Elf32_Vernaux, Elf32_Rel, Elf32_Rela, 32>(fileContents), fileContents, outputFileName2);
