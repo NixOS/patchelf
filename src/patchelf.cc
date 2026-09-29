@@ -1065,6 +1065,26 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
         prevSection = std::move(sectionName);
     }
 
+    /* If an earlier operation on this file already split the header area
+       into its own small PT_LOAD (distinct from the PT_LOAD holding the
+       bulk of the file, e.g. via shiftFile()), startOffset computed above
+       may lie deep inside that *other* LOAD segment, far past where the
+       small header LOAD segment currently ends. Packing the reserved area
+       in-place up to such a startOffset would silently grow the header
+       LOAD segment's p_filesz/p_vaddr range so that it overlaps the next
+       LOAD segment (different, possibly conflicting flags), corrupting the
+       binary. Clamp startOffset/startAddr down to the start of the nearest
+       intervening PT_LOAD segment so the space calculation below correctly
+       decides to grow the file (shiftFile) instead of packing in-place. */
+    for (auto & phdr : phdrs) {
+        if (rdi(phdr.p_type) != PT_LOAD) continue;
+        Elf_Off otherOffset = rdi(phdr.p_offset);
+        if (otherOffset > 0 && otherOffset < startOffset) {
+            startOffset = otherOffset;
+            startAddr = rdi(phdr.p_vaddr);
+        }
+    }
+
     debug("first reserved offset/addr is 0x%x/0x%llx\n",
         startOffset, (unsigned long long) startAddr);
 
@@ -1090,8 +1110,16 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
     }
 
 
-    normalizeNoteSegments();
+    /* Snapshot the header-table end offset as it stood *before*
+       normalizeNoteSegments() runs. normalizeNoteSegments() can append an
+       extra PT_NOTE-derived PT_LOAD/PT_NOTE phdr, growing the program header
+       table. Any LOAD segment covering the header area was only guaranteed
+       to be sized for the phdr count as of this point, so this snapshot
+       (rather than the post-split count) is the correct key to look up that
+       pre-existing LOAD segment further below. */
+    Elf_Off preSplitHdrEnd = sizeof(Elf_Ehdr) + phdrs.size() * sizeof(Elf_Phdr);
 
+    normalizeNoteSegments();
 
     /* Compute the total space needed for the replaced sections, the
        ELF header, and the program headers. */
@@ -1161,8 +1189,8 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
        extend the existing one. */
     for (auto& phdr : phdrs)
         if (rdi(phdr.p_type) == PT_LOAD &&
-            rdi(phdr.p_offset) <= curOff &&
-            rdi(phdr.p_offset) + rdi(phdr.p_filesz) > curOff)
+            rdi(phdr.p_offset) <= preSplitHdrEnd &&
+            rdi(phdr.p_offset) + rdi(phdr.p_filesz) > preSplitHdrEnd)
         {
             if (rdi(phdr.p_filesz) < neededSpace) {
                 wri(phdr.p_filesz, neededSpace);
