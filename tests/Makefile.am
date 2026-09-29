@@ -37,6 +37,8 @@ src_TESTS = \
   no-gnu-hash.sh \
   change-abi.sh \
   grow-file.sh \
+  executable-page-growth.sh \
+  strip-gap-rewrite.sh \
   no-dynamic-section.sh \
   args-from-file.sh \
   basic-flags.sh \

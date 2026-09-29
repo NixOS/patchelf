@@ -6,7 +6,7 @@ READELF=${READELF:-readelf}
 
 EXEC_NAME="overlapping-segments-after-rounding"
 
-if test "$(uname -i)" = x86_64 && test "$(uname)" = Linux; then
+if test "$(uname -m)" = x86_64 && test "$(uname)" = Linux; then
     rm -rf "${SCRATCH}"
     mkdir -p "${SCRATCH}"
 
