@@ -59,6 +59,7 @@ src_TESTS = \
   modify-execstack.sh \
   rename-dynamic-symbols.sh \
   overlapping-segments-after-rounding.sh \
+  grow-interpreter-and-rpath.sh \
   shared-rpath.sh \
   short-first-segment.sh \
   empty-note.sh \
@@ -162,7 +163,7 @@ check_DATA = libbig-dynstr.debug
 # - with libtool, it is difficult to control options
 # - with libtool, it is not possible to compile convenience *dynamic* libraries :-(
 check_PROGRAMS += libfoo.so libfoo-scoped.so libbar.so libbar-scoped.so libsimple.so libsimple-execstack.so libbuildid.so libtoomanystrtab.so \
-                  phdr-corruption.so pht-collision.so libcustom-init.so many-syms-main libmany-syms.so liboveralign.so libshared-rpath.so
+                  phdr-corruption.so pht-collision.so libcustom-init.so many-syms-main many-syms-main-no-pie libmany-syms.so liboveralign.so libshared-rpath.so
 
 libbuildid_so_SOURCES = simple.c
 libbuildid_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,--build-id
@@ -207,6 +208,19 @@ many_syms_main_LDFLAGS = $(LDFLAGS_local)
 many_syms_main_LDADD = -lmany-syms $(AM_LDADD)
 many_syms_main_DEPENDENCIES = libmany-syms.so
 many_syms_main_CFLAGS = -pie -fPIE
+
+# Non-PIE (ET_EXEC) variant of many-syms-main, with no pre-existing RPATH/RUNPATH.
+# Used by grow-interpreter-and-rpath.sh: its large .dynsym/.dynstr (one entry
+# per imported symbol from libmany-syms.so) mean that relocating them into the
+# reserved area at the front of the file (as done by rewriteSectionsExecutable()
+# when --set-rpath forces a .dynstr/.dynamic resize) needs more room than a
+# prior, unrelated --set-interpreter call would have reserved there.
+many_syms_main_no_pie_SOURCES = many-syms-main.c
+many_syms_main_no_pie_LDFLAGS = $(LDFLAGS_local) -no-pie
+many_syms_main_no_pie_LDADD = -lmany-syms $(AM_LDADD)
+many_syms_main_no_pie_DEPENDENCIES = libmany-syms.so
+many_syms_main_no_pie_CFLAGS = -fno-pie
+
 libmany_syms_so_SOURCES = many-syms.c
 libmany_syms_so_LDFLAGS = $(LDFLAGS_sharedlib)
 

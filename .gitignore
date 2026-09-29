@@ -39,6 +39,7 @@ CMakeLists.txt.user
 /tests/simple-pie
 /tests/simple-execstack
 /tests/large-page
+/tests/many-syms-main-no-pie
 
 .direnv/
 .vscode/
