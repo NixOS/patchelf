@@ -6,7 +6,19 @@ READELF=${READELF:-readelf}
 
 EXEC_NAME="overlapping-segments-after-rounding"
 
-if test "$(uname -i)" = x86_64 && test "$(uname)" = Linux; then
+# ldd would need the NVHPC libraries the fixture links against.
+check_load_pages() {
+    "${READELF}" -lW "$1" | awk '$1 == "LOAD" { print $3, $6 }' | {
+        previous_end=0
+        while read -r addr size; do
+            test "$((addr / 4096 * 4096))" -ge "${previous_end}"
+            previous_end=$(((addr + size + 4095) / 4096 * 4096))
+        done
+        test "${previous_end}" -gt 0
+    }
+}
+
+if test "$(uname -m)" = x86_64 && test "$(uname)" = Linux; then
     rm -rf "${SCRATCH}"
     mkdir -p "${SCRATCH}"
 
@@ -15,9 +27,9 @@ if test "$(uname -i)" = x86_64 && test "$(uname)" = Linux; then
 
     ${PATCHELF} --force-rpath --remove-rpath --output modified1 "${EXEC_NAME}"
 
-    ldd modified1
+    check_load_pages modified1
 
     ${PATCHELF} --force-rpath --set-rpath "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" --output modified2 modified1
 
-    ldd modified2
+    check_load_pages modified2
 fi
