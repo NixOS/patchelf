@@ -24,7 +24,7 @@ jobs:
       actions: write   # REST cache deletes
       contents: read
     steps:
-      - uses: Mic92/hestia@v2
+      - uses: Mic92/hestia@v3
       - run: |
           "$HESTIA_BIN" gc ${{ inputs.dry-run && '--dry-run' || '' }}
         env:

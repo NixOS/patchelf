@@ -16,7 +16,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
       - uses: cachix/install-nix-action@v31
-      - uses: Mic92/hestia@v2
+      - uses: Mic92/hestia@v3
       - name: Build tarballs
         run: |
           nix build -L .#hydraJobs.tarball
@@ -34,7 +34,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
       - uses: cachix/install-nix-action@v31
-      - uses: Mic92/hestia@v2
+      - uses: Mic92/hestia@v3
       - name: Build windows executable
         run: |
           nix build -L .#patchelf-win32 .#patchelf-win64

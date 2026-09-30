@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v7
     - uses: cachix/install-nix-action@v31
-    - uses: Mic92/hestia@v2
+    - uses: Mic92/hestia@v3
     - run: nix-build -A hydraJobs.release
   ubuntu:
     runs-on: ubuntu-latest
