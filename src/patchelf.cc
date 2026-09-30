@@ -1139,12 +1139,11 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
 
         /* Calculate how many bytes are needed out of the additional pages. */
         size_t extraSpace = neededSpace > startOffset ? neededSpace - startOffset : 0;
-        /* The second half of the split LOAD starts on the page containing
-           startOffset. Keep the first half below that page even when the
-           loader rounds the second half's address down. */
+        /* The loader rounds the split-off LOAD down to the page containing
+           startOffset, so the new LOAD has to end below that page. */
         size_t startPage = startOffset - startOffset % getPageSize();
-        unsigned int neededPages = roundUp(neededSpace > startPage ? neededSpace - startPage : 0,
-                                          getPageSize()) / getPageSize();
+        size_t overlap = neededSpace > startPage ? neededSpace - startPage : 0;
+        unsigned int neededPages = roundUp(overlap, getPageSize()) / getPageSize();
         debug("needed pages is %d\n", neededPages);
         if (neededPages * getPageSize() > firstPage)
             error("virtual address space underrun!");
@@ -1168,10 +1167,8 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
             rdi(phdr.p_offset) <= curOff &&
             rdi(phdr.p_offset) + rdi(phdr.p_filesz) > curOff)
         {
-            /* strip may remove a file page between LOADs without changing
-               their virtual addresses. The LOAD covering the ELF header can
-               then have a different address-to-offset mapping from the LOAD
-               containing startOffset. */
+            /* strip can drop file padding between LOADs, so this LOAD's
+               address-to-offset mapping may differ from firstPage. */
             headerBase = rdi(phdr.p_vaddr) - rdi(phdr.p_offset);
             if (rdi(phdr.p_filesz) < neededSpace) {
                 wri(phdr.p_filesz, neededSpace);

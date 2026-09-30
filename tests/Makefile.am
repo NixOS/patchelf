@@ -1,6 +1,6 @@
 LIBS =
 
-check_PROGRAMS = simple-pie simple simple-execstack main main-no-pie main-emit-relocs pad-to-page too-many-strtab main-scoped big-dynstr no-rpath contiguous-note-sections large-page
+check_PROGRAMS = simple-pie simple simple-execstack main main-no-pie main-no-pie-rpath main-emit-relocs pad-to-page too-many-strtab main-scoped big-dynstr no-rpath contiguous-note-sections large-page
 
 no_rpath_arch_TESTS = \
   no-rpath-alpha.sh \
@@ -115,6 +115,14 @@ main_no_pie_CFLAGS = -fno-pie
 main_no_pie_LDADD = -lfoo $(AM_LDADD)
 main_no_pie_DEPENDENCIES = libfoo.so
 main_no_pie_LDFLAGS = $(LDFLAGS_local) -no-pie
+
+# With an rpath already present, --set-rpath moves .dynstr but not .dynamic;
+# see strip-gap-rewrite.sh.
+main_no_pie_rpath_SOURCES = main.c
+main_no_pie_rpath_CFLAGS = -fno-pie
+main_no_pie_rpath_LDADD = -lfoo $(AM_LDADD)
+main_no_pie_rpath_DEPENDENCIES = libfoo.so
+main_no_pie_rpath_LDFLAGS = $(LDFLAGS_local) -no-pie -Wl,-rpath,/nonexistent
 
 # Non-PIE binary with a max-page-size larger than the runtime page size. On
 # 32-bit targets this makes patchelf relocate .dynamic into the read-only first

@@ -19,7 +19,7 @@ original_load=$(first_load_addr "${SCRATCH}/main")
 ../src/patchelf --set-rpath "$(printf '%0800d' 0)" "${SCRATCH}/main"
 modified_load=$(first_load_addr "${SCRATCH}/main")
 
-# This growth fits below the original split LOAD with one extra page.
+# 800 bytes fit into a single extra page.
 test "$((original_load - modified_load))" -eq 4096
 
 exitCode=0

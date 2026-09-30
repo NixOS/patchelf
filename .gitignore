@@ -28,6 +28,7 @@ CMakeLists.txt.user
 /tests/scratch
 /tests/main
 /tests/main-no-pie
+/tests/main-no-pie-rpath
 /tests/main-emit-relocs
 /tests/pad-to-page
 /tests/simple
