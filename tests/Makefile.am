@@ -81,7 +81,7 @@ TESTS_ENVIRONMENT = PATCHELF_DEBUG=1 STRIP=$(STRIP) NM=$(NM) OBJDUMP=$(OBJDUMP) 
 $(no_rpath_arch_TESTS): no-rpath-prebuild.sh
 	@ln -s $< $@
 
-CLEANFILES = big-dynstr.c
+CLEANFILES = big-dynstr.c many-syms.c many-syms-main.c
 clean-local:
 	$(RM) -r scratch $(no_rpath_arch_TESTS)
 

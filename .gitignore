@@ -45,3 +45,4 @@ CMakeLists.txt.user
 .idea/
 result
 /tests/property-fail-*
+/tests/many-syms*
