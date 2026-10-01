@@ -1,5 +1,19 @@
 # Release History
 
+## 0.19.2 (October 1, 2026)
+
+A bug fix release for rewriting executables after stripping.
+
+### Bug fixes
+
+* Fix executable corruption when patching again after `strip` removes padding
+  between load segments, as seen when bootstrapping GHC (#593, #667). Rewritten
+  sections and program headers now use the address mapping of the load segment
+  covering the ELF header.
+* Avoid allocating an unnecessary extra page when growing executable sections,
+  while keeping split load segments from overlapping after page alignment
+  (#667).
+
 ## 0.19.1 (July 6, 2026)
 
 A small bug fix release for `--build-resolution-cache`.
