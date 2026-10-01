@@ -931,6 +931,27 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
 
     Elf_Off startOffset = roundUp(fileContents->size(), alignStartPage);
 
+    /* Linux < 5.18 computes AT_PHDR as load_bias + e_phoff instead of
+       using PT_PHDR.  patchelf moves the program headers into the new
+       segment, so make the segment's virtual address match its file
+       offset; otherwise (e.g. unstripped binaries, where non-alloc
+       sections sit between the last PT_LOAD and the new segment) ld.so
+       gets a wrong phdr pointer and crashes. */
+    if (startOffset + firstPage > startPage) {
+        startPage = startOffset + firstPage;
+        debug("moved last page to 0x%llx to match file offset\n", (unsigned long long) startPage);
+    }
+
+    /* The opposite case (e.g. a large .bss puts the last page above the file
+       size): executables need vaddr == file offset too, so pad the file. */
+    bool isExecutable = false;
+    for (auto & phdr : phdrs)
+        if (rdi(phdr.p_type) == PT_INTERP) isExecutable = true;
+    if (isExecutable && startPage > startOffset + firstPage) {
+        startOffset = startPage - firstPage;
+        debug("padded file to offset 0x%llx to match last page\n", (unsigned long long) startOffset);
+    }
+
     // In older version of binutils (2.30), readelf would check if the dynamic
     // section segment is strictly smaller than the file (and not same size).
     // By making it one byte larger, we don't break readelf.

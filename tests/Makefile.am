@@ -37,6 +37,7 @@ src_TESTS = \
   no-gnu-hash.sh \
   change-abi.sh \
   grow-file.sh \
+  phdr-vaddr-matches-offset.sh \
   executable-page-growth.sh \
   strip-gap-rewrite.sh \
   no-dynamic-section.sh \
