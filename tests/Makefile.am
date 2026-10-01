@@ -66,6 +66,7 @@ src_TESTS = \
   empty-note.sh \
   set-interpreter-same.sh \
   property-rewrite.sh \
+  verdef-relocate.sh \
   large-page-dynamic.sh
 
 build_TESTS = \

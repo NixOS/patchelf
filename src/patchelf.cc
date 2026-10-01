@@ -1382,6 +1382,8 @@ void ElfFile<ElfFileParamNames>::rewriteHeaders(Elf_Addr phdrAddress)
             }
             else if (d_tag == DT_VERNEED)
                 dyn->d_un.d_ptr = findSectionHeader(".gnu.version_r").sh_addr;
+            else if (d_tag == DT_VERDEF)
+                dyn->d_un.d_ptr = findSectionHeader(".gnu.version_d").sh_addr;
             else if (d_tag == DT_VERSYM)
                 dyn->d_un.d_ptr = findSectionHeader(".gnu.version").sh_addr;
             /* DT_{PREINIT,INIT,FINI}_ARRAY point at the corresponding
