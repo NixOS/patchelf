@@ -66,7 +66,8 @@ src_TESTS = \
   empty-note.sh \
   set-interpreter-same.sh \
   property-rewrite.sh \
-  large-page-dynamic.sh
+  large-page-dynamic.sh \
+  section-info.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)
@@ -142,6 +143,15 @@ main_emit_relocs_LDFLAGS = $(LDFLAGS_local) -Wl,--emit-relocs
 # Test helper: page-aligns an ELF's section header table.
 pad_to_page_SOURCES = pad-to-page.c
 pad_to_page_CFLAGS =
+
+# Native ELF fixtures with section-index sh_info metadata, including CREL.
+check_PROGRAMS += section-info section-info-no-pie
+section_info_SOURCES = section-info.c
+section_info_CFLAGS = -fPIE
+section_info_LDFLAGS = -pie
+section_info_no_pie_SOURCES = section-info.c
+section_info_no_pie_CFLAGS = -fno-pie
+section_info_no_pie_LDFLAGS = -no-pie
 
 main_scoped_SOURCES = main.c
 main_scoped_LDADD = -lfoo-scoped $(AM_LDADD)
