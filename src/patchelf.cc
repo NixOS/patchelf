@@ -543,7 +543,7 @@ void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, size_t start
     for (int i = 0; i < rdi(hdr()->e_phnum); ++i) {
         Elf_Off p_start = rdi(phdrs.at(i).p_offset);
 
-        if (p_start <= startOffset && p_start + rdi(phdrs.at(i).p_filesz) > startOffset && rdi(phdrs.at(i).p_type) == PT_LOAD) {
+        if (p_start < startOffset && p_start + rdi(phdrs.at(i).p_filesz) > startOffset && rdi(phdrs.at(i).p_type) == PT_LOAD) {
             assert(splitIndex == -1);
 
             splitIndex = i;
@@ -576,7 +576,10 @@ void ElfFile<ElfFileParamNames>::shiftFile(unsigned int extraPages, size_t start
         }
     }
 
-    assert(splitIndex != -1);
+    /* If no LOAD crosses startOffset, the existing header LOAD can grow
+       without splitting the LOAD that starts at the first reserved section. */
+    if (splitIndex == -1)
+        return;
 
     /* Add another PT_LOAD segment loading the data we've split above. */
     phdrs.resize(rdi(hdr()->e_phnum) + 1);
@@ -1014,6 +1017,54 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
 static bool noSort = false;
 
 template<ElfFileParams>
+Elf_Phdr * ElfFile<ElfFileParamNames>::findLoadSegmentByOffset(Elf_Off offset)
+{
+    for (auto & phdr : phdrs)
+        if (rdi(phdr.p_type) == PT_LOAD && rdi(phdr.p_offset) <= offset &&
+            rdi(phdr.p_offset) + rdi(phdr.p_filesz) > offset)
+            return &phdr;
+    return nullptr;
+}
+
+
+template<ElfFileParams>
+void ElfFile<ElfFileParamNames>::trimLoadSegments(Elf_Off startOffset, size_t headerIndex)
+{
+    /* Sections before startOffset are being relocated into the header LOAD.
+       Trim old LOADs so they cannot overwrite the header page permissions.
+
+       File offsets: 0                 startOffset
+                     | moved sections | reserved sections
+       Before:       [header LOAD...]
+                              [old LOAD..................]
+       After:        [header LOAD....][old LOAD...........]
+
+       Growth may move the header LOAD backwards in virtual memory; the
+       reserved sections keep their addresses. Walk backwards through phdrs
+       so erasing a LOAD does not change indices still to visit. */
+    for (size_t i = phdrs.size(); i != 0;) {
+        auto & phdr = phdrs[--i];
+        Elf_Off offset = rdi(phdr.p_offset);
+        if (i == headerIndex || rdi(phdr.p_type) != PT_LOAD || offset >= startOffset)
+            continue;
+
+        Elf_Off skipped = startOffset - offset;
+        if (rdi(phdr.p_filesz) <= skipped && rdi(phdr.p_memsz) <= skipped) {
+            phdrs.erase(phdrs.begin() + i);
+            continue;
+        }
+        wri(phdr.p_offset, startOffset);
+        wri(phdr.p_vaddr, rdi(phdr.p_vaddr) + skipped);
+        wri(phdr.p_paddr, rdi(phdr.p_paddr) + skipped);
+        /* Preserve any zero-filled tail even if no file bytes remain. */
+        wri(phdr.p_filesz, rdi(phdr.p_filesz) > skipped ? rdi(phdr.p_filesz) - skipped : 0);
+        wri(phdr.p_memsz, rdi(phdr.p_memsz) > skipped ? rdi(phdr.p_memsz) - skipped : 0);
+    }
+    wri(hdr()->e_phnum, phdrs.size());
+}
+
+
+template<ElfFileParams>
 void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
 {
     if (!noSort) {
@@ -1092,6 +1143,16 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
 
     normalizeNoteSegments();
 
+    Elf_Off headerEnd = sizeof(Elf_Ehdr) + phdrs.size() * sizeof(Elf_Phdr);
+    bool reuseHeaderLoad = false;
+    Elf_Addr originalHeaderBase = firstPage;
+    unsigned int originalHeaderFlags = 0;
+    if (auto headerLoad = findLoadSegmentByOffset(headerEnd)) {
+        originalHeaderBase = rdi(headerLoad->p_vaddr) - rdi(headerLoad->p_offset);
+        originalHeaderFlags = rdi(headerLoad->p_flags);
+        reuseHeaderLoad = rdi(headerLoad->p_offset) + rdi(headerLoad->p_filesz) <= startOffset;
+        trimLoadSegments(startOffset, headerLoad - phdrs.data());
+    }
 
     /* Compute the total space needed for the replaced sections, the
        ELF header, and the program headers. */
@@ -1109,45 +1170,42 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
             return (rdi(findSectionHeader(i.first).sh_flags) & SHF_WRITE) != 0;
         });
 
-    /* If that area sits in an executable LOAD segment, marking it writable
-       would create a W+X segment. Prefer to grow the file instead, so shiftFile
-       splits the reserved area into its own R/W segment and leaves the
-       executable one untouched. Growing adds one program header and one page;
-       only take this path when both fit (otherwise the underrun check below
-       would abort), else fall back to marking the segment writable (W+X). */
-    bool growForWritable = false;
-    if (needWritable && neededSpace + sizeof(Elf_Phdr) <= startOffset
-        && firstPage >= getPageSize()) {
-        Elf_Off hdrOff = sizeof(Elf_Ehdr) + phdrs.size() * sizeof(Elf_Phdr);
-        for (const auto & phdr : phdrs)
-            if (rdi(phdr.p_type) == PT_LOAD &&
-                rdi(phdr.p_offset) <= hdrOff &&
-                rdi(phdr.p_offset) + rdi(phdr.p_filesz) > hdrOff)
-            {
-                growForWritable = (rdi(phdr.p_flags) & PF_X) != 0;
-                break;
-            }
+    unsigned int neededPages = 0;
+    if (reuseHeaderLoad) {
+        /* strip may remove file padding while leaving a virtual gap.
+           File growth keeps the replacement before startOffset. Virtual
+           growth moves the header base down so its end stays below the page
+           containing the first reserved section. Use the larger requirement. */
+        Elf_Addr reservedPage = startAddr - startAddr % getPageSize();
+        size_t fileGrowth = neededSpace > startOffset ? neededSpace - startOffset : 0;
+        size_t virtualGrowth = originalHeaderBase + neededSpace > reservedPage
+            ? originalHeaderBase + neededSpace - reservedPage : 0;
+        size_t growth = std::max(fileGrowth, virtualGrowth);
+        if (growth != 0)
+            neededPages = roundUp(growth, getPageSize()) / getPageSize();
+    } else if (neededSpace > startOffset ||
+        (needWritable && (originalHeaderFlags & PF_X) != 0 &&
+         neededSpace + sizeof(Elf_Phdr) <= startOffset && firstPage >= getPageSize()))
+    {
+        /* Split the header area into its own R/W LOAD when more space is
+           needed, or to avoid making an executable LOAD writable. For the
+           latter, fall back to W+X if the extra header or page cannot fit. */
+        neededSpace += sizeof(Elf_Phdr);
+        /* The loader rounds the remaining LOAD down to the page containing
+           startOffset, so the new header LOAD must end below that page. */
+        size_t startPage = startOffset - startOffset % getPageSize();
+        size_t growth = neededSpace > startPage ? neededSpace - startPage : 0;
+        neededPages = roundUp(growth, getPageSize()) / getPageSize();
     }
 
-    /* If we need more space at the start of the file, then grow the
-       file by the minimum number of pages and adjust internal
-       offsets. */
-    if (neededSpace > startOffset || growForWritable) {
-        /* We also need an additional program header, so adjust for that. */
-        neededSpace += sizeof(Elf_Phdr);
+    if (neededPages != 0) {
         debug("needed space is %d\n", neededSpace);
-
-        /* Calculate how many bytes are needed out of the additional pages. */
-        size_t extraSpace = neededSpace > startOffset ? neededSpace - startOffset : 0;
-        /* The loader rounds the split-off LOAD down to the page containing
-           startOffset, so the new LOAD has to end below that page. */
-        size_t startPage = startOffset - startOffset % getPageSize();
-        size_t overlap = neededSpace > startPage ? neededSpace - startPage : 0;
-        unsigned int neededPages = roundUp(overlap, getPageSize()) / getPageSize();
         debug("needed pages is %d\n", neededPages);
-        if (neededPages * getPageSize() > firstPage)
+        if (neededPages * getPageSize() > firstPage ||
+            (reuseHeaderLoad && neededPages * getPageSize() > originalHeaderBase))
             error("virtual address space underrun!");
 
+        size_t extraSpace = neededSpace > startOffset ? neededSpace - startOffset : 0;
         shiftFile(neededPages, startOffset, extraSpace);
 
         firstPage -= neededPages * getPageSize();
@@ -1157,33 +1215,21 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
     Elf_Off curOff = sizeof(Elf_Ehdr) + phdrs.size() * sizeof(Elf_Phdr);
     Elf_Addr headerBase = firstPage;
 
-    /* Ensure PHDR is covered by a LOAD segment.
-
-       Because PHDR is supposed to have been covered by such section before, in
-       here we assume that we don't have to create any new section, but rather
-       extend the existing one. */
-    for (auto& phdr : phdrs)
-        if (rdi(phdr.p_type) == PT_LOAD &&
-            rdi(phdr.p_offset) <= curOff &&
-            rdi(phdr.p_offset) + rdi(phdr.p_filesz) > curOff)
-        {
-            /* strip can drop file padding between LOADs, so this LOAD's
-               address-to-offset mapping may differ from firstPage. */
-            headerBase = rdi(phdr.p_vaddr) - rdi(phdr.p_offset);
-            if (rdi(phdr.p_filesz) < neededSpace) {
-                wri(phdr.p_filesz, neededSpace);
-                wri(phdr.p_memsz, neededSpace);
-            }
-            /* The segment may already be large enough (e.g. with a large page
-               size), so set this regardless of whether it was extended. If a
-               grow happened above this is the new R/W segment shiftFile created
-               and the flag is already set; otherwise we set it here, which for
-               an executable segment is the W+X fallback when growing was not
-               possible. */
-            if (needWritable)
-                wri(phdr.p_flags, rdi(phdr.p_flags) | PF_W);
-            break;
+    /* Extend the LOAD covering PHDR to include all relocated sections. */
+    if (auto headerLoad = findLoadSegmentByOffset(curOff)) {
+        /* strip can drop file padding between LOADs, so this LOAD's
+           address-to-offset mapping may differ from firstPage. */
+        headerBase = rdi(headerLoad->p_vaddr) - rdi(headerLoad->p_offset);
+        if (rdi(headerLoad->p_filesz) < neededSpace) {
+            wri(headerLoad->p_filesz, neededSpace);
+            wri(headerLoad->p_memsz, neededSpace);
         }
+        /* Set write access even if the LOAD was already large enough. A new
+           LOAD from shiftFile is R/W; an unsplit executable LOAD uses the
+           W+X fallback when an extra header or page could not fit. */
+        if (needWritable)
+            wri(headerLoad->p_flags, rdi(headerLoad->p_flags) | PF_W);
+    }
 
     /* Clear out the free space. startOffset is taken from an sh_offset in
        the input, so must be bounded before being used as a write extent. */
