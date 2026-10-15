@@ -118,6 +118,12 @@ Do not sort program headers or section headers.  This is useful when
 debugging patchelf, because it makes it easier to read diffs of the
 output of "readelf -a".
 
+.IP "--old-kernel-compat"
+When the program header table has to be moved to the end of the file, map it
+so that executables still load on Linux kernels older than 5.18, which compute
+AT_PHDR as the load address plus e_phoff.  This can make the output file larger,
+because the file may need to be padded up to the end of the address space.
+
 .IP "--add-debug-tag"
 Adds DT_DEBUG tag to the .dynamic section if not yet present in an ELF
 object. A shared library (-shared) by default does not receive DT_DEBUG tag.

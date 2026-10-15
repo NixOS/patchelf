@@ -59,6 +59,7 @@ static bool debugMode = false;
 
 static bool forceRPath = false;
 static bool clobberOldSections = true;
+static bool oldKernelCompat = false;
 
 /* Upper bound on PT_LOAD p_align honoured when placing the new segment in
    rewriteSectionsLibrary(); anything larger is treated as corrupt input
@@ -931,6 +932,23 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
 
     Elf_Off startOffset = roundUp(fileContents->size(), alignStartPage);
 
+    /* Linux kernels before 0da1d5002745 (5.18) compute AT_PHDR as the load
+       address plus e_phoff, so a relocated PHT is only found if it is mapped at
+       the same distance from the load address as from the start of the file.
+       This may pad the file up to the end of the address space (e.g. past .bss). */
+    bool oldKernelLayout = relocatePht && oldKernelCompat;
+    if (oldKernelLayout) {
+        auto firstLoad = std::find_if(phdrs.begin(), phdrs.end(),
+            [this](const Elf_Phdr & phdr) { return rdi(phdr.p_type) == PT_LOAD; });
+        if (firstLoad == phdrs.end())
+            error("cannot apply --old-kernel-compat: no PT_LOAD segment");
+        Elf_Addr loadBias = rdi(firstLoad->p_vaddr) - rdi(firstLoad->p_offset);
+        if (startOffset + loadBias < startPage)
+            startOffset = startPage - loadBias;
+        startPage = startOffset + loadBias;
+        debug("mapping relocated pht at 0x%llx for old kernels\n", (unsigned long long) startPage);
+    }
+
     // In older version of binutils (2.30), readelf would check if the dynamic
     // section segment is strictly smaller than the file (and not same size).
     // By making it one byte larger, we don't break readelf.
@@ -942,7 +960,8 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
 
     /* As an optimization, instead of allocating a new PT_LOAD segment, try
        expanding the last one */
-    if (!phdrs.empty() &&
+    if (!oldKernelLayout &&
+        !phdrs.empty() &&
         rdi(phdrs.back().p_type) == PT_LOAD &&
         rdi(phdrs.back().p_flags) == (PF_R | PF_W) &&
         rdi(phdrs.back().p_align) == alignStartPage) {
@@ -3048,6 +3067,7 @@ static void showHelp(const std::string & progName)
   [--print-needed]\n\
   [--no-default-lib]\n\
   [--no-sort]\t\tDo not sort program+section headers; useful for debugging patchelf.\n\
+  [--old-kernel-compat]\t\tIf the program headers must move, keep the output loadable by Linux < 5.18 (may grow the file).\n\
   [--clear-symbol-version SYMBOL]\n\
   [--add-debug-tag]\n\
   [--build-resolution-cache]\n\
@@ -3146,6 +3166,9 @@ static int mainWrapped(int argc, char * * argv)
         }
         else if (arg == "--no-sort") {
             noSort = true;
+        }
+        else if (arg == "--old-kernel-compat") {
+            oldKernelCompat = true;
         }
         else if (arg == "--add-needed") {
             if (++i == argc) error("missing argument");

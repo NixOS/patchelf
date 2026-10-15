@@ -51,6 +51,9 @@ if [ "${verify_phoff}" != "${new_phoff}" ]; then
   exit 1
 fi
 
+COMPAT_SO="${SCRATCH}/compat-${SONAME}"
+cp "${SCRATCH_SO}" "${COMPAT_SO}"
+
 # Now for the actual test: add a DT_NEEDED and force patchelf to grow the PHT.
 # It should detect that there's no room to grow it in place.
 "${PATCHELF}" --add-needed libfoo.so "${SCRATCH_SO}"
@@ -59,5 +62,32 @@ fi
 if ! ${READELF} -p .adjacent_data "${SCRATCH_SO}" 2>&1 | grep -q "zzzzzzzzzzzzzzzz"; then
   echo "ERROR: .adjacent_data was corrupted by PHT expansion!"
   ${READELF} -x .adjacent_data "${SCRATCH_SO}"
+  exit 1
+fi
+
+# With --old-kernel-compat the relocated PHT must be mapped where Linux < 5.18
+# looks for it: AT_PHDR = (first PT_LOAD p_vaddr - p_offset) + e_phoff.
+"${PATCHELF}" --old-kernel-compat --add-needed libfoo.so "${COMPAT_SO}"
+
+phoff=$(${READELF} -h "${COMPAT_SO}" | awk '/Start of program headers:/{print $5}')
+loads=$(${READELF} -Wl "${COMPAT_SO}" | awk '$1 == "LOAD" {print $2, $3, $5}')
+bias=""
+found=0
+while read -r off vaddr filesz; do
+  [ -n "${bias}" ] || bias=$((vaddr - off))
+  if [ $((off)) -le "${phoff}" ] && [ "${phoff}" -lt $((off + filesz)) ] && [ $((vaddr - off)) -eq "${bias}" ]; then
+    found=1
+  fi
+done <<EOF
+${loads}
+EOF
+if [ "${found}" -ne 1 ]; then
+  echo "ERROR: --old-kernel-compat did not map the PHT at load address + e_phoff"
+  ${READELF} -Wlh "${COMPAT_SO}"
+  exit 1
+fi
+
+if ! ${READELF} -p .adjacent_data "${COMPAT_SO}" 2>&1 | grep -q "zzzzzzzzzzzzzzzz"; then
+  echo "ERROR: .adjacent_data was corrupted with --old-kernel-compat!"
   exit 1
 fi
