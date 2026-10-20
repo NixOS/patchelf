@@ -131,6 +131,10 @@ private:
 
     void rewriteSectionsLibrary();
 
+    Elf_Phdr * findLoadSegmentByOffset(Elf_Off offset);
+
+    void trimLoadSegments(Elf_Off startOffset, size_t headerIndex);
+
     void rewriteSectionsExecutable();
 
     void normalizeNoteSegments();
