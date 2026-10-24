@@ -427,11 +427,14 @@ void ElfFile<ElfFileParamNames>::sortShdrs()
         if (rdi(shdrs.at(i).sh_link) != 0)
             linkage[getSectionName(shdrs.at(i))] = getSectionName(shdrs.at(rdi(shdrs.at(i).sh_link)));
 
-    /* Idem for sh_info on certain sections. */
+    /* Idem for sh_info when it contains a section index. Keep the explicit
+       REL/RELA cases for compatibility with ELF files that omit SHF_INFO_LINK. */
     std::map<SectionName, SectionName> info;
     for (unsigned int i = 1; i < rdi(hdr()->e_shnum); ++i)
         if (rdi(shdrs.at(i).sh_info) != 0 &&
-            (rdi(shdrs.at(i).sh_type) == SHT_REL || rdi(shdrs.at(i).sh_type) == SHT_RELA))
+            (rdi(shdrs.at(i).sh_type) == SHT_REL ||
+                rdi(shdrs.at(i).sh_type) == SHT_RELA ||
+                (rdi(shdrs.at(i).sh_flags) & SHF_INFO_LINK) != 0))
             info[getSectionName(shdrs.at(i))] = getSectionName(shdrs.at(rdi(shdrs.at(i).sh_info)));
 
     /* Idem for the index of the .shstrtab section in the ELF header. */
@@ -448,10 +451,12 @@ void ElfFile<ElfFileParamNames>::sortShdrs()
             wri(shdrs[i].sh_link,
                 getSectionIndex(linkage[getSectionName(shdrs[i])]));
 
-    /* And the st_info mappings. */
+    /* And the sh_info mappings. */
     for (unsigned int i = 1; i < rdi(hdr()->e_shnum); ++i)
         if (rdi(shdrs.at(i).sh_info) != 0 &&
-            (rdi(shdrs.at(i).sh_type) == SHT_REL || rdi(shdrs.at(i).sh_type) == SHT_RELA))
+            (rdi(shdrs.at(i).sh_type) == SHT_REL ||
+                rdi(shdrs.at(i).sh_type) == SHT_RELA ||
+                (rdi(shdrs.at(i).sh_flags) & SHF_INFO_LINK) != 0))
             wri(shdrs.at(i).sh_info,
                 getSectionIndex(info.at(getSectionName(shdrs.at(i)))));
 
