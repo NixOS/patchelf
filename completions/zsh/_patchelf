@@ -1,7 +1,7 @@
 #compdef patchelf
 
 # Completes the libraries needed by the input files, or any file if there are none.
-_get_dep() {
+_patchelf_needed_libraries() {
     # How many arguments each option takes.
     local -A nargs=(
         --page-size              1
@@ -54,8 +54,8 @@ local options=(
   '--print-rpath[Prints the DT_RUNPATH or DT_RPATH for an executable or library]'
   '--force-rpath[Forces the use of the obsolete DT_RPATH in the file instead of DT_RUNPATH]'
   '*--add-needed[Adds a declared dependency on a dynamic library]:LIBRARY:_files'
-  '*--replace-needed[Replaces a declared dependency on a dynamic library with another one]:LIB_ORIG:_get_dep:LIB_NEW:_files'
-  '*--remove-needed[Removes a declared dependency on LIBRARY]:LIBRARY:_get_dep'
+  '*--replace-needed[Replaces a declared dependency on a dynamic library with another one]:LIB_ORIG:_patchelf_needed_libraries:LIB_NEW:_files'
+  '*--remove-needed[Removes a declared dependency on LIBRARY]:LIBRARY:_patchelf_needed_libraries'
   '--print-needed[Prints all DT_NEEDED entries of the executable]'
   '--no-default-lib[Marks the object so that the search for dependencies of this object will ignore any default library search paths]'
   '--no-sort[Do not sort program headers or section headers]'
