@@ -90,7 +90,7 @@ check_completed 'patchelf --print-interpreter ma'            'patchelf --print-i
 check_completed 'patchelf --print-needed --print-rp'         'patchelf --print-needed --print-rpath '
 check_unchanged 'patchelf --version ma'
 check_completed 'patchelf --clear-execstack --set-e'         'patchelf --clear-execstack --set-execstack '
-F check_completed 'patchelf --set-os-abi hp'                   'patchelf --set-os-abi hp-ux '
+check_completed 'patchelf --set-os-abi hp'                   'patchelf --set-os-abi hp-ux '
 F check_completed 'patchelf --add-needed a.so --add-ne'        'patchelf --add-needed a.so --add-needed '
 F check_completed 'patchelf --set-rpath /:li'                  'patchelf --set-rpath /:libdir/'
 F check_completed 'patchelf --allowed-rpath-prefixes /:li'     'patchelf --allowed-rpath-prefixes /:libdir/'

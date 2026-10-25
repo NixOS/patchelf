@@ -27,7 +27,7 @@ local options=(
   '--set-interpreter[Change the dynamic loader of executable]:INTERPRETER:_files'
   '--print-interpreter[Prints the ELF interpreter of the executable]'
   '--print-os-abi[Prints the OS ABI of the executable]'
-  '--set-os-abi[Changes the OS ABI of the executable]:ABI:(none sysv hpux netbsd gnu linux solaris aix irix freebsd tru64 modesto openbsd arm_aeabi arm standalone)'
+  '--set-os-abi[Changes the OS ABI of the executable]:ABI:(sysv hp-ux netbsd gnu linux hurd solaris aix irix freebsd tru64 openbsd openvms)'
   '--print-soname[Prints DT_SONAME entry of .dynamic section]'
   '--set-soname[Sets DT_SONAME entry of a library to SONAME]:SONAME:'
   '--set-rpath[Change the DT_RUNPATH of the executable or library to RUNPATH]:RUNPATH:_dirs'
