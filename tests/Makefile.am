@@ -67,7 +67,8 @@ src_TESTS = \
   empty-note.sh \
   set-interpreter-same.sh \
   property-rewrite.sh \
-  large-page-dynamic.sh
+  large-page-dynamic.sh \
+  zsh-completion.sh
 
 build_TESTS = \
   $(no_rpath_arch_TESTS)
