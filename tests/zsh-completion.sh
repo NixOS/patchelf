@@ -86,8 +86,8 @@ alias F=failing
 
 await ready
 check_completed 'patchelf ma'                                'patchelf main '
-F check_completed 'patchelf --print-interpreter ma'            'patchelf --print-interpreter main '
-F check_completed 'patchelf --print-needed --print-rp'         'patchelf --print-needed --print-rpath '
+check_completed 'patchelf --print-interpreter ma'            'patchelf --print-interpreter main '
+check_completed 'patchelf --print-needed --print-rp'         'patchelf --print-needed --print-rpath '
 F check_unchanged 'patchelf --version ma'
 check_completed 'patchelf --clear-execstack --set-e'         'patchelf --clear-execstack --set-execstack '
 F check_completed 'patchelf --set-os-abi hp'                   'patchelf --set-os-abi hp-ux '
