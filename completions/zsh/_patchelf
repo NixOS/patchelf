@@ -51,7 +51,7 @@ local options=(
   '--rename-dynamic-symbols[Renames dynamic symbols]:NAME_MAP_FILE:_files'
   '--output[Set the output file name]:FILE:_files'
   '--debug[Prints details of the changes made to the input file]'
-  '--version[Shows the version of patchelf]'
+  '(- : *)--version[Shows the version of patchelf]'
   "(- : *)"{-h,--help}'[Show list of command-line options]'
 )
 
