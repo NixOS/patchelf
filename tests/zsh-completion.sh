@@ -70,20 +70,6 @@ check_completed() {
 # Types $1, presses Tab and checks that nothing was completed.
 check_unchanged() { check_completed "$1" "$1" }
 
-# Runs a check that is expected to fail, and fails if it passes instead.
-failing() {
-    local was_failed=$failed
-    failed=0
-    "$@" > /dev/null
-    if (( failed )); then
-        failed=$was_failed
-    else
-        print -r -- "'$2<Tab>' passed, so it shouldn't be marked F"
-        failed=1
-    fi
-}
-alias F=failing
-
 await ready
 check_completed 'patchelf ma'                                'patchelf main '
 check_completed 'patchelf --print-interpreter ma'            'patchelf --print-interpreter main '
