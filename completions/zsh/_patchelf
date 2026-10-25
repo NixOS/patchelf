@@ -58,4 +58,4 @@ local options=(
   "(- : *)"{-h,--help}'[Show list of command-line options]'
 )
 
-_arguments -s -S $options '*: :_files'
+_arguments -s $options '*: :_files'

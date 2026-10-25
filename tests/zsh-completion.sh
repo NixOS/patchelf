@@ -97,7 +97,7 @@ F check_completed 'patchelf --allowed-rpath-prefixes /:li'     'patchelf --allow
 check_completed 'patchelf --clear-sy'                        'patchelf --clear-symbol-version '
 check_completed 'patchelf --no-cl'                           'patchelf --no-clobber-old-sections '
 check_unchanged 'patchelf --interp'
-F check_completed 'patchelf -- --print-i'                      'patchelf -- --print-interpreter '
+check_completed 'patchelf -- --print-i'                      'patchelf -- --print-interpreter '
 check_completed 'patchelf --output out ma'                   'patchelf --output out main '
 F check_unchanged 'patchelf --output out main ma'
 check_completed 'patchelf --interpreter /x --output out ma'  'patchelf --interpreter /x --output out main '
