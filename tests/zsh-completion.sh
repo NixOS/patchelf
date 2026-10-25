@@ -99,7 +99,7 @@ check_completed 'patchelf --no-cl'                           'patchelf --no-clob
 check_unchanged 'patchelf --interp'
 check_completed 'patchelf -- --print-i'                      'patchelf -- --print-interpreter '
 check_completed 'patchelf --output out ma'                   'patchelf --output out main '
-F check_unchanged 'patchelf --output out main ma'
+check_unchanged 'patchelf --output out main ma'
 check_completed 'patchelf --interpreter /x --output out ma'  'patchelf --interpreter /x --output out main '
 F check_completed 'patchelf --debug main --remove-needed libf' 'patchelf --debug main --remove-needed libfoo.so '
 F check_completed 'patchelf --debug main --remove-needed libz' 'patchelf --debug main --remove-needed libz:x.so '

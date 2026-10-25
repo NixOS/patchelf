@@ -58,4 +58,8 @@ local options=(
   "(- : *)"{-h,--help}'[Show list of command-line options]'
 )
 
-_arguments -s $options '*: :_files'
+# patchelf patches any number of files in place, or a single file into --output.
+local files='*: :_files'
+(( $words[(I)--output] )) && files=': :_files'
+
+_arguments -s $options $files
