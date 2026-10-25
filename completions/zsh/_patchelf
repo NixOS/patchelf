@@ -27,13 +27,13 @@ _get_dep() {
             (( i += nargs[$word] ))
         } else {
             file=${~word}
-            [[ -f $file ]] && deps+=($(patchelf --print-needed $file 2>/dev/null))
+            [[ -f $file ]] && deps+=(${(f)"$(patchelf --print-needed $file 2>/dev/null)"})
         }
     }
     if (( $#deps )) {
-        _values "LIBS" $deps
+        compadd "$@" -a deps
     } else {
-        _files
+        _files "$@"
     }
 }
 

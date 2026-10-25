@@ -102,10 +102,10 @@ check_completed 'patchelf --output out ma'                   'patchelf --output 
 check_unchanged 'patchelf --output out main ma'
 check_completed 'patchelf --interpreter /x --output out ma'  'patchelf --interpreter /x --output out main '
 check_completed 'patchelf --debug main --remove-needed libf' 'patchelf --debug main --remove-needed libfoo.so '
-F check_completed 'patchelf --debug main --remove-needed libz' 'patchelf --debug main --remove-needed libz:x.so '
+check_completed 'patchelf --debug main --remove-needed libz' 'patchelf --debug main --remove-needed libz:x.so '
 check_unchanged 'patchelf main "--add-needed" libdir/libfoo.so --remove-needed libb'
-F check_completed 'patchelf -main --remove-needed libz'        'patchelf -main --remove-needed libz:x.so '
-F check_completed 'patchelf ~/main --remove-needed libz'       'patchelf ~/main --remove-needed libz:x.so '
+check_completed 'patchelf -main --remove-needed libz'        'patchelf -main --remove-needed libz:x.so '
+check_completed 'patchelf ~/main --remove-needed libz'       'patchelf ~/main --remove-needed libz:x.so '
 check_completed 'patchelf --remove-needed libd'              'patchelf --remove-needed libdir/'
 # \eb\C-b puts the cursor just after libf.
 check_completed $'patchelf --remove-needed libf main\eb\C-b' 'patchelf --remove-needed libfoo.so  main'
