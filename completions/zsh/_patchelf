@@ -1,25 +1,40 @@
 #compdef patchelf
 
+# Completes the libraries needed by the input files, or any file if there are none.
 _get_dep() {
-    # preparm have fewer checks, as they can't be the so to replace
-    if [[ -f $words[2] ]] {  # check if arg #1 is a elf file and not a so
-        local deps=($(patchelf --print-needed $words[2] 2>/dev/null)) # discard error
-        if [[ $? -ne 0 ]] || [[ $#deps -eq 0 ]] {           # if no dependency or not a elf
-            _files                                      # fallback to _files
+    # How many arguments each option takes.
+    local -A nargs=(
+        --page-size              1
+        --set-interpreter        1
+        --interpreter            1
+        --set-os-abi             1
+        --set-soname             1
+        --set-rpath              1
+        --add-rpath              1
+        --allowed-rpath-prefixes 1
+        --add-needed             1
+        --replace-needed         2
+        --remove-needed          1
+        --clear-symbol-version   1
+        --rename-dynamic-symbols 1
+        --output                 1
+    )
+    local i word file deps=()
+    # $line stops at the cursor, so pick the input files out of all the words.
+    for (( i = 2; i <= $#words; i++ )) {
+        word=${(Q)words[i]}
+        if (( ${+nargs[$word]} )) {
+            (( i += nargs[$word] ))
         } else {
-            _values "LIBS" $deps # else use dependencies of the file as candidates
+            file=${~word}
+            [[ -f $file ]] && deps+=($(patchelf --print-needed $file 2>/dev/null))
         }
-    # postparm need to check
-    } elif [[ -f $words[-1] ]] && [[ -z ${words[-1]:e} ]] { # check arg #-1, as most people do like this
-        local deps=($(patchelf --print-needed $words[-1] 2>/dev/null))
-        if [[ $? -ne 0 ]] || [[ $#deps -eq 0 ]] {
-            _files
-        } else {
-            _values "LIBS" $deps
-        }
+    }
+    if (( $#deps )) {
+        _values "LIBS" $deps
     } else {
         _files
-    }       
+    }
 }
 
 local options=(
