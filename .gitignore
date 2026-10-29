@@ -37,6 +37,7 @@ CMakeLists.txt.user
 /tests/main-scoped
 /tests/libbig-dynstr.debug
 /tests/contiguous-note-sections
+/tests/notes-after-interp
 /tests/simple-pie
 /tests/simple-execstack
 /tests/large-page

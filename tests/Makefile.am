@@ -39,6 +39,7 @@ src_TESTS = \
   grow-file.sh \
   executable-page-growth.sh \
   executable-header-rewrite.sh \
+  header-load-pht-growth.sh \
   strip-gap-rewrite.sh \
   no-dynamic-section.sh \
   args-from-file.sh \
@@ -172,7 +173,7 @@ check_DATA = libbig-dynstr.debug
 # - without libtool, only archives (static libraries) can be built by automake
 # - with libtool, it is difficult to control options
 # - with libtool, it is not possible to compile convenience *dynamic* libraries :-(
-check_PROGRAMS += libfoo.so libfoo-scoped.so libbar.so libbar-scoped.so libsimple.so libsimple-execstack.so libbuildid.so libtoomanystrtab.so many-syms-no-pie \
+check_PROGRAMS += libfoo.so libfoo-scoped.so libbar.so libbar-scoped.so libsimple.so libsimple-execstack.so libbuildid.so libtoomanystrtab.so many-syms-no-pie notes-after-interp \
                   phdr-corruption.so pht-collision.so libcustom-init.so many-syms-main libmany-syms.so liboveralign.so libshared-rpath.so
 
 libbuildid_so_SOURCES = simple.c
@@ -223,6 +224,9 @@ many_syms_no_pie_CFLAGS = -fno-pie
 many_syms_no_pie_LDFLAGS = $(LDFLAGS_local) -no-pie -Wl,-z,noseparate-code -Wl,--hash-style=both -Wl,-rpath,/nonexistent
 many_syms_no_pie_LDADD = -lmany-syms $(AM_LDADD)
 many_syms_no_pie_DEPENDENCIES = libmany-syms.so
+notes_after_interp_SOURCES = notes-after-interp.c notes-after-interp.ld
+notes_after_interp_CFLAGS = -fno-pie
+notes_after_interp_LDFLAGS = $(LDFLAGS_local) -no-pie -Wl,-T,$(srcdir)/notes-after-interp.ld
 libmany_syms_so_SOURCES = many-syms.c
 libmany_syms_so_LDFLAGS = $(LDFLAGS_sharedlib)
 
