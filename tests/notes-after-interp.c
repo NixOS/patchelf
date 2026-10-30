@@ -1,5 +1,5 @@
 /* Several 4-byte aligned notes that notes-after-interp.ld groups into one
-   PT_NOTE directly after .interp, like Go binaries. */
+   PT_NOTE before .dynsym, so a .dynstr rewrite relocates them. */
 #define NOTE(name)                                   \
     __asm__(".section .note." #name ",\"a\",%note\n" \
             ".p2align 2\n"                           \
