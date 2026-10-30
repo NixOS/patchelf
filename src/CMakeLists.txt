@@ -3,7 +3,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(PAGESIZE 4096)
 
-add_executable(${PROJECT_NAME} patchelf.cc elf.h patchelf.h)
+add_executable(${PROJECT_NAME} patchelf.cc elf.h patchelf.h file-contents.h)
 
 target_compile_definitions(
   patchelf PRIVATE PAGESIZE=${PAGESIZE}
