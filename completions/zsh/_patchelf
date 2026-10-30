@@ -1,58 +1,80 @@
 #compdef patchelf
 
-_get_dep() {
-    # preparm have fewer checks, as they can't be the so to replace
-    if [[ -f $words[2] ]] {  # check if arg #1 is a elf file and not a so
-        local deps=($(patchelf --print-needed $words[2] 2>/dev/null)) # discard error
-        if [[ $? -ne 0 ]] || [[ $#deps -eq 0 ]] {           # if no dependency or not a elf
-            _files                                      # fallback to _files
+# Completes the libraries needed by the input files, or any file if there are none.
+_patchelf_needed_libraries() {
+    # How many arguments each option takes.
+    local -A nargs=(
+        --page-size              1
+        --set-interpreter        1
+        --interpreter            1
+        --set-os-abi             1
+        --set-soname             1
+        --set-rpath              1
+        --add-rpath              1
+        --allowed-rpath-prefixes 1
+        --add-needed             1
+        --replace-needed         2
+        --remove-needed          1
+        --clear-symbol-version   1
+        --rename-dynamic-symbols 1
+        --output                 1
+    )
+    local i word file deps=()
+    # $line stops at the cursor, so pick the input files out of all the words.
+    for (( i = 2; i <= $#words; i++ )) {
+        word=${(Q)words[i]}
+        if (( ${+nargs[$word]} )) {
+            (( i += nargs[$word] ))
         } else {
-            _values "LIBS" $deps # else use dependencies of the file as candidates
+            file=${~word}
+            [[ -f $file ]] && deps+=(${(f)"$(patchelf --print-needed $file 2>/dev/null)"})
         }
-    # postparm need to check
-    } elif [[ -f $words[-1] ]] && [[ -z ${words[-1]:e} ]] { # check arg #-1, as most people do like this
-        local deps=($(patchelf --print-needed $words[-1] 2>/dev/null))
-        if [[ $? -ne 0 ]] || [[ $#deps -eq 0 ]] {
-            _files
-        } else {
-            _values "LIBS" $deps
-        }
+    }
+    if (( $#deps )) {
+        compadd "$@" -a deps
     } else {
-        _files
-    }       
+        _files "$@"
+    }
 }
 
 local options=(
   '--page-size[Uses the given page size]:SIZE:'
   '--set-interpreter[Change the dynamic loader of executable]:INTERPRETER:_files'
-  '(- : *)--print-interpreter[Prints the ELF interpreter of the executable]'
-  '(- : *)--print-os-abi[Prints the OS ABI of the executable]'
-  '--set-os-abi[Changes the OS ABI of the executable]:ABI:(none sysv hpux netbsd gnu linux solaris aix irix freebsd tru64 modesto openbsd arm_aeabi arm standalone)'
-  '(- : *)--print-soname[Prints DT_SONAME entry of .dynamic section]'
+  '!--interpreter:INTERPRETER:_files'
+  '--print-interpreter[Prints the ELF interpreter of the executable]'
+  '--print-os-abi[Prints the OS ABI of the executable]'
+  '--set-os-abi[Changes the OS ABI of the executable]:ABI:(sysv hp-ux netbsd gnu linux hurd solaris aix irix freebsd tru64 openbsd openvms)'
+  '--print-soname[Prints DT_SONAME entry of .dynamic section]'
   '--set-soname[Sets DT_SONAME entry of a library to SONAME]:SONAME:'
-  '--set-rpath[Change the DT_RUNPATH of the executable or library to RUNPATH]:RUNPATH:_dirs'
-  '--add-rpath[Add RUNPATH to the existing DT_RUNPATH of the executable or library.]:RUNPATH:_dirs'
+  '--set-rpath[Change the DT_RUNPATH of the executable or library to RUNPATH]:RUNPATH:_dir_list'
+  '--add-rpath[Add RUNPATH to the existing DT_RUNPATH of the executable or library.]:RUNPATH:_dir_list'
   '--remove-rpath[Removes the DT_RPATH or DT_RUNPATH entry of the executable or library]'
   '--shrink-rpath[Remove from the DT_RUNPATH or DT_RPATH all directories that do not contain a library referenced by DT_NEEDED fields of the executable or library]'
-  '--allowed-rpath-prefixes[Combined with the "--shrink-rpath" option, this can be used for further rpath tuning]:PREFIXES:'
-  '(- : *)--print-rpath[Prints the DT_RUNPATH or DT_RPATH for an executable or library]'
+  '--allowed-rpath-prefixes[Combined with the "--shrink-rpath" option, this can be used for further rpath tuning]:PREFIXES:_dir_list'
+  '--print-rpath[Prints the DT_RUNPATH or DT_RPATH for an executable or library]'
   '--force-rpath[Forces the use of the obsolete DT_RPATH in the file instead of DT_RUNPATH]'
-  '--add-needed[Adds a declared dependency on a dynamic library]:LIBRARY:_files'
-  '*--replace-needed[Replaces a declared dependency on a dynamic library with another one]:LIB_ORIG:_get_dep:LIB_NEW:_files'
-  '--remove-needed[Removes a declared dependency on LIBRARY]:LIBRARY:_get_dep'
-  '(- : *)--print-needed[Prints all DT_NEEDED entries of the executable]'
+  '*--add-needed[Adds a declared dependency on a dynamic library]:LIBRARY:_files'
+  '*--replace-needed[Replaces a declared dependency on a dynamic library with another one]:LIB_ORIG:_patchelf_needed_libraries:LIB_NEW:_files'
+  '*--remove-needed[Removes a declared dependency on LIBRARY]:LIBRARY:_patchelf_needed_libraries'
+  '--print-needed[Prints all DT_NEEDED entries of the executable]'
   '--no-default-lib[Marks the object so that the search for dependencies of this object will ignore any default library search paths]'
   '--no-sort[Do not sort program headers or section headers]'
+  '*--clear-symbol-version[Clears the version of the dynamic symbol SYMBOL]:SYMBOL:'
   '--add-debug-tag[Adds DT_DEBUG tag to the .dynamic section if not yet present in an ELF object]'
   '--build-resolution-cache[Records resolved DT_NEEDED paths in a .note.nixos.ldcache note so a loader can skip the run-path search]'
-  '(- : *)--print-execstack[Prints the state of the executable flag of the GNU_STACK program header, if present]'
+  '--print-execstack[Prints the state of the executable flag of the GNU_STACK program header, if present]'
   '--clear-execstack[Clears the executable flag of the GNU_STACK program header, or adds a new header]'
   '--set-execstack[Sets the executable flag of the GNU_STACK program header, or adds a new header]'
-  '--rename-dynamic-symbols[Renames dynamic symbols]:NAME_MAP_FILE:_files'
+  '*--rename-dynamic-symbols[Renames dynamic symbols]:NAME_MAP_FILE:_files'
+  '--no-clobber-old-sections[Do not clobber old section values]'
   '--output[Set the output file name]:FILE:_files'
   '--debug[Prints details of the changes made to the input file]'
-  '--version[Shows the version of patchelf]'
+  '(- : *)--version[Shows the version of patchelf]'
   "(- : *)"{-h,--help}'[Show list of command-line options]'
 )
 
-_arguments -s -S $options '*: :_files'
+# patchelf patches any number of files in place, or a single file into --output.
+local files='*: :_files'
+(( $words[(I)--output] )) && files=': :_files'
+
+_arguments -s $options $files

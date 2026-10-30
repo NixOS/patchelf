@@ -3,6 +3,7 @@
   autoreconfHook,
   lld,
   mold,
+  zsh,
   version,
   src,
 }:
@@ -16,6 +17,7 @@ stdenv.mkDerivation {
   nativeCheckInputs = [
     lld
     mold
+    zsh # for tests/zsh-completion.sh
   ];
   doCheck = true;
 }
