@@ -1,5 +1,13 @@
 # Release History
 
+## Unreleased
+
+### Bug fixes
+
+* Keep the program header table covered by a load segment when repeated
+  executable rewrites split note segments and grow the table. This fixes invalid
+  PHDR coverage on x86_64 and an assertion failure on AArch64 (#675).
+
 ## 0.19.2 (October 1, 2026)
 
 A bug fix release for rewriting executables after stripping.

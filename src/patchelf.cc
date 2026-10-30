@@ -1143,11 +1143,10 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
 
     normalizeNoteSegments();
 
-    Elf_Off headerEnd = sizeof(Elf_Ehdr) + phdrs.size() * sizeof(Elf_Phdr);
     bool reuseHeaderLoad = false;
     Elf_Addr originalHeaderBase = firstPage;
     unsigned int originalHeaderFlags = 0;
-    if (auto headerLoad = findLoadSegmentByOffset(headerEnd)) {
+    if (auto headerLoad = findLoadSegmentByOffset(sizeof(Elf_Ehdr))) {
         originalHeaderBase = rdi(headerLoad->p_vaddr) - rdi(headerLoad->p_offset);
         originalHeaderFlags = rdi(headerLoad->p_flags);
         reuseHeaderLoad = rdi(headerLoad->p_offset) + rdi(headerLoad->p_filesz) <= startOffset;
@@ -1216,7 +1215,7 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsExecutable()
     Elf_Addr headerBase = firstPage;
 
     /* Extend the LOAD covering PHDR to include all relocated sections. */
-    if (auto headerLoad = findLoadSegmentByOffset(curOff)) {
+    if (auto headerLoad = findLoadSegmentByOffset(sizeof(Elf_Ehdr))) {
         /* strip can drop file padding between LOADs, so this LOAD's
            address-to-offset mapping may differ from firstPage. */
         headerBase = rdi(headerLoad->p_vaddr) - rdi(headerLoad->p_offset);
