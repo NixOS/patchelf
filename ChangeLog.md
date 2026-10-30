@@ -1,12 +1,28 @@
 # Release History
 
-## Unreleased
+## 0.19.3 (October 30, 2026)
+
+A bug fix release for executable rewrites, symbol version definitions, and zsh
+completion.
 
 ### Bug fixes
 
+* Fix overlapping load segment mappings when growing an executable's interpreter
+  and then rewriting its RPATH. Preserve writable coverage of `.dynamic` so the
+  dynamic loader can update `DT_DEBUG`, fixing crashes in musl bootstrap GCC and
+  GNAT (#672).
+* Reuse the header load segment for further growth and reserve enough file and
+  virtual address space after `strip` removes padding, preventing later rewrites
+  from overlapping mappings or corrupting section contents (#672).
 * Keep the program header table covered by a load segment when repeated
   executable rewrites split note segments and grow the table. This fixes invalid
-  PHDR coverage on x86_64 and an assertion failure on AArch64 (#675).
+  PHDR coverage on x86_64 and an assertion failure on AArch64, including when
+  patching Grpc.Tools binaries (#675, #679).
+* Update `DT_VERDEF` when `.gnu.version_d` is relocated, preventing the dynamic
+  loader from following stale symbol version definitions and crashing before
+  the program starts (#664, #665).
+* Fix zsh completion of options, OS ABI names, input files, library names, and
+  colon-separated directory lists (#677).
 
 ## 0.19.2 (October 1, 2026)
 
