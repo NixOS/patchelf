@@ -33,6 +33,7 @@ src_TESTS = \
   build-id.sh \
   invalid-elf.sh \
   endianness.sh \
+  crel-sh-info.sh \
   contiguous-note-sections.sh \
   no-gnu-hash.sh \
   change-abi.sh \
