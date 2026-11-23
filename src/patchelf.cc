@@ -864,8 +864,6 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
     if (alignStartPage > maxSegmentAlignment)
         error("segment alignment is implausibly large; refusing to grow file");
 
-    startPage = roundUp(startPage, alignStartPage);
-
     debug("last page is 0x%llx\n", (unsigned long long) startPage);
     debug("first page is 0x%llx\n", (unsigned long long) firstPage);
 
@@ -932,7 +930,13 @@ void ElfFile<ElfFileParamNames>::rewriteSectionsLibrary()
 
     debug("needed space is %d\n", neededSpace);
 
-    Elf_Off startOffset = roundUp(fileContents->size(), alignStartPage);
+    /* The new segment only needs its virtual address and file offset to be
+       congruent modulo the segment alignment, so place the data tightly at
+       the end of the file and round the difference between the two up to
+       the alignment instead of both values separately. */
+    Elf_Off startOffset = roundUp(fileContents->size(), getPageSize());
+    auto startPageSlack = startPage > startOffset ? startPage - startOffset : 0;
+    startPage = startOffset + roundUp(startPageSlack, alignStartPage);
 
     // In older version of binutils (2.30), readelf would check if the dynamic
     // section segment is strictly smaller than the file (and not same size).

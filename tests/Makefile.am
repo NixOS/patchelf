@@ -70,6 +70,7 @@ src_TESTS = \
   property-rewrite.sh \
   verdef-relocate.sh \
   large-page-dynamic.sh \
+  library-page-padding.sh \
   zsh-completion.sh
 
 build_TESTS = \
@@ -175,7 +176,7 @@ check_DATA = libbig-dynstr.debug
 # - without libtool, only archives (static libraries) can be built by automake
 # - with libtool, it is difficult to control options
 # - with libtool, it is not possible to compile convenience *dynamic* libraries :-(
-check_PROGRAMS += libfoo.so libfoo-scoped.so libbar.so libbar-scoped.so libsimple.so libsimple-execstack.so libbuildid.so libtoomanystrtab.so many-syms-no-pie notes-after-interp \
+check_PROGRAMS += libfoo.so libfoo-scoped.so libbar.so libbar-scoped.so libsimple.so libsimple-execstack.so libmaxpage.so libbuildid.so libtoomanystrtab.so many-syms-no-pie notes-after-interp \
                   phdr-corruption.so pht-collision.so libcustom-init.so many-syms-main libmany-syms.so liboveralign.so libshared-rpath.so
 
 libbuildid_so_SOURCES = simple.c
@@ -199,6 +200,11 @@ libbar_scoped_so_LDFLAGS = $(LDFLAGS_sharedlib)
 
 libsimple_so_SOURCES = simple.c
 libsimple_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-z,noexecstack
+
+# Shared library with a max-page-size larger than the runtime page size,
+# like RHEL-style distro builds. See library-page-padding.sh.
+libmaxpage_so_SOURCES = simple.c
+libmaxpage_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-z,max-page-size=0x200000
 
 libcustom_init_so_SOURCES = custom-init.c
 libcustom_init_so_LDFLAGS = $(LDFLAGS_sharedlib) -Wl,-init,my_init
